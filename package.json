@@ -1,0 +1,45 @@
+{
+  "name": "rebofiles",
+  "version": "0.1.0",
+  "description": "A file drive for the browser, built into your application, on your own storage: folders, upload, previews, versions, trash and sharing.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @rebofiles/playground",
+    "demo": "npm run dev -w @rebofiles/demo",
+    "build:demo": "npm run build -w @rebofiles/demo",
+    "site": "npm run dev -w @rebofiles/site",
+    "build:site": "npm run build -w @rebofiles/site",
+    "test": "vitest run --project node",
+    "coverage": "vitest run --project node --coverage --coverage.include='packages/*/src/**'",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/playground && tsc --noEmit -p apps/demo",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "sample": "vite-node tools/sample.ts --",
+    "build:packages": "npm run build -w @rebofiles/core -w @rebofiles/server -w @rebofiles/react"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@rebodocs/core": "^0.10.0",
+    "@rebodocs/react": "^0.10.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-node": "^6.0.0",
+    "vitest": "^5.0.5"
+  }
+}

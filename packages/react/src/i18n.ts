@@ -1,0 +1,164 @@
+// Every text a person reads, in English and Spanish. A language of your own
+// goes in as an object with the same keys (`texts` on the provider).
+
+const en = {
+  myFiles: 'My files',
+  recent: 'Recent',
+  trash: 'Trash',
+  search: 'Search in the drive',
+  resultsFor: 'Results for “{q}”',
+  newFolder: 'New folder',
+  upload: 'Upload',
+  uploadFiles: 'Upload files',
+  dropHere: 'Drop files to upload them here',
+  name: 'Name',
+  owner: 'Owner',
+  modified: 'Modified',
+  size: 'Size',
+  type: 'Type',
+  location: 'Location',
+  key: 'Key',
+  list: 'List',
+  grid: 'Grid',
+  emptyFolder: 'This folder is empty. Drop files here, or upload them.',
+  emptyTrash: 'Empty trash',
+  trashIsEmpty: 'The trash is empty.',
+  noResults: 'Nothing is called that.',
+  noRecent: 'Nothing changed yet.',
+  nothingSelected: 'Nothing selected. Pick a file or a folder to see it here.',
+  details: 'Details',
+  versions: 'Versions',
+  current: 'Current',
+  version: 'Version {n}',
+  restoredFrom: 'Restored from version {n}',
+  restore: 'Restore',
+  download: 'Download',
+  open: 'Open',
+  openInRebodocs: 'Open in Rebodocs',
+  rename: 'Rename',
+  move: 'Move',
+  moveHere: 'Move here',
+  moveTo: 'Move “{name}” to',
+  moveToTrash: 'Move to trash',
+  deleteForever: 'Delete forever',
+  confirmEmpty: 'Delete everything in the trash for good? This cannot be undone.',
+  confirmDelete: 'Delete “{name}” for good? This cannot be undone.',
+  cancel: 'Cancel',
+  save: 'Save',
+  create: 'Create',
+  folderName: 'Folder name',
+  newName: 'New name',
+  items: '{n} items',
+  item: '1 item',
+  uploading: 'Uploading {name}… {pct}%',
+  uploaded: 'Uploaded {name}',
+  movedToTrash: '“{name}” moved to the trash',
+  restored: '“{name}” restored',
+  deleted: 'Deleted for good',
+  versionRestored: 'Version {n} restored as the current one',
+  folder: 'Folder',
+  kindDocx: 'Word document',
+  kindPdf: 'PDF',
+  kindSheet: 'Spreadsheet',
+  kindImage: 'Image',
+  kindText: 'Text',
+  top: 'the top of the drive',
+  noPreview: 'No preview for this type of file.',
+  loading: 'Loading…',
+  tryAgain: 'Try again',
+};
+
+export type Texts = typeof en;
+
+const es: Texts = {
+  myFiles: 'Mis archivos',
+  recent: 'Recientes',
+  trash: 'Papelera',
+  search: 'Buscar en el drive',
+  resultsFor: 'Resultados de “{q}”',
+  newFolder: 'Carpeta nueva',
+  upload: 'Subir',
+  uploadFiles: 'Subir archivos',
+  dropHere: 'Suelta los archivos para subirlos aquí',
+  name: 'Nombre',
+  owner: 'Propietario',
+  modified: 'Modificado',
+  size: 'Tamaño',
+  type: 'Tipo',
+  location: 'Ubicación',
+  key: 'Clave',
+  list: 'Lista',
+  grid: 'Cuadrícula',
+  emptyFolder: 'Esta carpeta está vacía. Suelta archivos aquí, o súbelos.',
+  emptyTrash: 'Vaciar papelera',
+  trashIsEmpty: 'La papelera está vacía.',
+  noResults: 'Nada se llama así.',
+  noRecent: 'Nada ha cambiado todavía.',
+  nothingSelected: 'Nada seleccionado. Elige un archivo o una carpeta para verlo aquí.',
+  details: 'Detalles',
+  versions: 'Versiones',
+  current: 'Actual',
+  version: 'Versión {n}',
+  restoredFrom: 'Restaurada de la versión {n}',
+  restore: 'Restaurar',
+  download: 'Descargar',
+  open: 'Abrir',
+  openInRebodocs: 'Abrir en Rebodocs',
+  rename: 'Cambiar nombre',
+  move: 'Mover',
+  moveHere: 'Mover aquí',
+  moveTo: 'Mover “{name}” a',
+  moveToTrash: 'Mover a la papelera',
+  deleteForever: 'Eliminar para siempre',
+  confirmEmpty: '¿Eliminar para siempre todo lo que hay en la papelera? No se puede deshacer.',
+  confirmDelete: '¿Eliminar “{name}” para siempre? No se puede deshacer.',
+  cancel: 'Cancelar',
+  save: 'Guardar',
+  create: 'Crear',
+  folderName: 'Nombre de la carpeta',
+  newName: 'Nombre nuevo',
+  items: '{n} elementos',
+  item: '1 elemento',
+  uploading: 'Subiendo {name}… {pct}%',
+  uploaded: 'Se subió {name}',
+  movedToTrash: '“{name}” se movió a la papelera',
+  restored: '“{name}” se restauró',
+  deleted: 'Eliminado para siempre',
+  versionRestored: 'La versión {n} es ahora la actual',
+  folder: 'Carpeta',
+  kindDocx: 'Documento de Word',
+  kindPdf: 'PDF',
+  kindSheet: 'Hoja de cálculo',
+  kindImage: 'Imagen',
+  kindText: 'Texto',
+  top: 'el inicio del drive',
+  noPreview: 'No hay vista previa para este tipo de archivo.',
+  loading: 'Cargando…',
+  tryAgain: 'Reintentar',
+};
+
+export const TEXTS: Record<'en' | 'es', Texts> = { en, es };
+
+export type Translate = (key: keyof Texts, values?: Record<string, string | number>) => string;
+
+export const translator =
+  (texts: Texts): Translate =>
+  (key, values = {}) =>
+    texts[key].replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ''));
+
+/** Sizes as a person reads them: 48 KB, 1.2 MB. */
+export function formatSize(bytes: number, locale: string): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1000 && unit < units.length - 1) (value /= 1000), unit++;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: value < 10 && unit > 0 ? 1 : 0 }).format(value)} ${units[unit]}`;
+}
+
+/** A date as a person reads it: the hour today, the day this year, the whole date before. */
+export function formatDate(iso: string, locale: string, now = new Date()): string {
+  const date = new Date(iso);
+  if (date.toDateString() === now.toDateString()) return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+  if (date.getFullYear() === now.getFullYear()) return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date);
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+}

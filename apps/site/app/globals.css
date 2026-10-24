@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/* The suite's tokens, as Rebodocs' site has them (apps/site/app/globals.css
+   there), with ReboFiles' emerald as the brand. Rebodocs' blue stays only on
+   what points to Rebodocs. */
+@theme {
+  --color-brand: #0e7c52;
+  --color-brand-hover: #095c3c;
+  --color-brand-light: #e3f4ea;
+  --color-docs: #0b57d0;
+  --color-docs-hover: #08398a;
+
+  --color-ink: #2f2e2b;
+  --color-ink-soft: #4a4843;
+  --color-muted: #6b6964;
+  --color-faint: #9b9890; /* decoration only, never real text */
+  --color-surface: #f7f6f3;
+  --color-hover: #f1f0ec;
+  --color-border: #eae8e3;
+  --color-border-strong: #dddad3;
+  --color-delete: #b13a2a;
+  --color-pastel-blue: #e8f0fd;
+  --color-pastel-blue-fg: #0b57d0;
+  --color-pastel-yellow: #fbf3db;
+  --color-pastel-yellow-fg: #8a5a00;
+  --color-pastel-green: #e7f3ea;
+  --color-pastel-green-fg: #2e6b3c;
+  --color-pastel-pink: #fbe8ef;
+  --color-pastel-pink-fg: #a23a5e;
+  --color-pastel-purple: #f0ebf8;
+  --color-pastel-purple-fg: #6a4a9c;
+  --color-pastel-orange: #fcebdd;
+  --color-pastel-orange-fg: #a4521c;
+
+  --shadow-lift: 0 12px 28px rgba(47, 46, 43, 0.1);
+  --shadow-menu: 0 16px 36px rgba(47, 46, 43, 0.14);
+
+  --animate-draw: draw 1.4s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-slow: float 8s ease-in-out -2s infinite;
+  --animate-pop-in: pop-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  --animate-wiggle: wiggle 0.5s ease;
+  --animate-grow: grow 2.2s cubic-bezier(0.6, 0, 0.2, 1) 0.5s forwards;
+
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-2deg);
+    }
+    50% {
+      transform: translateY(-10px) rotate(2deg);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes wiggle {
+    0%,
+    100% {
+      transform: rotate(0);
+    }
+    30% {
+      transform: rotate(-10deg);
+    }
+    60% {
+      transform: rotate(8deg);
+    }
+  }
+  @keyframes grow {
+    to {
+      width: 100%;
+    }
+  }
+}
+
+/* The fonts, loaded by next/font in `app/layout.tsx`. */
+@theme inline {
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-text: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-code: var(--font-jetbrains), ui-monospace, monospace;
+  --font-hand: var(--font-caveat), cursive;
+}
+
+.home {
+  font-family: var(--font-text);
+}
+/* The green of Rebodocs' blue ring. */
+.home :focus-visible {
+  outline: 3px solid #8fd3ae;
+  outline-offset: 2px;
+}
+/* The drive of the demo takes the fonts of the page. */
+.home .rf-drive {
+  --rf-font: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --rf-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/* A hand-drawn stroke that draws itself in. */
+.draw {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+}
+
+/* Sections rise into view where the browser ties animations to scrolling; elsewhere they are just there. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 25%;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(36px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition: none !important;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+body {
+  color: var(--color-ink);
+  background: #fff;
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@rebofiles/core",
+  "version": "0.1.0",
+  "description": "The model of a drive: folders, names, moving, the trash, versions and search. No DOM, no dependencies.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@rebofiles/server",
+  "version": "0.1.0",
+  "description": "The backend of a drive: its routes, who may do what, the bytes on S3 or the disk, and the metadata in memory or SQLite. No dependencies but core.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rebofiles/core": "0.1.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}
