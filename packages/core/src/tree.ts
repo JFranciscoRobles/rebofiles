@@ -60,10 +60,13 @@ export function isTrashed(drive: Drive, id: EntryId): boolean {
   return false;
 }
 
-/** What was put in the trash, the latest first; what is inside a trashed folder goes with it and is not listed. */
-export function trash(drive: Drive): Entry[] {
+/**
+ * What was put in the trash, the latest first; what is inside a trashed folder goes with it and is not listed.
+ * With `user`, their trash: what they own or put there, not what others threw away where they may look.
+ */
+export function trash(drive: Drive, user?: string): Entry[] {
   const found: Entry[] = [];
-  for (const entry of drive.entries.values()) if (entry.trashed) found.push(entry);
+  for (const entry of drive.entries.values()) if (entry.trashed && (user === undefined || entry.owner === user || entry.trashed.by === user)) found.push(entry);
   return found.sort((a, b) => (a.trashed!.at < b.trashed!.at ? 1 : a.trashed!.at > b.trashed!.at ? -1 : byName(a, b)));
 }
 

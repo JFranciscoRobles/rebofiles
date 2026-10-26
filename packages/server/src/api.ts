@@ -206,8 +206,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
         case 'GET /trash': {
           const drive = await options.metadata.load();
           // One's own trash: what one owns or put there, not what others threw away in a folder shared with them.
-          const mine = core.trash(drive).filter((entry) => entry.owner === user.id || entry.trashed?.by === user.id);
-          return Response.json({ entries: await readable(user, mine, drive) });
+          return Response.json({ entries: await readable(user, core.trash(drive, user.id), drive) });
         }
         case 'GET /shared': {
           const drive = await options.metadata.load();
@@ -343,8 +342,9 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               const removed = core.deleteForever(drive, id);
               return { drive: removed.drive, answer: removed };
             }
-            for (const entry of core.trash(drive)) for (const inside of core.subtree(drive, entry.id)) await allow(user, 'delete', inside, drive);
-            const removed = core.emptyTrash(drive);
+            // One's own trash, as it is listed: others' things in it are theirs to empty.
+            for (const entry of core.trash(drive, user.id)) for (const inside of core.subtree(drive, entry.id)) await allow(user, 'delete', inside, drive);
+            const removed = core.emptyTrash(drive, user.id);
             return { drive: removed.drive, answer: removed };
           });
           // The entries are gone first: bytes left behind by a failure here cost space, not a file that points nowhere.

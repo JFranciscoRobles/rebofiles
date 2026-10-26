@@ -92,7 +92,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       }),
     entry: (entryId) => run(() => ({ entry: core.getEntry(drive, entryId), path: core.ancestors(drive, entryId), trashed: core.isTrashed(drive, entryId) })),
     recent: () => run(() => core.recent(drive)),
-    trash: () => run(() => core.trash(drive).filter((entry) => options.top === 'everyone' || entry.owner === user || entry.trashed?.by === user)),
+    trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
     shared: () => run(() => core.sharedWith(drive, user)),
     search: (query, found = {}) => run(() => core.search(drive, query, { within: found.within, trashed: found.trashed, limit: 200 })),
     info: async () => ({ storage: options.label ?? 'memory', maxSize: Number.MAX_SAFE_INTEGER }),
@@ -117,7 +117,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     },
     emptyTrash: async () => {
       const removed = await change((current) => {
-        const gone = core.emptyTrash(current);
+        const gone = core.emptyTrash(current, options.top === 'everyone' ? undefined : user);
         return { drive: gone.drive, answer: gone };
       });
       forget(removed.keys);

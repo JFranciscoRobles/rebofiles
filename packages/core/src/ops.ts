@@ -138,10 +138,11 @@ export function deleteForever(drive: Drive, id: EntryId): Removed {
   return remove(drive, subtree(drive, id));
 }
 
-export function emptyTrash(drive: Drive): Removed {
+/** Everything in the trash gone for good; with `user`, what is in their trash (see `trash`). */
+export function emptyTrash(drive: Drive, user?: string): Removed {
   return remove(
     drive,
-    trash(drive).flatMap((entry) => subtree(drive, entry.id)),
+    trash(drive, user).flatMap((entry) => subtree(drive, entry.id)),
   );
 }
 

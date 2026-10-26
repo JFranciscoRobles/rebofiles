@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EVERYONE, accessOf, addFile, addLink, allows, createFolder, linked, move, moveToTrash, removeLink, rename, restore, share, sharedWith, unshare } from '../src';
+import { EVERYONE, accessOf, addFile, addLink, allows, createFolder, emptyTrash, linked, move, moveToTrash, removeLink, rename, restore, share, sharedWith, trash, unshare } from '../src';
 import { ana, demoDrive, luis, v } from './drive';
 
 const bea = { by: 'bea', at: '2026-10-03T09:00:00.000Z' };
@@ -82,6 +82,29 @@ describe('who may do what', () => {
     expect(() => share(drive, 'clients', 'ana', 'viewer', ana)).toThrow('ana owns Clients');
     expect(() => share(drive, 'clients', 'luis', 'owner' as never, ana)).toThrow('is not a role');
     expect(() => share(moveToTrash(drive, 'clients', ana), 'northwind', 'luis', 'viewer', ana)).toThrow('in the trash');
+  });
+});
+
+describe('one’s trash', () => {
+  it('is what one owns or put there, and only that is emptied', () => {
+    let drive = share(demoDrive(), 'clients', 'luis', 'editor', ana);
+    drive = moveToTrash(drive, 'contract', luis);
+    drive = moveToTrash(drive, 'photos', ana);
+    drive = addFile(drive, { id: 'mine', name: 'mine.txt', parent: null, type: 'text/plain', version: v() }, luis);
+    drive = moveToTrash(drive, 'mine', luis);
+    expect(
+      trash(drive, 'luis')
+        .map((e) => e.id)
+        .sort(),
+    ).toEqual(['contract', 'mine']);
+    expect(
+      trash(drive, 'ana')
+        .map((e) => e.id)
+        .sort(),
+    ).toEqual(['contract', 'photos']);
+    const emptied = emptyTrash(drive, 'luis');
+    expect(emptied.removed.sort()).toEqual(['contract', 'mine']);
+    expect(trash(emptied.drive).map((e) => e.id)).toEqual(['photos']);
   });
 });
 

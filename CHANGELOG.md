@@ -117,7 +117,9 @@ minor version (0.x.0) may change the API; such changes are listed under
   has there is free, and not told: two people may both have "Contracts".
   `takenBy` and `uniqueName` take the owner as a last argument.
 - **One's trash** lists what one owns or put there, not what others threw
-  away in a folder shared with one.
+  away in a folder shared with one, and emptying it empties that: before,
+  anyone's trash in the drive stopped one from emptying one's own.
+  `trash(drive, user)` and `emptyTrash(drive, user)` in core.
 - **Where an entry is** (`path`) starts from where it was shared with the one
   asking, not from folders they may not read.
 - **`Action`** comes from core and has `comment` and `share`. An `authorize`

@@ -110,6 +110,16 @@ describe('sharing, through the routes', () => {
     expect((await d.bea.ask('GET', '/api/files/trash')).body.entries).toEqual([]);
   });
 
+  it('empties one’s own trash, whatever others have in theirs', async () => {
+    const d = drive();
+    const { contract } = await anasClients(d);
+    const mine = (await d.bea.ask('POST', '/api/files/folders', { name: 'Old', parent: null })).body.entry;
+    await d.ana.ask('POST', `/api/files/entries/${contract.id}/trash`);
+    await d.bea.ask('POST', `/api/files/entries/${mine.id}/trash`);
+    expect((await d.bea.ask('POST', '/api/files/trash/empty')).body.removed).toEqual([mine.id]);
+    expect(names((await d.ana.ask('GET', '/api/files/trash')).body.entries)).toEqual(['contract.txt']);
+  });
+
   it('lets someone leave what was shared with them, and only who may share take it from others', async () => {
     const d = drive();
     const { clients } = await anasClients(d);
