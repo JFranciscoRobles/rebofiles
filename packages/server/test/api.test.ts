@@ -125,7 +125,8 @@ describe('who may do what', () => {
   });
 
   it('lists only what the person may read', async () => {
-    const handle = onDisk({ authorize: (user, action, entry) => action !== 'read' || user.id === 'ana' || entry?.name !== 'Private' });
+    // One drive for the team, so Ana's top is Luis's too, but for what he may not read.
+    const handle = onDisk({ top: 'everyone', authorize: (user, action, entry) => action !== 'read' || user.id === 'ana' || entry?.name !== 'Private' });
     await client(handle).ask('POST', '/api/files/folders', { name: 'Private', parent: null });
     await client(handle).ask('POST', '/api/files/folders', { name: 'Public', parent: null });
     expect(names((await client(handle, 'luis').ask('GET', '/api/files/entries')).body.entries)).toEqual(['Public']);

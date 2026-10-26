@@ -1,7 +1,7 @@
 // What @rebofiles/server promises: the routes, the storages of the bytes, the
 // stores of the metadata, and how to put them on `node:http`.
 
-export { type Action, type User, type DriveServerOptions, createDriveHandler, everyone } from './api';
+export { type Action, type User, type DriveServerOptions, createDriveHandler, everyone, byRoles } from './api';
 export { nodeHandler } from './node';
 export { type Storage, type UploadPart, type UploadPlan, type FinishedPart, PART_SIZE } from './storage';
 export { type S3Options, s3Storage, s3OptionsFrom } from './s3';
