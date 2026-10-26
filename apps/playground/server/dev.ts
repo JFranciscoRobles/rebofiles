@@ -10,7 +10,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createDriveHandler, diskStorage, everyone, sqliteMetadata } from '@rebofiles/server';
 
-const STORAGE = resolve(import.meta.dirname, '../../../storage');
+// `REBOFILES_STORAGE` puts it elsewhere, as the tests in Chrome do, to start from nothing.
+const STORAGE = resolve(process.env.REBOFILES_STORAGE || resolve(import.meta.dirname, '../../../storage'));
 mkdirSync(STORAGE, { recursive: true });
 
 // A secret made once and kept beside the files, so addresses signed before a restart still work after it.

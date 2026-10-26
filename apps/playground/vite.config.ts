@@ -5,7 +5,8 @@
 import react from '@vitejs/plugin-react';
 import { type Plugin, defineConfig } from 'vite';
 
-const PORT = 5180;
+// Another with `PORT`, as the tests in Chrome do, beside a playground already running.
+const PORT = Number(process.env.PORT) || 5180;
 
 function backend(): Plugin {
   return {

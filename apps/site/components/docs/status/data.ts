@@ -17,6 +17,11 @@ export const TESTS: { where: string; count: number; what: string }[] = [
     count: 16,
     what: 'The client against the routes and against a bucket: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
+  {
+    where: 'npm run test:browser',
+    count: 7,
+    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone.',
+  },
 ];
 
 /** Checked by hand, each with what was done. */
@@ -40,7 +45,6 @@ export const CHECKED: [string, string][] = [
 export const NOT_CHECKED: [string, string][] = [
   ['Other buckets', 'Cloudflare R2 only. Not AWS, MinIO or Backblaze yet.'],
   ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone.'],
-  ['Tests in a browser', 'The walk through the interface was a script run by hand, not a test the repository keeps. Playwright comes in 0.3.'],
   ['Two processes on one database', 'SQLite was opened by two handlers one after the other, not at once.'],
 ];
 

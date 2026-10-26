@@ -72,13 +72,16 @@ Taken on October 25, 2026, by running `npm test`, every one passing:
 
 ### The interface
 
+`npm run test:browser` · 7 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll.
+
+By hand:
+
 Driven in Chrome without a window, with real clicks and keys, on the playground: a folder made, two files uploaded into it, a text previewed, a second upload with the same name as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, the grid with a picture, and the drive in Spanish at the width of a phone. A Word document uploaded, previewed as a page, opened in Rebodocs, changed, saved with ⌘S, and back in the drive as its second version. The demo: Acme's files made in the page, a Word document and a PDF previewed, Claude's rename and its card, the grid with pictures, an upload in steps, the trash emptied. The landing built as plain files and seen at the width of a desktop and of a phone, the demo working in its frame, with no errors in the page and no sideways scroll.
 
 ## What is not
 
 - `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
 - `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone.
-- `Tests in a browser.` The walk through the interface was a script run by hand, not a test the repository keeps.
 - `Two processes on one database.` SQLite was opened by two handlers one after the other, not at once.
 
 ## Known limits

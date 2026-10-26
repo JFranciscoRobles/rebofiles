@@ -15,5 +15,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "tools/*.ts"]
+  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "tools/*.ts", "playwright.config.ts"]
 }

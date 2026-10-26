@@ -61,7 +61,7 @@ export function StatusPage() {
     >
       <Section id="tests" title="The tests">
         <p>
-          {total} tests, every one passing, by <code className="font-code text-[0.9em]">npm test</code>.
+          {total} tests, every one passing, by <code className="font-code text-[0.9em]">npm test</code> and, in Chrome, <code className="font-code text-[0.9em]">npm run test:browser</code>.
         </p>
         <div className="overflow-hidden rounded-[14px] border border-border">
           {TESTS.map((row) => (

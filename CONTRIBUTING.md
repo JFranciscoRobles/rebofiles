@@ -5,6 +5,7 @@
 ```bash
 npm install
 npm test            # Vitest
+npm run test:browser  # the playground in Chrome, with Playwright: the Chrome installed, nothing downloaded
 npm run typecheck   # tsc, over every package
 npm run lint        # Biome: the format and the lint rules, as biome.json says
 npm run format      # Biome, writing: the format and the fixes that are safe
@@ -47,6 +48,8 @@ good places to start.
 - Changes to the server are tested through its routes, as a browser would ask
   them, on the disk and on an S3 kept in memory (`packages/server/test/helpers.ts`).
 - A signature is tested against AWS's own examples.
+- What a person does in the drive is tested in Chrome, in
+  `apps/playground/test`, by the roles and names a screen reader is told.
 
 ## Publishing
 

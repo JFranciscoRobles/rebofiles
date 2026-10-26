@@ -87,6 +87,9 @@ minor version (0.x.0) may change the API; such changes are listed under
   needs `abortUpload(key, state, size)`.
 - **Deleting in one request.** `s3Storage` deletes up to a thousand keys at
   once, with DeleteObjects, instead of one request for each.
+- **Tests in Chrome** (`npm run test:browser`): the playground driven by
+  Playwright, in the Chrome of the machine, on a port and a folder of its own.
+  The playground takes `PORT` and `REBOFILES_STORAGE`.
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes
