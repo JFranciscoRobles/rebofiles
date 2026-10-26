@@ -152,8 +152,10 @@ minor version (0.x.0) may change the API; such changes are listed under
   side margins left out. It is a picture made when the document is uploaded
   (`pictureDocument: pictureOfDocx`): its first page drawn by Rebodocs'
   editor, in an SVG with the editor's stylesheet, onto a canvas, in the two
-  sizes the grid and the details show, as JPEG (PNG when the settings keep
-  the original's type), and kept with its version as images' copies are. A
+  sizes the grid and the details show, as WebP where the browser writes it
+  (a third lighter than JPEG for a page of text: 184 KB to 120 KB for a
+  contract), JPEG where it does not, PNG when the settings keep the
+  original's type, and kept with its version as images' copies are. A
   document uploaded before gets them the first time it is shown, drawn live
   meanwhile (`thumbDocument: thumbDocx`), when the one looking may upload. A picture is always whole on the
   screen, with nothing to scroll; a click shows its real size. The arrows go to the files before and after;

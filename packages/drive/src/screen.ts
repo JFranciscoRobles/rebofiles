@@ -279,6 +279,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const pages = new Map<string, DocumentPreview | null>();
   /** The first page of each Word document as its engine draws it, for thumbnails: null while it is made, an Error when it could not be. */
   const thumbs = new Map<string, HTMLElement | null | Error>();
+  /** Whether this browser writes WebP from a canvas: some write PNG when asked for it. */
+  let webp: boolean | undefined;
+  const makesWebp = () => (webp ??= typeof document !== 'undefined' && document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'));
   /** The sizes a thumbnail is shown at, in the grid and in the details, in pixels: twice as many as it covers. */
   const THUMB_SIZES = [320, 640];
   /** The pictures made of a file when it goes up: of an image, in the drive's sizes; of a Word document, its first page in those the drive shows. */
@@ -288,7 +291,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     if (!isDocx) return renditionsOf(file, images);
     if (!document || !images.enabled || file.size > PREVIEW_LIMIT) return [];
     const sizes = [...new Set(THUMB_SIZES.map((wanted) => images.sizes.find((size) => size >= wanted) ?? images.sizes[images.sizes.length - 1]))];
-    const type = images.format === 'original' ? 'image/png' : 'image/jpeg';
+    // A page is mostly text, which WebP keeps sharper and lighter than JPEG, by a third; JPEG where the browser makes no WebP.
+    const type = images.format === 'original' ? 'image/png' : makesWebp() ? 'image/webp' : 'image/jpeg';
     const bytes = new Uint8Array(await file.arrayBuffer());
     const made: MadeRendition[] = [];
     for (const size of sizes) {

@@ -45,7 +45,8 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
       const found = (await (await page.request.get('/api/files/search?q=agreement', { headers: { 'x-user': 'viewer' } })).json()).entries[0];
       return found.versions[0].renditions?.map((r: { type: string }) => r.type);
     })
-    .toEqual(['image/jpeg', 'image/jpeg']);
+    // WebP, which keeps the text of a page sharper and lighter than JPEG.
+    .toEqual(['image/webp', 'image/webp']);
   await item(page, 'a-agreement.docx').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).locator('img.rf-doc-pic')).toBeVisible();
   await page.getByRole('button', { name: 'Grid' }).click();
