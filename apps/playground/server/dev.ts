@@ -10,6 +10,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createMcpHandler } from '@rebofiles/mcp';
 import { byRoles, createDriveHandler, diskStorage, sqliteMetadata } from '@rebofiles/server';
 
 // `REBOFILES_STORAGE` puts it elsewhere, as the tests in Chrome do, to start from nothing.
@@ -28,4 +29,12 @@ export const handle = createDriveHandler({
   authorize: byRoles,
   secret,
   base: '/api/files',
+});
+
+// The tools for an assistant, at /api/mcp, asking the routes above in this process as the person `x-user`
+// says, as the page does: `claude mcp add --transport http rebofiles http://localhost:5180/api/mcp`.
+export const mcp = createMcpHandler({
+  base: 'http://playground.local/api/files',
+  fetch: (input, init) => handle(new Request(String(input), init)),
+  headers: (request): Record<string, string> => (request.headers.get('x-user') ? { 'x-user': request.headers.get('x-user')! } : {}),
 });

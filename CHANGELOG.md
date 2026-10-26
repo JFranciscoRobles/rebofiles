@@ -112,6 +112,14 @@ minor version (0.x.0) may change the API; such changes are listed under
   its button. Inside the move dialog, going into a folder puts the focus on
   its first folder, or on "Move here", rather than nowhere. Kept by a test in
   Chrome that makes, opens, uploads, renames, moves and trashes without a click.
+- **`@rebofiles/mcp`, the drive for an assistant.** Tools to list, search,
+  read (text, and Word documents with Rebodocs), see Recent and Shared with
+  me, make folders, write text files and new versions of them, rename, move,
+  and put in the trash and take out; not to delete for good nor to share.
+  They ask the drive's routes as the person the assistant works for, so
+  `authorize` decides for it as for them. `createMcpHandler` serves them over
+  HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
+  The playground serves them at `/api/mcp`.
 - **A dark theme.** `theme="dark"`, or `"auto"` as the system is, on
   `<FileDrive>` and `<SharedLink>`; light unless said. Every colour of the
   drive is a custom property now, the kinds of file, shadows and the toast

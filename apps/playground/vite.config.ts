@@ -15,11 +15,12 @@ function backend(): Plugin {
       // Loaded through Vite, which reads TypeScript and takes the packages from their source; a change in it shows without starting again.
       const load = async () => (await server.ssrLoadModule('/server/dev.ts')) as typeof import('./server/dev');
       server.middlewares.use((request, response, next) => {
-        if (!request.url?.startsWith('/api/files')) return next();
+        const mcp = request.url?.startsWith('/api/mcp');
+        if (!request.url?.startsWith('/api/files') && !mcp) return next();
         load()
-          .then(async ({ handle }) => {
+          .then(async (backend) => {
             const { nodeHandler } = (await server.ssrLoadModule('@rebofiles/server')) as typeof import('@rebofiles/server');
-            await nodeHandler(handle)(request, response);
+            await nodeHandler(mcp ? backend.mcp : backend.handle)(request, response);
           })
           .catch(next);
       });

@@ -60,7 +60,7 @@ sources stays the one the repository uses.
 
 ```bash
 npm run build:packages                          # dist/ of every package
-npm publish ./packages/core/dist                # then server, react, in that order
+npm publish ./packages/core/dist                # then server, react, mcp, in that order
 ```
 
 Before a release: `npm test`, `npm run typecheck`, `npm run lint`; the

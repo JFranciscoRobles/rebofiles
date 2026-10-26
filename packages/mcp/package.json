@@ -1,0 +1,28 @@
+{
+  "name": "@rebofiles/mcp",
+  "version": "0.1.0",
+  "description": "The drive for an AI assistant: tools to list, search, read, write, rename, move and trash files, through the routes of @rebofiles/server, with the rights of the one using it. No dependencies but core.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "rebofiles-mcp": "./src/bin.ts"
+  },
+  "dependencies": {
+    "@rebofiles/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "@rebodocs/core": ">=0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@rebodocs/core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

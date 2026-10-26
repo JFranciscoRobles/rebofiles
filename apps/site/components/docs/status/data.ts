@@ -22,6 +22,11 @@ export const TESTS: { where: string; count: number; what: string }[] = [
     what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
   {
+    where: 'packages/mcp',
+    count: 10,
+    what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may, Word documents read; and driven by the official SDK as a client.',
+  },
+  {
     where: 'npm run test:browser',
     count: 17,
     what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark.',
@@ -121,7 +126,7 @@ export const ROADMAP: Milestone[] = [
   {
     version: '0.4.0',
     name: 'Assistants',
-    items: [{ what: '@rebofiles/mcp, with authorize() asked for the assistant too' }, { what: 'Claude in the demo' }, { what: 'Rebodocs’ MCP and ReboFiles’ together' }],
+    items: [{ what: '@rebofiles/mcp, with authorize() asked for the assistant too', done: true }, { what: 'Claude in the demo' }, { what: 'Rebodocs’ MCP and ReboFiles’ together' }],
   },
   { version: '0.5.0', name: 'Big files and other storage', items: [{ what: 'Uploads that resume after a cut, files of several gigabytes' }, { what: 'Google Cloud Storage and Azure Blob' }] },
   { version: '0.6.0', name: 'The desktop', items: [{ what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' }, { what: 'The Tauri application, on a Mac first' }] },

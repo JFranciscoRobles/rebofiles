@@ -41,8 +41,9 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 | [`@rebofiles/core`](packages/core) | The model of a drive: folders, names, moving, the trash, versions, search. | Anywhere, no DOM |
 | [`@rebofiles/server`](packages/server) | The routes, `authorize()`, the bytes on S3 or the disk, the metadata in memory or SQLite. | Node 22.12+ |
 | [`@rebofiles/react`](packages/react) | `<FileDrive>`, and the hooks it is built from. | React 18+ |
+| [`@rebofiles/mcp`](packages/mcp) | Tools for an AI assistant, over HTTP or stdio, with the user's own rights. | Node 22.12+ |
 
-`drive`, `desktop` and `mcp` follow; see the roadmap.
+`drive` and `desktop` follow; see the roadmap.
 
 ## Development
 

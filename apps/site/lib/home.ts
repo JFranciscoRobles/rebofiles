@@ -35,7 +35,10 @@ export const TAGS = [
   'Trash',
   'S3 · R2 · MinIO · disk',
   'Your own authorize()',
-  'Keyboard',
+  'Sharing & links',
+  'MCP for assistants',
+  'Keyboard & screen readers',
+  'Dark theme',
   'English & Spanish',
 ];
 
@@ -55,7 +58,7 @@ export const PACKAGES: Package[] = [
   { name: '@rebofiles/react', what: 'The drive as a React component, or as headless hooks, with uploads and previews inside.', tag: 'React', color: 'green' },
   { name: '@rebofiles/server', what: 'The routes, authorize(), signed addresses, the bytes on S3 or a disk and the metadata in SQLite.', tag: 'Node', color: 'pink' },
   { name: '@rebofiles/desktop', what: 'A folder on disk kept like a folder of the drive, in a Tauri app.', tag: 'Desktop', color: 'purple', comes: '0.6' },
-  { name: '@rebofiles/mcp', what: 'Tools for an AI assistant to list, read, rename and file documents, with the user’s own rights.', tag: 'MCP', color: 'orange', comes: '0.4' },
+  { name: '@rebofiles/mcp', what: 'Tools for an AI assistant to list, search, read, write, rename, move and trash files, with the user’s own rights.', tag: 'MCP', color: 'orange' },
 ];
 /** In the order of the install picker: the one an application installs first. */
 export const INSTALL_ORDER = ['@rebofiles/react', '@rebofiles/server', '@rebofiles/core'];
@@ -74,9 +77,8 @@ export const FEATURES: [string, string, string, string?][] = [
   ['Open in Rebodocs', 'A .docx opens in the Rebodocs editor, and every save becomes a new version of the file.', 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5'],
   [
     'Sharing and permissions',
-    'Your backend answers every “may this person…?” today; viewer, commenter and editor roles come next.',
+    'Viewer, commenter and editor, on a folder and all that is in it, Shared with me, and links that expire. Your backend can still say no.',
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
-    '0.2',
   ],
   ['Versions', 'Every save keeps the file before it. Restore an old one in one click, without sending its bytes again.', 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2'],
   ['Trash', 'Deleted files wait in the trash, folders with what is in them, until someone empties it.', 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'],
@@ -93,13 +95,17 @@ export const FEATURES: [string, string, string, string?][] = [
   ],
   [
     'Keyboard',
-    'The arrows, Enter, Delete and F2 in the list; dialogs that keep the focus. Screen readers are next.',
+    'The arrows, Enter, Delete and F2 in the list, menus and dialogs that keep the focus, and a screen reader told where it is. Checked with axe.',
     'M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
   ],
   [
     'Your style',
-    'Use the built-in UI and change its colours, or build your own with the headless hooks.',
+    'Use the built-in UI, light or dark, and change its colours, or build your own with the headless hooks.',
     'M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1 3.7A1.5 1.5 0 0 1 14 22zM7.5 10.5h.01M12 7.5h.01M16.5 10.5h.01',
   ],
-  ['AI assistants', 'Claude lists, reads, renames and files documents through an MCP server, with the user’s own rights.', 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z', '0.4'],
+  [
+    'AI assistants',
+    'Claude finds, reads, writes, renames and files documents through an MCP server, with the user’s own rights, and nothing it does is for good.',
+    'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z',
+  ],
 ];

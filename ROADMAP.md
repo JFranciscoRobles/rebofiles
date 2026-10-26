@@ -69,6 +69,7 @@ Taken on October 25, 2026, by running `npm test`, every one passing:
 - `packages/core` · 43 · Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles inherited down the tree, Shared with me, links.
 - `packages/server` · 38 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people through the routes and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
 - `packages/react` · 19 · The client against the routes: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
+- `packages/mcp` · 10 · The protocol and every tool over HTTP and stdio against a drive in the same process: two people's assistants, each seeing and doing only what its person may; Word documents read with Rebodocs. Driven also by the protocol's official SDK as a client, over stdio from the command installed from its tarball and over HTTP from the playground, on October 25, 2026.
 
 ### The interface
 
@@ -155,7 +156,8 @@ server, the preview of a Word document, a strict typecheck.
 
 ### 0.4.0 · Assistants
 
-13. **`mcp`:** the tools, with `authorize()` asked for the assistant too.
+13. ✅ **`mcp`:** the tools, with `authorize()` asked for the assistant too,
+    over HTTP and stdio.
 14. Claude in the demo, as on the landing: a rename it makes, and seen.
 15. Rebodocs' MCP and ReboFiles' together: find a contract, open it, change
     it, save it as a new version.
