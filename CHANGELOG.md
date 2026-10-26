@@ -129,6 +129,20 @@ minor version (0.x.0) may change the API; such changes are listed under
   `authorize` decides for it as for them. `createMcpHandler` serves them over
   HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
   The playground serves them at `/api/mcp`.
+- **Settings, on a screen of their own.** A button at the top of the drive
+  opens them over it, as Rebodocs' menu is over a document, the parts down
+  one side: Language, Appearance and Pictures. Each person chooses their own
+  language and theme; whoever may `configure` the drive (`admin` with
+  `byRoles`) its language, theme, the colour of its brand, from swatches or
+  any other, and its pictures. Saved as they are chosen, by the metadata
+  store (`getSetting`, `setSetting`; a table in SQLite and Postgres), through
+  `GET` and `PUT /settings` and `PUT /settings/mine`. `useSettings` in React.
+- **Pictures in four sizes.** An image uploaded is made smaller in the page
+  in the drive's four sizes, 160, 480, 1024 and 2048 pixels unless changed,
+  as JPEG by default or as the type of the original, and the copies are sent
+  after it and kept with its version (`renditions`); the original stays as it
+  came. The grid and the preview show them; `url(id, { size })` and
+  `download?size=` give the smallest that shows a picture at a size.
 - **Uploads that go on after a cut.** A part that fails is tried again by
   itself, up to five times, waiting longer each time, after asking the
   server what arrived (`POST /uploads/resume`) and taking new addresses for
@@ -168,6 +182,10 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Changed
 
+- **The language and theme of `<FileDrive>`** are over the drive's settings
+  and under each person's own: the provider's `language` no longer defaults
+  to English, and `theme` no longer to light, so the drive's settings say
+  them when the application does not.
 - **A failed upload is not given up.** What arrived stays, to be gone on
   with; only one stopped by the person is given up. Set a lifecycle rule on
   the bucket for those never gone on with.

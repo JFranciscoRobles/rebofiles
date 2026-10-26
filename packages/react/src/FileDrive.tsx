@@ -25,7 +25,8 @@ export function FileDrive({ base, client, headers, language, texts, ...props }: 
 }
 
 function Mounted({ logo, ...options }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
-  const { client, revision, changed, texts, language } = useDrive();
+  // The application's own texts, if any, and its language under the settings, which the drive reads itself.
+  const { client, revision, changed, ownTexts: texts, givenLanguage: language } = useDrive();
   const box = useRef<HTMLDivElement>(null);
   const drive = useRef<MountedDrive | null>(null);
   // Where a logo of React's goes inside the drive, which has no React of its own.

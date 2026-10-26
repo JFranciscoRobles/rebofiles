@@ -9,6 +9,8 @@ export {
   type Listing,
   type UploadOptions,
   type UploadProgress,
+  type UploadMemory,
+  type SettingsAnswer,
   type LinkClient,
   type LinkListing,
   RequestError,
@@ -19,5 +21,6 @@ export { type MemoryOptions, type MemoryClient, createMemoryClient } from './mem
 export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate } from './i18n';
 export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
+export { type MadeRendition, renditionsOf, makesRenditions } from './images';
 export { type DriveOptions, type MountedDrive, mountDrive } from './screen';
 export { type SharedLinkOptions, mountSharedLink } from './link';

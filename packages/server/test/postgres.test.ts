@@ -32,6 +32,16 @@ describe('metadata on Postgres', () => {
     expect((await db.query('SELECT id FROM rebofiles_entries')).rows).toEqual([]);
   });
 
+  it('keeps the settings beside the entries', async () => {
+    const db = new PGlite();
+    const first = await postgresMetadata(db);
+    await first.setSetting!('drive', { brand: '#123456' });
+    await first.setSetting!('drive', { brand: '#654321' });
+    const again = await postgresMetadata(db);
+    expect(await again.getSetting!('drive')).toEqual({ brand: '#654321' });
+    expect(await again.getSetting!('person:bea')).toBeUndefined();
+  });
+
   it('takes a table of its own, and refuses a name that is not one', async () => {
     const db = new PGlite();
     const drive = client(createDriveHandler({ ...options, metadata: await postgresMetadata(db, { table: 'acme_files' }) }));

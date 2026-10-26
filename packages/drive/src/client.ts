@@ -5,7 +5,8 @@
 // server what arrived; and an upload left halfway is remembered, so the same
 // file uploaded again goes on from where it was.
 
-import type { Entry, EntryId, FileEntry, FolderEntry, Role } from '@rebofiles/core';
+import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings, Role } from '@rebofiles/core';
+import { renditionsOf } from './images';
 
 export interface ClientOptions {
   /** Where the routes are: `/api/files`. */
@@ -84,6 +85,24 @@ export interface UploadOptions {
   file?: EntryId;
   onProgress?: (progress: UploadProgress) => void;
   signal?: AbortSignal;
+  /** Of a picture, the smaller ones to make of it in the page and send after it, as the drive's settings say. */
+  images?: ImageSettings;
+  /** Not a file: a smaller picture of a version of one. */
+  rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
+}
+
+/** The settings as the server says them for the one asking. */
+export interface SettingsAnswer {
+  /** The drive's. */
+  drive: DriveSettings;
+  /** Their own, over the drive's. */
+  mine: PersonalSettings;
+  /** The two together: what their drive is. */
+  settings: DriveSettings;
+  /** Whether they may change the drive's. */
+  canConfigure: boolean;
+  /** Whether the drive's were ever saved: until they are, they are the defaults, and an application's options come before them. */
+  saved: boolean;
 }
 
 interface Part {
@@ -163,7 +182,7 @@ export function createDriveClient(options: ClientOptions) {
     });
   }
 
-  return {
+  const api = {
     list: (folder: EntryId | null) => ask<Listing>('GET', `/entries${q({ folder: folder ?? undefined })}`),
     entry: (id: EntryId) => ask<{ entry: Entry; path: FolderEntry[]; trashed: boolean }>('GET', `/entries/${encodeURIComponent(id)}`),
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
@@ -191,16 +210,33 @@ export function createDriveClient(options: ClientOptions) {
     linkToken: async (id: EntryId, link: string) => (await ask<{ token: string }>('GET', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`)).token,
     removeLink: (id: EntryId, link: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`),
     restoreVersion: (id: EntryId, version: string) => one('POST', `/entries/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}/restore`) as Promise<FileEntry>,
-    /** An address to read the file from, for a few minutes; `inline` to show it in the page rather than save it. */
-    url: async (id: EntryId, options: { version?: string; inline?: boolean } = {}) =>
-      absolute((await ask<{ url: string }>('GET', `/entries/${encodeURIComponent(id)}/download${q({ version: options.version, inline: options.inline ? '1' : undefined })}`)).url),
+    /**
+     * An address to read the file from, for a few minutes; `inline` to show it in the page rather than save it.
+     * With `size`, of a picture: the smallest one made of it that shows it at that many pixels, or the original.
+     */
+    url: async (id: EntryId, options: { version?: string; inline?: boolean; size?: number } = {}) =>
+      absolute(
+        (
+          await ask<{ url: string }>(
+            'GET',
+            `/entries/${encodeURIComponent(id)}/download${q({ version: options.version, inline: options.inline ? '1' : undefined, size: options.size ? String(options.size) : undefined })}`,
+          )
+        ).url,
+      ),
+
+    /** The drive's settings, the one asking's own, and whether they may change the drive's. */
+    settings: () => ask<SettingsAnswer>('GET', '/settings'),
+    /** The drive's settings changed, over what they were: for whoever may configure the drive. */
+    saveSettings: async (settings: Partial<Omit<DriveSettings, 'images'>> & { images?: Partial<ImageSettings> }) => (await ask<{ drive: DriveSettings }>('PUT', '/settings', settings)).drive,
+    /** One's own: the language and the theme; what is left out is the drive's. */
+    saveMySettings: (mine: PersonalSettings) => ask<{ mine: PersonalSettings; settings: DriveSettings }>('PUT', '/settings/mine', mine),
 
     async upload(file: Blob & { name?: string; lastModified?: number }, options: UploadOptions = {}): Promise<FileEntry> {
       // A bucket signs the type of a file of one part, so each part goes with the type the server was told.
       const type = file.type || 'application/octet-stream';
       const name = file.name ?? 'file';
       const signal = options.signal;
-      const key = JSON.stringify([base, options.file ?? options.parent ?? null, name, file.size, file.lastModified ?? null, type]);
+      const key = JSON.stringify([base, options.rendition ?? options.file ?? options.parent ?? null, name, file.size, file.lastModified ?? null, type]);
 
       type Plan = { token: string; parts: Part[]; done: { number: number; etag: string }[] };
       const resume = (token: string) => ask<Plan>('POST', '/uploads/resume', { token }, signal);
@@ -209,7 +245,8 @@ export function createDriveClient(options: ClientOptions) {
       const remembered = memory.get(key);
       if (remembered) plan = await resume(remembered).catch(() => (memory.delete(key), null));
       if (!plan) {
-        const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', { name, parent: options.parent ?? null, file: options.file, type, size: file.size }, signal);
+        const asked = options.rendition ? { rendition: options.rendition, type, size: file.size } : { name, parent: options.parent ?? null, file: options.file, type, size: file.size };
+        const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', asked, signal);
         plan = { ...start, done: [] };
         memory.set(key, plan.token);
       }
@@ -266,11 +303,23 @@ export function createDriveClient(options: ClientOptions) {
         report();
         waiting = again.parts;
       }
-      const entry = (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token, parts: [...finished].map(([number, etag]) => ({ number, etag })) }, signal)).entry;
+      let entry = (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token, parts: [...finished].map(([number, etag]) => ({ number, etag })) }, signal)).entry;
       memory.delete(key);
+      // The smaller pictures after: the file is up whether or not they are, and is shown by the original until they are.
+      if (options.images && !options.rendition) {
+        const version = entry.versions[0].id;
+        try {
+          for (const made of await renditionsOf(file, options.images)) {
+            entry = await api.upload(made.blob, { rendition: { file: entry.id, version, size: made.size, width: made.width, height: made.height }, signal });
+          }
+        } catch (error) {
+          if (signal?.aborted) throw error;
+        }
+      }
       return entry;
     },
   };
+  return api;
 }
 
 export interface LinkListing {

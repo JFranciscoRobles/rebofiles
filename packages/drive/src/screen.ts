@@ -7,8 +7,9 @@
 //   const drive = mountDrive(document.getElementById('files')!, { base: '/api/files' });
 //   drive.destroy();
 
-import { EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type Role, versionNumber } from '@rebofiles/core';
-import { type DriveClient, RequestError, createDriveClient } from './client';
+import { type DriveSettings, EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type PersonalSettings, type Role, versionNumber } from '@rebofiles/core';
+import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
+import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
 import { type IconName, icon, logo as mark } from './icons';
@@ -22,6 +23,7 @@ export interface DriveOptions {
   client?: DriveClient;
   /** Headers for every request to the server, such as a token of the session. */
   headers?: () => Record<string, string> | Promise<Record<string, string>>;
+  /** Over the drive's settings, under each person's own; the drive's (English) unless given. */
   language?: 'en' | 'es';
   /** Texts of another language, with the keys of the English ones. */
   texts?: Texts;
@@ -38,8 +40,10 @@ export interface DriveOptions {
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
   linkAddress?: (token: string) => string;
-  /** Light (the default), dark, or as the system is (`'auto'`). */
+  /** Light, dark, or as the system is (`'auto'`): over the drive's settings, under each person's own. The drive's (light) unless given. */
   theme?: 'light' | 'dark' | 'auto';
+  /** False to leave out the settings of the server, and the button that changes them. */
+  settings?: boolean;
   className?: string;
   /** Called after every change made from the drive, for what else in the page shows it to ask again. */
   onChange?: () => void;
@@ -90,8 +94,28 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let options = given;
   const client = options.client ?? createDriveClient({ base: options.base ?? '/api/files', headers: () => options.headers?.() ?? {} });
   const prefix = `rf${++mounts}`;
-  let t: Translate = translator(options.texts ?? TEXTS[options.language ?? 'en']);
-  let locale = options.language ?? 'en';
+  // The settings of the server, once they come: a person's own first, then what the application said, then the drive's.
+  let settings: SettingsAnswer | null = null;
+  const languageNow = (): 'en' | 'es' => settings?.mine.language ?? options.language ?? settings?.drive.language ?? 'en';
+  const themeNow = () => settings?.mine.theme ?? options.theme ?? settings?.drive.theme ?? 'light';
+  let t: Translate = translator(options.texts ?? TEXTS[languageNow()]);
+  let locale = languageNow();
+  const retranslate = () => {
+    t = translator(options.texts ?? TEXTS[languageNow()]);
+    locale = languageNow();
+  };
+  const loadSettings = () =>
+    options.settings === false
+      ? Promise.resolve()
+      : client.settings().then(
+          (answer) => {
+            settings = answer;
+            retranslate();
+            render();
+          },
+          // A server without them: the drive as the options say.
+          () => undefined,
+        );
 
   // What is shown, as the hooks of @rebofiles/react keep it.
   let section: Section = 'files';
@@ -156,11 +180,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
   // Addresses to show a file in the page, one for each version, kept while the drive is mounted.
   const inline = new Map<string, string | null>();
-  const urlOf = (file: FileEntry): string | null => {
-    const key = `${file.id}:${file.versions[0].id}`;
+  /** With `size`, of a picture: the smaller one made of it that shows it at that size, once there is one. */
+  const urlOf = (file: FileEntry, size?: number): string | null => {
+    const key = `${file.id}:${file.versions[0].id}:${size ?? ''}:${file.versions[0].renditions?.length ?? 0}`;
     if (!inline.has(key)) {
       inline.set(key, null);
-      client.url(file.id, { inline: true }).then(
+      client.url(file.id, { inline: true, size }).then(
         (url) => (inline.set(key, url), render()),
         () => undefined,
       );
@@ -256,7 +281,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         queue = queue.then(async () => {
           set(id, { state: 'sending', error: undefined, retry: undefined });
           try {
-            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
+            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: settings?.settings.images });
             set(id, { state: 'done', sent: file.size });
             selected = entry.id;
             say(t('uploaded', { name: entry.name }));
@@ -450,7 +475,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             { class: 'rf-grid' },
             entries.map((entry) => {
               const kind = kindOf(entry);
-              const url = kind === 'image' ? urlOf(entry as FileEntry) : null;
+              const url = kind === 'image' ? urlOf(entry as FileEntry, 320) : null;
               return item(
                 entry,
                 'rf-card',
@@ -465,7 +490,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   function preview(file: FileEntry) {
     const kind = kindOf(file);
     const reads = kind === 'text' || (kind === 'docx' && options.previewDocument && file.versions[0].size <= PREVIEW_LIMIT);
-    const url = kind === 'image' || kind === 'pdf' || reads ? urlOf(file) : null;
+    const url = kind === 'image' ? urlOf(file, 640) : kind === 'pdf' || reads ? urlOf(file) : null;
     const key = `${file.id}:${file.versions[0].id}`;
     if (url && kind === 'text' && !texts.has(key)) {
       texts.set(key, null);
@@ -837,6 +862,292 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
 
+  // ---- The settings: a screen of their own over the drive, as Rebodocs' menu is over a document ----
+
+  type SettingsPart = 'language' | 'appearance' | 'pictures';
+  let settingsPart: SettingsPart | null = null;
+  let settingsNote: { text: string; error: boolean } | null = null;
+  /** What is typed in the sizes, before it is saved. */
+  let typedSizes: string[] = [];
+  let gear: HTMLElement | null = null;
+
+  const openSettings = () => {
+    if (!settings) return;
+    settingsPart = 'language';
+    settingsNote = null;
+    typedSizes = settings.drive.images.sizes.map(String);
+    afterRender.push(() => element.querySelector<HTMLElement>('.rf-set-tab[aria-selected="true"]')?.focus());
+    render();
+  };
+  const closeSettings = () => {
+    settingsPart = null;
+    afterRender.push(() => gear?.focus());
+    render();
+  };
+  /** A change saved at once, as it is made: what the server says of it is said in the screen. */
+  const saveSetting = async (work: () => Promise<unknown>) => {
+    try {
+      await work();
+      await loadSettings();
+      settingsNote = { text: t('settingsSaved'), error: false };
+      options.onChange?.();
+    } catch (error) {
+      settingsNote = { text: (error as Error).message, error: true };
+    }
+    render();
+  };
+  const saveMine = (change: PersonalSettings) => void saveSetting(() => client.saveMySettings({ ...settings!.mine, ...change }));
+  const saveDrive = (change: Partial<Omit<DriveSettings, 'images'>> & { images?: Partial<DriveSettings['images']> }) => void saveSetting(() => client.saveSettings(change));
+
+  /** Choices as buttons side by side, the one in use pressed. */
+  const segmented = <T extends string>(label: string, value: T, choices: [T, string][], onChoose: (value: T) => void) =>
+    h(
+      'div',
+      { class: 'rf-set-seg', role: 'group', 'aria-label': label },
+      choices.map(([v, text]) => button(text, () => v !== value && onChoose(v), { key: v, 'aria-pressed': v === value })),
+    );
+  const field = (label: string, hint: string | null, ...content: Child[]) =>
+    h('div', { class: 'rf-set-field' }, h('div', { class: 'rf-set-label' }, label), hint && h('p', { class: 'rf-set-hint' }, hint), ...content);
+
+  const PRESETS = ['#0b57d0', '#7c3aed', '#c026d3', '#dc2626', '#ea580c', '#a16207', '#0f766e', '#334155'];
+
+  function settingsScreen(part: SettingsPart) {
+    const answer = settings!;
+    const { mine, drive, canConfigure } = answer;
+    const languages: ['en' | 'es', string][] = [
+      ['en', 'English'],
+      ['es', 'Español'],
+    ];
+    const themes: ['light' | 'dark' | 'auto', string][] = [
+      ['light', t('themeLight')],
+      ['dark', t('themeDark')],
+      ['auto', t('themeAuto')],
+    ];
+    const parts: [SettingsPart, IconName, string][] = [
+      ['language', 'globe', t('language')],
+      ['appearance', 'contrast', t('appearance')],
+      ...(canConfigure ? ([['pictures', 'image', t('pictures')]] as [SettingsPart, IconName, string][]) : []),
+    ];
+    const show = (next: SettingsPart) => {
+      settingsPart = next;
+      settingsNote = null;
+      afterRender.push(() => element.querySelector<HTMLElement>('.rf-set-tab[aria-selected="true"]')?.focus());
+      render();
+    };
+    const tabKeys = (event: KeyboardEvent) => {
+      const at = parts.findIndex(([id]) => id === part);
+      const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+      if (step === undefined) return;
+      event.preventDefault();
+      show(parts[(at + step + parts.length) % parts.length][0]);
+    };
+    const forEveryone = (...content: Child[]) =>
+      canConfigure &&
+      h(
+        'section',
+        { class: 'rf-set-group', 'aria-labelledby': `${prefix}-everyone-${part}` },
+        h('h3', { id: `${prefix}-everyone-${part}` }, t('forEveryone')),
+        h('p', { class: 'rf-set-hint' }, t('forEveryoneHint')),
+        ...content,
+      );
+    const forYou = (...content: Child[]) => h('section', { class: 'rf-set-group', 'aria-labelledby': `${prefix}-you-${part}` }, h('h3', { id: `${prefix}-you-${part}` }, t('forYou')), ...content);
+
+    let body: Child;
+    let intro = '';
+    if (part === 'language') {
+      intro = t('languageIntro');
+      body = [
+        forYou(
+          field(
+            t('language'),
+            null,
+            segmented(t('language'), mine.language ?? '', [['', t('driveDefault')], ...languages], (v) => saveMine({ language: v || undefined })),
+          ),
+        ),
+        forEveryone(
+          field(
+            t('language'),
+            null,
+            segmented(`${t('language')} · ${t('forEveryone')}`, drive.language, languages, (v) => saveDrive({ language: v })),
+          ),
+        ),
+      ];
+    } else if (part === 'appearance') {
+      intro = t('appearanceIntro');
+      const low = drive.brand !== null && contrastOnWhite(drive.brand) < 4.5;
+      body = [
+        forYou(
+          field(
+            t('theme'),
+            null,
+            segmented(t('theme'), mine.theme ?? '', [['', t('driveDefault')], ...themes], (v) => saveMine({ theme: v || undefined })),
+          ),
+        ),
+        forEveryone(
+          field(
+            t('theme'),
+            null,
+            segmented(`${t('theme')} · ${t('forEveryone')}`, drive.theme, themes, (v) => saveDrive({ theme: v })),
+          ),
+          field(
+            t('brandColour'),
+            t('brandHint'),
+            h(
+              'div',
+              { class: 'rf-swatches', role: 'group', 'aria-label': t('brandColour') },
+              button(h('span', { class: 'rf-swatch rf-swatch-own' }), () => drive.brand !== null && saveDrive({ brand: null }), {
+                key: 'own',
+                'aria-pressed': drive.brand === null,
+                'aria-label': t('defaultColour'),
+                title: t('defaultColour'),
+              }),
+              PRESETS.map((hex) =>
+                button(h('span', { class: 'rf-swatch', style: `background: ${hex}` }), () => drive.brand !== hex && saveDrive({ brand: hex }), {
+                  key: hex,
+                  'aria-pressed': drive.brand === hex,
+                  'aria-label': hex,
+                  title: hex,
+                }),
+              ),
+              h(
+                'label',
+                { class: 'rf-swatch-custom', title: t('customColour') },
+                h('span', { class: 'rf-sr' }, t('customColour')),
+                h('input', { type: 'color', value: drive.brand ?? '#0e7c52', onChange: (event: Event) => saveDrive({ brand: (event.target as HTMLInputElement).value }) }),
+              ),
+            ),
+            low && h('p', { class: 'rf-set-hint rf-set-warn' }, t('lowContrast')),
+          ),
+        ),
+      ];
+    } else {
+      intro = t('picturesIntro');
+      const images = drive.images;
+      const names = [t('sizeThumb'), t('sizeSmall'), t('sizeMedium'), t('sizeLarge')];
+      const commitSizes = () => {
+        const sizes = typedSizes.map(Number);
+        if (sizes.join() !== images.sizes.join()) saveDrive({ images: { sizes } });
+      };
+      body = [
+        h(
+          'label',
+          { class: 'rf-set-switch' },
+          h('input', { type: 'checkbox', role: 'switch', checked: images.enabled, onChange: (event: Event) => saveDrive({ images: { enabled: (event.target as HTMLInputElement).checked } }) }),
+          h('span', null, h('strong', null, t('makeSmaller')), h('small', null, t('originalKept'))),
+        ),
+        images.enabled && [
+          field(
+            t('sizes'),
+            t('sizesHint'),
+            h(
+              'div',
+              { class: 'rf-set-sizes' },
+              names.map((name, i) =>
+                h(
+                  'label',
+                  { key: `size${i}`, class: 'rf-set-size' },
+                  h('span', { class: 'rf-set-frame', style: `--rf-frame: ${18 + i * 12}px`, 'aria-hidden': 'true' }),
+                  h('span', null, name),
+                  h(
+                    'span',
+                    { class: 'rf-set-px' },
+                    h('input', {
+                      type: 'number',
+                      min: '16',
+                      max: '8192',
+                      'aria-label': `${name}, ${t('pixels')}`,
+                      value: typedSizes[i] ?? '',
+                      onInput: (event: Event) => (typedSizes[i] = (event.target as HTMLInputElement).value),
+                      onChange: commitSizes,
+                    }),
+                    'px',
+                  ),
+                ),
+              ),
+            ),
+          ),
+          field(
+            t('format'),
+            null,
+            h(
+              'div',
+              { class: 'rf-set-cards', role: 'group', 'aria-label': t('format') },
+              button([h('strong', null, 'JPG'), h('small', null, t('asJpg'))], () => images.format !== 'jpeg' && saveDrive({ images: { format: 'jpeg' } }), {
+                key: 'jpeg',
+                'aria-pressed': images.format === 'jpeg',
+              }),
+              button([h('strong', null, t('original')), h('small', null, t('keepType'))], () => images.format !== 'original' && saveDrive({ images: { format: 'original' } }), {
+                key: 'original',
+                'aria-pressed': images.format === 'original',
+              }),
+            ),
+          ),
+          field(
+            `${t('quality')} · ${Math.round(images.quality * 100)}%`,
+            t('qualityHint'),
+            h('input', {
+              class: 'rf-set-range',
+              type: 'range',
+              min: '10',
+              max: '100',
+              step: '1',
+              'aria-label': t('quality'),
+              value: String(Math.round(images.quality * 100)),
+              onChange: (event: Event) => saveDrive({ images: { quality: Number((event.target as HTMLInputElement).value) / 100 } }),
+            }),
+          ),
+        ],
+      ];
+    }
+
+    const current = parts.find(([id]) => id === part)!;
+    return h(
+      'section',
+      {
+        key: 'settings',
+        class: 'rf-set',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-label': t('settings'),
+        onKeydown: (event: KeyboardEvent) => event.key === 'Escape' && (event.stopPropagation(), closeSettings()),
+      },
+      h(
+        'nav',
+        { class: 'rf-set-nav', 'aria-label': t('settings') },
+        button([icon('back', 18), h('span', null, t('backToDrive'))], closeSettings, { class: 'rf-set-back' }),
+        h(
+          'div',
+          { class: 'rf-set-tabs', role: 'tablist', 'aria-orientation': 'vertical', onKeydown: tabKeys },
+          parts.map(([id, iconName, label]) =>
+            button([icon(iconName, 18), label], () => show(id), {
+              key: id,
+              class: 'rf-set-tab',
+              role: 'tab',
+              id: `${prefix}-set-${id}`,
+              'aria-selected': id === part,
+              'aria-controls': `${prefix}-set-pane`,
+              tabindex: id === part ? '0' : '-1',
+            }),
+          ),
+        ),
+        h('div', { class: 'rf-set-card' }, h('strong', null, options.title ?? 'Files'), h('span', null, storage || ' ')),
+      ),
+      h(
+        'div',
+        { class: 'rf-set-main' },
+        button(icon('close', 20), closeSettings, { class: 'rf-set-x', 'aria-label': t('close'), title: t('close') }),
+        h(
+          'div',
+          { class: 'rf-set-pane', id: `${prefix}-set-pane`, role: 'tabpanel', 'aria-labelledby': `${prefix}-set-${current[0]}` },
+          h('h2', null, current[2]),
+          intro && h('p', { class: 'rf-set-intro' }, intro),
+          body,
+          h('p', { class: `rf-set-note${settingsNote?.error ? ' rf-set-warn' : ''}`, role: 'status' }, settingsNote?.text ?? ''),
+        ),
+      ),
+    );
+  }
+
   function dialogs() {
     if (!dialog) return null;
     switch (dialog.kind) {
@@ -886,11 +1197,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
     return h(
       'div',
-      { class: `rf-drive${options.className ? ` ${options.className}` : ''}`, 'data-theme': options.theme ?? 'light' },
+      { class: `rf-drive${options.className ? ` ${options.className}` : ''}`, 'data-theme': themeNow(), 'data-rf': prefix },
       h('style', null, CSS),
+      // Its own element for each colour: a stylesheet is not walked by morph, so another colour is another element.
+      settings?.settings.brand ? h('style', { key: `brand${settings.settings.brand}` }, brandStyle(`.rf-drive[data-rf="${prefix}"]`, settings.settings.brand)) : null,
       h(
         'div',
-        { class: 'rf-top' },
+        { class: 'rf-top', inert: Boolean(settingsPart) },
         h('div', { class: 'rf-title' }, options.logo ?? mark(), h('span', null, title)),
         h(
           'label',
@@ -906,10 +1219,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           }),
           typed && button(icon('close', 16), () => setTyped(''), { 'aria-label': t('cancel') }),
         ),
+        settings &&
+          button(icon('settings'), openSettings, { class: 'rf-gear', 'aria-label': t('settings'), title: t('settings'), 'aria-haspopup': 'dialog', mount: (node: HTMLElement) => (gear = node) }),
       ),
       h(
         'div',
-        { class: 'rf-body' },
+        { class: 'rf-body', inert: Boolean(settingsPart) },
         h(
           'nav',
           { class: 'rf-side', 'aria-label': title },
@@ -1001,7 +1316,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       h('span', { class: 'rf-sr', 'aria-live': 'polite' }, loading ? '' : `${heading ?? path.at(-1)?.name ?? t('myFiles')} · ${count}`),
       h(
         'div',
-        { class: 'rf-status' },
+        { class: 'rf-status', inert: Boolean(settingsPart) },
         h('span', { class: 'rf-grow' }, count, storage && h('span', { class: 'rf-where' }, ` · ${storage}`)),
         sending
           ? [
@@ -1032,6 +1347,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       ),
       toast && h('div', { class: 'rf-toast', role: 'status' }, toast),
       dialogs(),
+      settingsPart && settings && settingsScreen(settingsPart),
     );
   }
 
@@ -1066,18 +1382,19 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     (info) => ((storage = info.storage), render()),
     () => undefined,
   );
+  void loadSettings();
   render();
 
   return {
     client,
     update(next) {
       options = { ...options, ...next };
-      t = translator(options.texts ?? TEXTS[options.language ?? 'en']);
-      locale = options.language ?? 'en';
+      retranslate();
       render();
     },
     refresh() {
       revision++;
+      void loadSettings();
       render();
     },
     destroy() {

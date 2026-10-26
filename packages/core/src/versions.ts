@@ -2,7 +2,7 @@
 // a new version, so that nothing is lost by restoring.
 
 import { DriveError } from './errors';
-import type { Context, Drive, EntryId, FileEntry, Version } from './model';
+import type { Context, Drive, EntryId, FileEntry, Rendition, Version } from './model';
 import { getFile, isTrashed } from './tree';
 
 function live(drive: Drive, id: EntryId): FileEntry {
@@ -28,7 +28,7 @@ export function restoreVersion(drive: Drive, id: EntryId, versionId: string, new
   if (!old) throw new DriveError('no-version', `${file.name} has no version ${versionId}`);
   if (old === file.versions[0]) return drive;
   if (file.versions.some((v) => v.id === newId)) throw new DriveError('duplicate-id', `There is already a version ${newId}`);
-  const next: Version = { id: newId, key: old.key, size: old.size, at: context.at, by: context.by, restoredFrom: old.id };
+  const next: Version = { id: newId, key: old.key, size: old.size, at: context.at, by: context.by, restoredFrom: old.id, ...(old.renditions ? { renditions: old.renditions } : {}) };
   return withFile(drive, { ...file, versions: [next, ...file.versions], modified: context.at, modifiedBy: context.by });
 }
 
@@ -37,3 +37,18 @@ export const versionNumber = (file: FileEntry, versionId: string): number => {
   const index = file.versions.findIndex((v) => v.id === versionId);
   return index < 0 ? 0 : file.versions.length - index;
 };
+
+/**
+ * A smaller picture of a version, made after it was uploaded; one for the same size takes the place of the last.
+ * Not a change a person sees: the file keeps when and by whom it was changed.
+ */
+export function addRendition(drive: Drive, id: EntryId, versionId: string, rendition: Rendition): Drive {
+  const file = getFile(drive, id);
+  const version = file.versions.find((v) => v.id === versionId);
+  if (!version) throw new DriveError('no-version', `${file.name} has no version ${versionId}`);
+  const renditions = [...(version.renditions ?? []).filter((r) => r.size !== rendition.size), rendition].sort((a, b) => a.size - b.size);
+  return withFile(drive, { ...file, versions: file.versions.map((v) => (v === version ? { ...v, renditions } : v)) });
+}
+
+/** The smallest rendition of a version that shows it at `size` pixels, or none when only the original does. */
+export const renditionFor = (version: Version, size: number): Rendition | undefined => version.renditions?.find((r) => r.size >= size);

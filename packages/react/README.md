@@ -104,6 +104,13 @@ function Folder({ id }: { id: string | null }) {
 | `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `upload`, `url`. |
 | `useUploads()` | Files sent one after another, in parts, with what has gone of each. |
 
+## Settings of your own
+
+`useSettings()` gives the drive as the one asking sees it, the drive's and
+their own, whether they may configure it, and `save` and `saveMine`.
+`useUploads` makes the smaller pictures of an image as the settings say.
+`<FileDrive>` has the whole screen of settings behind its button.
+
 ## Without a server
 
 `createMemoryClient({ drive, blobs, user })` keeps the drive in the page, with

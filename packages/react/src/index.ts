@@ -4,7 +4,7 @@
 
 export { type FileDriveProps, FileDrive } from './FileDrive';
 export { type SharedLinkProps, SharedLink } from './SharedLink';
-export { type DriveProviderProps, type View, type Entries, type Upload, DriveProvider, useDrive, useOuterDrive, useEntries, useEntry, useActions, useUploads } from './headless';
+export { type DriveProviderProps, type View, type Entries, type Upload, DriveProvider, useDrive, useOuterDrive, useEntries, useEntry, useActions, useUploads, useSettings } from './headless';
 // What the drive is made of, from @rebofiles/drive, so that an application of React needs only this package.
 export {
   type ClientOptions,
@@ -14,6 +14,7 @@ export {
   type UploadProgress,
   type LinkClient,
   type LinkListing,
+  type SettingsAnswer,
   type MemoryOptions,
   type MemoryClient,
   type Texts,

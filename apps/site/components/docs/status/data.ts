@@ -8,12 +8,12 @@ export const MEASURED = 'October 25, 2026';
 export const TESTS: { where: string; count: number; what: string }[] = [
   {
     where: 'packages/core',
-    count: 44,
+    count: 49,
     what: 'Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me, links.',
   },
   {
     where: 'packages/server',
-    count: 43,
+    count: 50,
     what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
   },
   {
@@ -28,7 +28,7 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 23,
+    count: 26,
     what: 'The demo of the landing: Claude’s calls to the MCP tools, the rename seen, and left alone when the person renamed first. The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark; the drive with no framework; a drive from the hooks alone.',
   },
 ];

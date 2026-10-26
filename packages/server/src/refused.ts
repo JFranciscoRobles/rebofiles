@@ -25,6 +25,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'not-in-trash': 409,
   'no-version': 404,
   'invalid-share': 400,
+  'invalid-settings': 400,
 };
 
 /** The answer to an error: what core refused and why, what was refused here, or a 500 that says nothing of the inside. */

@@ -6,7 +6,7 @@
 // upload, a restore from the trash) is made free with "(2)".
 
 import { DriveError } from './errors';
-import type { Context, Drive, Entry, EntryId, FileEntry, FolderEntry } from './model';
+import type { Context, Drive, Entry, EntryId, FileEntry, FolderEntry, Version } from './model';
 import { checkName, takenBy, uniqueName } from './names';
 import { getEntry, getFolder, isTrashed, isWithin, subtree, trash } from './tree';
 
@@ -151,8 +151,9 @@ function remove(drive: Drive, entries: Entry[]): Removed {
   for (const entry of entries) next.delete(entry.id);
   // A key still used by a version of a file left in the drive stays, as restoring a version reuses its key.
   const kept = new Set<string>();
-  for (const entry of next.values()) if (entry.kind === 'file') for (const version of entry.versions) kept.add(version.key);
+  const keysOf = (version: Version) => [version.key, ...(version.renditions ?? []).map((r) => r.key)];
+  for (const entry of next.values()) if (entry.kind === 'file') for (const version of entry.versions) for (const key of keysOf(version)) kept.add(key);
   const keys = new Set<string>();
-  for (const entry of entries) if (entry.kind === 'file') for (const version of entry.versions) if (!kept.has(version.key)) keys.add(version.key);
+  for (const entry of entries) if (entry.kind === 'file') for (const version of entry.versions) for (const key of keysOf(version)) if (!kept.has(key)) keys.add(key);
   return { drive: { entries: next }, removed: entries.map((entry) => entry.id), keys: [...keys] };
 }

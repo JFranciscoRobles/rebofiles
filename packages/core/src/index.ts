@@ -5,6 +5,7 @@
 export {
   type EntryId,
   type Version,
+  type Rendition,
   type Trashed,
   type Role,
   type Share,
@@ -35,7 +36,21 @@ export {
   deleteForever,
   emptyTrash,
 } from './ops';
-export { addVersion, restoreVersion, versionNumber } from './versions';
+export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor } from './versions';
+export {
+  type Language,
+  type Theme,
+  type ImageSettings,
+  type DriveSettings,
+  type PersonalSettings,
+  LANGUAGES,
+  THEMES,
+  IMAGE_SIZES,
+  DEFAULT_SETTINGS,
+  readDriveSettings,
+  readPersonalSettings,
+  settingsFor,
+} from './settings';
 export { type SearchOptions, search } from './search';
 export { type Changes, changes } from './changes';
 export { type Action, type Access, EVERYONE, allows, accessOf, share, unshare, sharedWith, addLink, removeLink, linked } from './sharing';

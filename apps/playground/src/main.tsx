@@ -17,9 +17,10 @@ import { createRoot } from 'react-dom/client';
 const Editor = lazy(() => import('./Editor'));
 
 const params = new URLSearchParams(location.search);
-const language = params.get('lang') === 'es' ? 'es' : 'en';
+const language = params.get('lang') === 'es' ? 'es' : params.get('lang') === 'en' ? 'en' : undefined;
 const as = params.get('as');
-const theme = (['dark', 'auto'].includes(params.get('theme') ?? '') ? params.get('theme') : 'light') as 'light' | 'dark' | 'auto';
+// Unless given, the drive's settings say it.
+const theme = (['light', 'dark', 'auto'].includes(params.get('theme') ?? '') ? params.get('theme') : undefined) as 'light' | 'dark' | 'auto' | undefined;
 const link = params.get('link');
 const headers = (): Record<string, string> => (as ? { 'x-user': as } : {});
 const retries = params.get('retries');
@@ -38,7 +39,7 @@ function Playground() {
       />
       {open && (
         <Suspense fallback={null}>
-          <Editor file={open.file} url={open.url} language={language} onClose={() => setOpen(null)} />
+          <Editor file={open.file} url={open.url} language={language ?? 'en'} onClose={() => setOpen(null)} />
         </Suspense>
       )}
     </DriveProvider>
@@ -46,6 +47,6 @@ function Playground() {
 }
 
 // The page behind the drive goes with it (index.html).
-document.body.dataset.theme = theme;
+document.body.dataset.theme = theme ?? 'light';
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{link ? <SharedLink token={link} language={language} theme={theme} /> : <Playground />}</StrictMode>);

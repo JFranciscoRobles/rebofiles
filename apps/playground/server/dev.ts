@@ -25,7 +25,8 @@ const secret = readFileSync(secretFile, 'utf8');
 export const handle = createDriveHandler({
   storage: diskStorage({ folder: resolve(STORAGE, 'files'), secret, label: 'disk:storage/files' }),
   metadata: await sqliteMetadata(resolve(STORAGE, 'drive.sqlite')),
-  identify: (request) => ({ id: request.headers.get('x-user') || process.env.USER || 'me' }),
+  // The one of this machine may configure the drive; whoever `?as=` names may not.
+  identify: (request) => ({ id: request.headers.get('x-user') || process.env.USER || 'me', admin: !request.headers.get('x-user') }),
   authorize: byRoles,
   secret,
   base: '/api/files',

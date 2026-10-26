@@ -59,6 +59,23 @@ Neon's `Pool` is `pg`'s; with `postgres.js`, `{ query: (text, values) =>
 sql.unsafe(text, values).then((rows) => ({ rows })) }` works, on one process.
 `{ table: 'acme_files' }` for a table of another name.
 
+## Settings, and pictures in four sizes
+
+`GET /settings` gives the drive's settings, the one asking's own over them,
+and whether they may change the drive's: `PUT /settings`, for whoever
+`authorize` lets `configure` (with `byRoles`, a user `identify` gives as
+`{ id, admin: true }`); `PUT /settings/mine` for one's own language and
+theme. They are kept by the metadata store (a table beside the entries in
+SQLite and Postgres), and `settings` on `createDriveHandler` gives the
+defaults: language, theme, the colour of the brand, and the four sizes
+pictures are made in, as JPEG (the default) or as the original's type.
+
+The browser makes the smaller pictures when an image is uploaded and sends
+them as `POST /uploads` with `{ rendition: { file, version, size, width,
+height } }`; they are kept with the version, the original untouched, and
+`GET /entries/:id/download?size=320` gives the smallest that shows it at
+that size. They come back with a version restored and go with the file.
+
 ## What is in it
 
 | Area | What it does |

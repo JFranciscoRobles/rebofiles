@@ -6,6 +6,7 @@
 import * as core from '@rebofiles/core';
 import type { Context, Drive, DriveErrorCode, Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
 import { type DriveClient, RequestError, type UploadOptions } from './client';
+import { renditionsOf } from './images';
 
 export interface MemoryOptions {
   /** The drive to start with, made with core. */
@@ -21,6 +22,8 @@ export interface MemoryOptions {
   now?: () => Date;
   /** What My files shows at the top, as the server's option says: the user's own (the default), or everything there. */
   top?: 'own' | 'everyone';
+  /** The drive's settings to start with; the user may change them, as one who may configure the drive. */
+  settings?: Partial<core.DriveSettings>;
 }
 
 export type MemoryClient = DriveClient & {
@@ -42,6 +45,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'not-in-trash': 409,
   'no-version': 404,
   'invalid-share': 400,
+  'invalid-settings': 400,
 };
 
 export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
@@ -82,7 +86,22 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       signal?.addEventListener('abort', () => (clearTimeout(timer), fail(new DOMException('The upload was stopped.', 'AbortError'))));
     });
 
+  let settings = core.readDriveSettings(options.settings ?? {});
+  let saved = options.settings !== undefined;
+  let mine: core.PersonalSettings = {};
+
   const client: DriveClient = {
+    settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved }),
+    saveSettings: (given) =>
+      run(() => {
+        saved = true;
+        return (settings = core.readDriveSettings(given, settings));
+      }),
+    saveMySettings: (given) =>
+      run(() => {
+        mine = core.readPersonalSettings(given);
+        return { mine, settings: core.settingsFor(settings, mine) };
+      }),
     list: (folder) =>
       run(() => {
         const found = folder ? core.getFolder(drive, folder) : null;
@@ -140,11 +159,13 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         const file = core.getFile(drive, entryId);
         const version = found.version ? file.versions.find((v) => v.id === found.version) : file.versions[0];
         if (!version) throw new core.DriveError('no-version', `${file.name} has no version ${found.version}`);
-        let url = urls.get(version.key);
+        const smaller = found.size ? core.renditionFor(version, found.size) : undefined;
+        const key = smaller?.key ?? version.key;
+        let url = urls.get(key);
         if (!url) {
-          const blob = blobs.get(version.key) ?? new Blob([], { type: file.type });
-          url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: file.type }));
-          urls.set(version.key, url);
+          const blob = blobs.get(key) ?? new Blob([], { type: file.type });
+          url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: smaller?.type ?? file.type }));
+          urls.set(key, url);
         }
         return url;
       }),
@@ -166,7 +187,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       }
       how.onProgress?.({ sent: file.size, size: file.size });
       const versionId = id();
-      return change((current) => {
+      const made = await change((current) => {
         const fileId = how.file ?? id();
         const key = `${fileId}/${versionId}`;
         blobs.set(key, file);
@@ -176,6 +197,14 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
           : core.addFile(current, { id: fileId, name, parent: how.parent ?? null, type: file.type || 'application/octet-stream', version }, context());
         return { drive: next, answer: core.getFile(next, fileId) };
       });
+      // The smaller pictures, made in the page as the client of a server makes them, and kept beside.
+      const smaller = how.images ? await renditionsOf(file, how.images).catch(() => []) : [];
+      for (const r of smaller) {
+        const key = `${made.id}/${versionId}@${r.size}`;
+        blobs.set(key, r.blob);
+        drive = core.addRendition(drive, made.id, versionId, { size: r.size, width: r.width, height: r.height, key, type: r.blob.type, bytes: r.blob.size });
+      }
+      return smaller.length ? core.getFile(drive, made.id) : made;
     },
   };
 

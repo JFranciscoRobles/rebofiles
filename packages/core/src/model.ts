@@ -17,6 +17,20 @@ export interface Version {
   note?: string;
   /** The version this one brought back, when it was made by `restoreVersion`. */
   restoredFrom?: string;
+  /** Of a picture: smaller ones made of it when it was uploaded, to show it; the bytes under `key` stay as they came. */
+  renditions?: Rendition[];
+}
+
+/** A picture made smaller, for one size of the drive's: its longest side at most `size` pixels. */
+export interface Rendition {
+  /** The size of the drive's it was made for: the most pixels of its longest side. */
+  size: number;
+  width: number;
+  height: number;
+  key: string;
+  type: string;
+  /** In bytes. */
+  bytes: number;
 }
 
 /** What a person shared with may do, the least first. The owner may do everything, and is no role. */

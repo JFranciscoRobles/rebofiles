@@ -11,7 +11,8 @@ export type DriveErrorCode =
   | 'in-trash'
   | 'not-in-trash'
   | 'no-version'
-  | 'invalid-share';
+  | 'invalid-share'
+  | 'invalid-settings';
 
 export class DriveError extends Error {
   readonly code: DriveErrorCode;

@@ -41,6 +41,19 @@ after each change made from it, for what else in the page shows the drive.
 
 `mountSharedLink(element, { token })` is what someone sent a link sees.
 
+## Settings
+
+A button at the top of the drive opens its settings, a screen of their own
+over it, as Rebodocs' menu is over a document: the language and the theme
+each person chooses for themselves, and, for whoever may configure the drive,
+its language and theme, the colour of its brand, and the pictures. Each
+change is saved as it is made. When an image is uploaded, `renditionsOf`
+makes copies of it in the drive's four sizes (160, 480, 1024 and 2048 pixels
+unless changed) in the page, as JPEG or as the original's type, and the client
+sends them after it; the grid and the preview show those. A person's own come
+first, then the `language` and `theme` the application gives, then the
+drive's. `settings: false` leaves all of it out.
+
 ## What is in it
 
 | Area | What it is |

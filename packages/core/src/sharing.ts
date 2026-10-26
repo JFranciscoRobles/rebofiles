@@ -11,7 +11,8 @@ import { getEntry, isTrashed } from './tree';
 export const EVERYONE = '*';
 
 /** What may be done to an entry, as a server asks it. */
-export type Action = 'list' | 'read' | 'download' | 'comment' | 'create' | 'upload' | 'rename' | 'move' | 'trash' | 'restore' | 'delete' | 'share';
+/** What may be done: to an entry, or for `configure`, to the settings of the whole drive, asked with no entry. */
+export type Action = 'list' | 'read' | 'download' | 'comment' | 'create' | 'upload' | 'rename' | 'move' | 'trash' | 'restore' | 'delete' | 'share' | 'configure';
 
 /** What someone has of an entry: a role, or all of it as its owner. */
 export type Access = Role | 'owner';
@@ -32,6 +33,7 @@ const NEEDS: Record<Action, Access> = {
   restore: 'editor',
   delete: 'owner',
   share: 'owner',
+  configure: 'owner',
 };
 
 export const allows = (access: Access | null, action: Action): boolean => access !== null && RANK[access] >= RANK[NEEDS[action]];

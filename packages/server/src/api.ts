@@ -10,7 +10,8 @@
 //   GET    /trash                         what is in the trash
 //   GET    /search?q=…&within=…&trashed=1 found by name
 //   POST   /folders                       { name, parent }
-//   POST   /uploads                       { name, parent, type, size }, or { file, type, size } for a new version: where to send the parts
+//   POST   /uploads                       { name, parent, type, size }, or { file, type, size } for a new version: where to send the parts;
+//                                         or { rendition: { file, version, size, width, height }, type, size }: a smaller picture of a version
 //   POST   /uploads/finish                { token, parts: [{ number, etag }] }: the file, once its bytes are there
 //   POST   /uploads/resume                { token }: an upload cut, gone on with: what arrived, and where to send the rest
 //   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
@@ -19,9 +20,12 @@
 //   POST   /entries/:id/restore           out of it
 //   DELETE /entries/:id                   gone for good, from the trash
 //   POST   /trash/empty
-//   GET    /entries/:id/download?version=&inline=1  an address to read it from, or to show it in the page
+//   GET    /entries/:id/download?version=&inline=1&size=  an address to read it from, or to show it in the page; with size, a smaller picture when there is one
 //   POST   /entries/:id/versions/:v/restore
 //   GET    /info                          where the bytes are, as a person reads it
+//   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
+//   PUT    /settings                      the drive's, for whoever may 'configure'
+//   PUT    /settings/mine                 { language, theme }: one's own
 //   GET    /shared                        what others shared with the one asking
 //   POST   /entries/:id/shares            { with, role }: shared, or given another role
 //   DELETE /entries/:id/shares/:with      no longer shared with them
@@ -47,6 +51,8 @@ export type { Action } from '@rebofiles/core';
 
 export interface User {
   id: string;
+  /** May change the settings of the whole drive, with `byRoles`. */
+  admin?: boolean;
 }
 
 export interface DriveServerOptions {
@@ -72,6 +78,8 @@ export interface DriveServerOptions {
   top?: 'own' | 'everyone';
   /** The largest file taken, in bytes; 5 GiB unless said. */
   maxSize?: number;
+  /** The settings of the drive until someone who may 'configure' changes them: its language, theme, colour, and the sizes pictures are made in. */
+  settings?: Partial<Omit<core.DriveSettings, 'images'>> & { images?: Partial<core.ImageSettings> };
   now?: () => Date;
   newId?: () => string;
 }
@@ -87,7 +95,7 @@ const AT_THE_TOP: Action[] = ['list', 'create', 'upload'];
  * allows, on it and on what is inside it. Yours may ask it and add rules of its own, as `isAdmin(user) || byRoles(…)`.
  */
 export const byRoles = (user: User, action: Action, entry: Entry | null, drive: Drive): boolean =>
-  entry === null ? AT_THE_TOP.includes(action) : core.allows(core.accessOf(drive, entry.id, user.id), action);
+  action === 'configure' ? user.admin === true : entry === null ? AT_THE_TOP.includes(action) : core.allows(core.accessOf(drive, entry.id, user.id), action);
 
 /** What a link's token holds: its id, and that it is one, so no other token of the server is taken for it. */
 interface LinkToken {
@@ -109,6 +117,8 @@ interface Pending {
   file?: { id: EntryId; name: string; parent: EntryId | null };
   /** A new version of this one. */
   of?: EntryId;
+  /** A smaller picture of a version of this one. */
+  rendition?: { of: EntryId; version: string; size: number; width: number; height: number };
 }
 
 /** An upload left halfway is good for this long. */
@@ -134,6 +144,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     queue = run.catch(() => undefined);
     return run;
   };
+
+  // Kept by the store when it can, else for as long as the process lasts.
+  const ownSettings = new Map<string, unknown>();
+  const getSetting = (name: string) => (options.metadata.getSetting ? options.metadata.getSetting(name) : Promise.resolve(ownSettings.get(name)));
+  const setSetting = (name: string, value: unknown) => (options.metadata.setSetting ? options.metadata.setSetting(name, value) : (ownSettings.set(name, value), Promise.resolve()));
+  /** The drive's settings: what was kept, over the defaults the server was given. */
+  const driveSettings = async () => core.readDriveSettings(await getSetting('drive'), defaults);
+  const defaults = core.readDriveSettings(options.settings ?? {});
 
   const allow = async (user: User, action: Action, entry: Entry | null, drive: Drive) => {
     if (!(await options.authorize(user, action, entry, drive))) throw new Refused(403, 'forbidden', 'You may not do that here.');
@@ -219,6 +237,34 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const found = core.search(drive, url.searchParams.get('q') ?? '', { within, trashed: url.searchParams.get('trashed') === '1', limit: 200 });
           return Response.json({ entries: await readable(user, found, drive) });
         }
+        case 'GET /settings': {
+          const drive = await options.metadata.load();
+          const kept = await getSetting('drive');
+          const settings = core.readDriveSettings(kept, defaults);
+          const mine = core.readPersonalSettings(await getSetting(`person:${user.id}`));
+          return Response.json({
+            drive: settings,
+            mine,
+            settings: core.settingsFor(settings, mine),
+            canConfigure: await options.authorize(user, 'configure', null, drive),
+            saved: kept !== undefined || options.settings !== undefined,
+          });
+        }
+
+        case 'PUT /settings': {
+          const asked = await body<unknown>();
+          await allow(user, 'configure', null, await options.metadata.load());
+          const settings = core.readDriveSettings(asked, await driveSettings());
+          await setSetting('drive', settings);
+          return Response.json({ drive: settings });
+        }
+
+        case 'PUT /settings/mine': {
+          const mine = core.readPersonalSettings(await body<unknown>());
+          await setSetting(`person:${user.id}`, mine);
+          return Response.json({ mine, settings: core.settingsFor(await driveSettings(), mine) });
+        }
+
         case 'GET /info':
           return Response.json({ storage: options.storage.label, maxSize });
 
@@ -235,7 +281,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
         }
 
         case 'POST /uploads': {
-          const asked = await body<{ name?: string; parent?: EntryId | null; file?: EntryId; type?: string; size: number }>();
+          const asked = await body<{
+            name?: string;
+            parent?: EntryId | null;
+            file?: EntryId;
+            type?: string;
+            size: number;
+            rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
+          }>();
           const size = Number(asked.size);
           if (!Number.isSafeInteger(size) || size < 0) throw new Refused(400, 'bad-size', 'Say the size of the file, in bytes.');
           if (size > maxSize) throw new Refused(413, 'too-large', `Files up to ${maxSize} bytes.`);
@@ -243,6 +296,23 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const drive = await options.metadata.load();
           let pending: Omit<Pending, 'key' | 'state'>;
           const versionId = newId();
+          if (asked.rendition) {
+            const r = asked.rendition;
+            const file = core.getFile(drive, String(r.file));
+            await allow(user, 'upload', file, drive);
+            const version = file.versions.find((v) => v.id === r.version);
+            if (!version) throw new Refused(404, 'no-version', `${file.name} has no version ${r.version}.`);
+            const sizes = (await driveSettings()).images.sizes;
+            const rendition = { of: file.id, version: version.id, size: Number(r.size), width: Number(r.width), height: Number(r.height) };
+            if (!sizes.includes(rendition.size)) throw new Refused(400, 'bad-size', `Pictures are made in ${sizes.join(', ')} pixels.`);
+            if (![rendition.width, rendition.height].every((n) => Number.isInteger(n) && n > 0 && n <= rendition.size))
+              throw new Refused(400, 'bad-size', 'Say the width and the height of the picture, at most its size.');
+            if (!type.startsWith('image/')) throw new Refused(400, 'not-a-picture', 'A smaller picture is a picture.');
+            const key = `${file.id}/${version.id}@${rendition.size}`;
+            const plan = await options.storage.startUpload(key, type, size, base);
+            const made: Pending = { versionId: version.id, size, type, user: user.id, rendition, key, state: plan.state };
+            return Response.json({ token: sealToken(options.secret, made, UPLOAD_LIFE), parts: plan.parts });
+          }
           if (asked.file) {
             const file = core.getFile(drive, asked.file);
             await allow(user, 'upload', file, drive);
@@ -277,6 +347,12 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const version = { id: pending.versionId, key: pending.key, size: pending.size };
           return Response.json(
             await change(async (drive) => {
+              if (pending.rendition) {
+                const { of, version: on, size, width, height } = pending.rendition;
+                await allow(user, 'upload', core.getEntry(drive, of), drive);
+                const next = core.addRendition(drive, of, on, { size, width, height, key: pending.key, type: pending.type, bytes: pending.size });
+                return { drive: next, answer: { entry: core.getEntry(next, of) } };
+              }
               // Asked again: what was allowed when it started may not be now.
               if (pending.of) {
                 await allow(user, 'upload', core.getEntry(drive, pending.of), drive);
@@ -378,7 +454,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const wanted = url.searchParams.get('version');
           const version = wanted ? file.versions.find((v) => v.id === wanted) : file.versions[0];
           if (!version) throw new Refused(404, 'no-version', `${file.name} has no version ${wanted}.`);
-          return Response.json({ url: await options.storage.downloadUrl(version.key, file.name, file.type, base, url.searchParams.get('inline') === '1') });
+          const inline = url.searchParams.get('inline') === '1';
+          // A smaller picture, when one shows it at that size: named as what it is.
+          const smaller = url.searchParams.has('size') ? core.renditionFor(version, Number(url.searchParams.get('size'))) : undefined;
+          if (smaller) {
+            const name = smaller.type === file.type ? file.name : `${core.splitName(file.name).base}.${smaller.type === 'image/jpeg' ? 'jpg' : smaller.type.split('/')[1]}`;
+            return Response.json({ url: await options.storage.downloadUrl(smaller.key, name, smaller.type, base, inline), width: smaller.width, height: smaller.height });
+          }
+          return Response.json({ url: await options.storage.downloadUrl(version.key, file.name, file.type, base, inline) });
         }
 
         case 'POST /entries/:id/shares': {

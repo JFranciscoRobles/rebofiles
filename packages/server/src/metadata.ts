@@ -13,12 +13,22 @@ export interface MetadataStore {
    * writes to. Without it, changes are put in order inside one process only.
    */
   lock?<T>(work: () => Promise<T>): Promise<T>;
+  /** A setting kept by name (`drive`, `person:<id>`): what `setSetting` was given, or undefined. Without them, settings last as long as the process. */
+  getSetting?(name: string): Promise<unknown>;
+  setSetting?(name: string, value: unknown): Promise<void>;
 }
 
 /** In memory: gone when the process ends. For tests and demos. */
 export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
   let drive = driveOf(entries);
+  const settings = new Map<string, unknown>();
   return {
+    async getSetting(name) {
+      return settings.get(name);
+    },
+    async setSetting(name, value) {
+      settings.set(name, value);
+    },
     async load() {
       return drive;
     },
@@ -40,7 +50,17 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const all = db.prepare('SELECT entry FROM rebofiles_entries');
   const upsert = db.prepare('INSERT INTO rebofiles_entries (id, parent, entry) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET parent = excluded.parent, entry = excluded.entry');
   const remove = db.prepare('DELETE FROM rebofiles_entries WHERE id = ?');
+  db.exec('CREATE TABLE IF NOT EXISTS rebofiles_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  const setting = db.prepare('SELECT value FROM rebofiles_settings WHERE name = ?');
+  const keep = db.prepare('INSERT INTO rebofiles_settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value');
   return {
+    async getSetting(name) {
+      const row = setting.get(name) as { value: string } | undefined;
+      return row ? JSON.parse(row.value) : undefined;
+    },
+    async setSetting(name, value) {
+      keep.run(name, JSON.stringify(value));
+    },
     async load() {
       const rows = all.all() as { entry: string }[];
       return rows.length ? driveOf(rows.map((row) => JSON.parse(row.entry) as Entry)) : emptyDrive();
@@ -105,6 +125,7 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
   await exclusive(async () => {
     await db.query(`CREATE TABLE IF NOT EXISTS ${table} (id text PRIMARY KEY, parent text, entry jsonb NOT NULL)`);
     await db.query(`CREATE INDEX IF NOT EXISTS ${table}_parent ON ${table} (parent)`);
+    await db.query(`CREATE TABLE IF NOT EXISTS ${table}_settings (name text PRIMARY KEY, value jsonb NOT NULL)`);
   });
   // One statement: the rows removed and the rows put, together or not at all, without a transaction to hold open.
   const write = `WITH removed AS (DELETE FROM ${table} WHERE id = ANY($2::text[]))
@@ -121,5 +142,13 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
       if (put.length || removed.length) await db.query(write, [JSON.stringify(put), removed]);
     },
     lock: pool ? exclusive : undefined,
+    async getSetting(name) {
+      const { rows } = await db.query(`SELECT value FROM ${table}_settings WHERE name = $1`, [name]);
+      const value = (rows[0] as { value: unknown } | undefined)?.value;
+      return typeof value === 'string' ? JSON.parse(value) : value;
+    },
+    async setSetting(name, value) {
+      await db.query(`INSERT INTO ${table}_settings (name, value) VALUES ($1, $2::jsonb) ON CONFLICT (name) DO UPDATE SET value = excluded.value`, [name, JSON.stringify(value)]);
+    },
   };
 }

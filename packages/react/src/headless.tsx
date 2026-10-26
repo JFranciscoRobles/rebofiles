@@ -2,9 +2,9 @@
 // hooks for what a screen of your own needs. The whole <FileDrive> is built
 // from these and nothing else.
 
-import type { Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
+import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, TEXTS, type Texts, type Translate, createDriveClient, translator } from '@rebofiles/drive';
+import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, createDriveClient, translator } from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;
@@ -16,6 +16,12 @@ interface DriveContext {
   /** The texts `t` says, for a drive mounted inside to say the same. */
   texts: Texts;
   language: 'en' | 'es';
+  /** The texts the application gave, if any: a drive mounted inside says these over its language. */
+  ownTexts?: Texts;
+  /** The language the application gave, if any: over the drive's settings, under a person's own. */
+  givenLanguage?: 'en' | 'es';
+  /** The settings of the server, once they come; null before, or from a server without them. */
+  settings: SettingsAnswer | null;
 }
 
 const Context = createContext<DriveContext | null>(null);
@@ -33,15 +39,30 @@ export interface DriveProviderProps {
   children: ReactNode;
 }
 
-export function DriveProvider({ base = '/api/files', client, headers, language = 'en', texts, children }: DriveProviderProps) {
+export function DriveProvider({ base = '/api/files', client, headers, language, texts, children }: DriveProviderProps) {
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const made = useMemo(() => client ?? createDriveClient({ base, headers: () => headersRef.current?.() ?? {} }), [client, base]);
   const [revision, setRevision] = useState(0);
   const changed = useCallback(() => setRevision((n) => n + 1), []);
+  const [settings, setSettings] = useState<SettingsAnswer | null>(null);
+  // Asked again after every change: one made in the settings among them.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: revision is when to ask again, not what is asked
+  useEffect(() => {
+    let live = true;
+    made.settings().then(
+      (answer) => live && setSettings(answer),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [made, revision]);
+  // A person's own first, then what the application gave, then the drive's.
+  const shown = settings?.mine.language ?? language ?? settings?.drive.language ?? 'en';
   const value = useMemo(
-    () => ({ client: made, revision, changed, t: translator(texts ?? TEXTS[language]), locale: language, texts: texts ?? TEXTS[language], language }),
-    [made, revision, changed, texts, language],
+    () => ({ client: made, revision, changed, t: translator(texts ?? TEXTS[shown]), locale: shown, texts: texts ?? TEXTS[shown], language: shown, ownTexts: texts, givenLanguage: language, settings }),
+    [made, revision, changed, texts, shown, language, settings],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
@@ -164,10 +185,40 @@ export interface Upload {
   entry?: FileEntry;
 }
 
+/** The settings of the drive and one's own, and saving them: for a panel of settings of your own. */
+export function useSettings() {
+  const { client, changed, settings } = useDrive();
+  return useMemo(
+    () => ({
+      /** The drive as the one asking sees it; null until it comes. */
+      settings: settings?.settings ?? null,
+      drive: settings?.drive ?? null,
+      mine: settings?.mine ?? null,
+      canConfigure: settings?.canConfigure ?? false,
+      /** The drive's, for whoever may configure it. */
+      save: async (given: Partial<Omit<DriveSettings, 'images'>> & { images?: Partial<ImageSettings> }) => {
+        const saved = await client.saveSettings(given);
+        changed();
+        return saved;
+      },
+      /** One's own language and theme. */
+      saveMine: async (mine: PersonalSettings) => {
+        const saved = await client.saveMySettings(mine);
+        changed();
+        return saved;
+      },
+    }),
+    [client, changed, settings],
+  );
+}
+
 /** Files sent one after another, each in parts; what has gone of each, for a bar. One that failed is tried again with `retry`, from what arrived. */
 export function useUploads() {
-  const { client, changed } = useDrive();
+  const { client, changed, settings } = useDrive();
   const [uploads, setUploads] = useState<Upload[]>([]);
+  // The sizes pictures are made in, as the drive's settings say when the upload starts.
+  const images = useRef<ImageSettings | undefined>(undefined);
+  images.current = settings?.settings.images;
   const queue = useRef(Promise.resolve());
   const counter = useRef(0);
   const sends = useRef(new Map<number, () => void>());
@@ -182,7 +233,7 @@ export function useUploads() {
           queue.current = queue.current.then(async () => {
             set(id, { state: 'sending', error: undefined });
             try {
-              const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
+              const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: images.current });
               sends.current.delete(id);
               set(id, { state: 'done', sent: file.size, entry });
               onDone?.(entry);
