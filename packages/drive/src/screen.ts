@@ -241,6 +241,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let tab: 'details' | 'versions' | 'activity' = 'details';
   let revision = 0;
   let alive = true;
+  /** Whether the drive is mounted inside the main of a page of its own, as on a landing. */
+  const inMain = Boolean(element.closest('main'));
 
   // ---- What is asked of the server, once for each thing and each revision ----
 
@@ -2479,9 +2481,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           storage && h('div', { class: 'rf-storage' }, t('location'), h('code', null, storage)),
         ),
         h(
-          'main',
+          // The page's own main, unless the drive is inside one already: then a region of it, named.
+          inMain ? 'section' : 'main',
           {
             class: 'rf-main',
+            'aria-label': inMain ? (options.title ?? t('myFiles')) : undefined,
             onDragover: (event: DragEvent) => {
               if (section !== 'files' || query || !event.dataTransfer?.types.includes('Files')) return;
               event.preventDefault();
