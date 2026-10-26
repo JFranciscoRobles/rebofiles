@@ -81,6 +81,16 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   // Its pages, by Rebodocs' engine.
   await expect(docx.locator('.rf-view-pages .dx-page').first()).toBeVisible({ timeout: 15_000 });
   await expect(docx.getByRole('button', { name: 'Open in Rebodocs' })).toBeVisible();
+  // Printed as its pages are shown, in place of a tab of its own.
+  await expect(docx.getByRole('button', { name: 'Print' })).toBeVisible();
+  await expect(docx.getByRole('button', { name: 'Open in a new tab' })).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as unknown as { printed: number }).printed = 0;
+    window.print = () => void (window as unknown as { printed: number }).printed++;
+  });
+  await docx.getByRole('button', { name: 'Print' }).click();
+  expect(await page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
+  await expect(page.locator('body > .dx-print .dx-print-page')).toHaveCount(1);
   // One page under another at first; Rebodocs' bar floating over them sets all of them out, and zooms.
   const bar = docx.locator('.rf-doc-zoom');
   await expect(bar.locator('[data-name="column"]')).toHaveClass(/dx-on/);

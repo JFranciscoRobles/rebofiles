@@ -146,7 +146,8 @@ minor version (0.x.0) may change the API; such changes are listed under
   screen, with Rebodocs' bar floating over them (the page one is on, the
   fit, the zoom), whose grid of pages sets all of them out at once, as large
   as lets them all fit (at the editor's least zoom, a quarter, for a long
-  one). A first page lying down is shown whole in its thumbnail. Its thumbnail, in the grid and the
+  one); printed from the viewer as its pages are shown. A first page lying
+  down is shown whole in its thumbnail. Its thumbnail, in the grid and the
   details, is the top of its first page as Rebodocs draws it, large, its
   side margins left out. It is a picture made when the document is uploaded
   (`pictureDocument: pictureOfDocx`): its first page drawn by Rebodocs'

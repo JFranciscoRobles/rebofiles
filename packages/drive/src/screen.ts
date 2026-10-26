@@ -65,7 +65,7 @@ export interface DriveOptions {
 }
 
 /** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
-export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void } | undefined;
+export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void } | undefined;
 
 export interface MountedDrive {
   readonly client: DriveClient;
@@ -1171,7 +1171,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
   const fullTexts = new Map<string, string | null | Error>();
   /** The document shown in pages, to take down before the next. */
-  let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void } | undefined;
+  let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void } | undefined;
   const undoDocument = () => {
     shownDocument?.destroy();
     shownDocument = undefined;
@@ -1386,7 +1386,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             class: 'rf-btn rf-docs rf-small',
           }),
         button(icon('download', 18), () => void attempt(() => downloadEach([file])), { class: 'rf-btn rf-icon', 'aria-label': t('download'), title: t('download') }),
-        button(icon('external', 18), () => void openInTab(file), { class: 'rf-btn rf-icon', 'aria-label': t('openInTab'), title: t('openInTab') }),
+        // A document shown in its pages prints as it is shown; anything else opens in a tab of its own.
+        kind === 'docx' && shownDocument?.print
+          ? button(icon('printer', 18), () => shownDocument?.print?.(), { class: 'rf-btn rf-icon', 'aria-label': t('print'), title: t('print') })
+          : button(icon('external', 18), () => void openInTab(file), { class: 'rf-btn rf-icon', 'aria-label': t('openInTab'), title: t('openInTab') }),
         button(icon('close', 18), closeView, { class: 'rf-btn rf-icon', 'aria-label': t('close'), title: t('close') }),
       ),
       h(

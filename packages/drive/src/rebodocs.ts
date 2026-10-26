@@ -30,6 +30,8 @@ export interface DocumentView {
   /** How many pages it has. */
   readonly pages: number;
   layout(mode: DocumentLayout): void;
+  /** The browser's print dialog, with the pages as they are laid out: to paper, or to a PDF. */
+  print(): void;
   destroy(): void;
 }
 
@@ -116,6 +118,7 @@ export async function viewDocx(element: HTMLElement, bytes: Uint8Array, context:
   return {
     pages: editor.pageCount,
     layout,
+    print: () => editor.print(),
     destroy: () => {
       offChange();
       status.destroy();
