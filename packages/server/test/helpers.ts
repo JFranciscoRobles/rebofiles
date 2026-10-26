@@ -18,7 +18,11 @@ export function client(handle: Handler, who = 'ana', origin = 'http://drive.test
     if (start.status !== 200) return start;
     const parts = [];
     for (const part of start.body.parts as UploadPart[]) {
-      const answer = await send(part.url.startsWith('/') ? origin + part.url : part.url, { method: 'PUT', body: bytes.slice(part.from, part.to) });
+      const answer = await send(part.url.startsWith('/') ? origin + part.url : part.url, {
+        method: 'PUT',
+        headers: { 'content-type': String(asked.type ?? 'application/octet-stream') },
+        body: bytes.slice(part.from, part.to),
+      });
       parts.push({ number: part.number, etag: answer.headers.get('etag') ?? '' });
     }
     return ask('POST', '/api/files/uploads/finish', { token: start.body.token, parts });
@@ -41,7 +45,10 @@ export function memoryS3() {
     const key = decodeURIComponent(url.pathname.replace(/^\/bucket\//, ''));
     const q = url.searchParams;
     const body = init.body === undefined ? new Uint8Array() : new Uint8Array(await new Response(init.body as BodyInit).arrayBuffer());
-    const signedLength = q.get('X-Amz-SignedHeaders')?.includes('content-length');
+    const signed = q.get('X-Amz-SignedHeaders')?.split(';');
+    // It cannot check a signature, but it can see that a header that was signed was not sent, as S3 would refuse.
+    const sent = new Headers(init.headers);
+    const unsent = signed?.find((name) => name !== 'host' && name !== 'content-length' && !sent.has(name));
     if (method === 'POST' && q.has('uploads')) {
       const id = `u${++next}`;
       uploads.set(id, new Map());
@@ -62,12 +69,14 @@ export function memoryS3() {
       return new Response('<CompleteMultipartUploadResult/>');
     }
     if (method === 'PUT') {
-      if (signedLength === false) return new Response('unsigned length', { status: 400 });
+      if (signed && !signed.includes('content-length')) return new Response('unsigned length', { status: 400 });
+      if (unsent) return new Response(`<Error><Code>SignatureDoesNotMatch</Code><Message>${unsent} was signed but not sent</Message></Error>`, { status: 403 });
       objects.set(key, body);
       return new Response(null, { headers: { etag: '"one"' } });
     }
     if (!objects.has(key)) return new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 });
-    if (method === 'HEAD') return new Response(null, { headers: { 'content-length': String(objects.get(key)!.length) } });
+    // As Cloudflare does: an answer it may compress says no length, and a HEAD of a text it compresses.
+    if (method === 'HEAD') return new Response(null, { headers: sent.get('accept-encoding') === 'identity' ? { 'content-length': String(objects.get(key)!.length) } : {} });
     if (method === 'DELETE') return objects.delete(key), new Response(null, { status: 204 });
     return new Response(objects.get(key)!.slice());
   };

@@ -91,7 +91,7 @@ export function createDriveClient(options: ClientOptions) {
   /** One part, with XMLHttpRequest where there is one, as only it says how much of a body has gone. */
   function sendPart(url: string, bytes: Blob, onSent: (sent: number) => void, signal?: AbortSignal): Promise<string> {
     if (typeof XMLHttpRequest === 'undefined' || options.fetch) {
-      return send(absolute(url), { method: 'PUT', body: bytes, signal }).then((answer) => {
+      return send(absolute(url), { method: 'PUT', headers: bytes.type ? { 'content-type': bytes.type } : undefined, body: bytes, signal }).then((answer) => {
         if (!answer.ok) throw new RequestError(answer.status, 'upload', `A part was refused (${answer.status}).`);
         onSent(bytes.size);
         return answer.headers.get('etag') ?? '';
@@ -133,10 +133,12 @@ export function createDriveClient(options: ClientOptions) {
       absolute((await ask<{ url: string }>('GET', `/entries/${encodeURIComponent(id)}/download${q({ version: options.version, inline: options.inline ? '1' : undefined })}`)).url),
 
     async upload(file: Blob & { name?: string }, options: UploadOptions = {}): Promise<FileEntry> {
+      // A bucket signs the type of a file of one part, so each part goes with the type the server was told.
+      const type = file.type || 'application/octet-stream';
       const start = await ask<{ token: string; parts: Part[] }>(
         'POST',
         '/uploads',
-        { name: file.name ?? 'file', parent: options.parent ?? null, file: options.file, type: file.type || 'application/octet-stream', size: file.size },
+        { name: file.name ?? 'file', parent: options.parent ?? null, file: options.file, type, size: file.size },
         options.signal,
       );
       const sent = new Map<number, number>();
@@ -147,7 +149,9 @@ export function createDriveClient(options: ClientOptions) {
       const worker = async () => {
         for (let part = waiting.shift(); part; part = waiting.shift()) {
           const { number } = part;
-          const etag = await sendPart(part.url, file.slice(part.from, part.to), (n) => (sent.set(number, n), report()), options.signal);
+          const etag = await sendPart(part.url, file.slice(part.from, part.to, type), (n) => (sent.set(number, n), report()), options.signal);
+          // A bucket that lets the page in but not its ETag: the parts arrived, and cannot be put together.
+          if (!etag && start.parts.length > 1) throw new RequestError(0, 'upload', 'The bucket did not let the page read the ETag of a part. Its rule of origins has to expose ETag.');
           finished.push({ number, etag });
         }
       };

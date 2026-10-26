@@ -50,7 +50,8 @@ export function s3Storage(options: S3Options): Storage {
     return url.toString();
   };
   const ask = async (method: string, url: string, body?: string): Promise<Response> => {
-    const answer = await send(presign(credentials, { method, url, expires: 60 }), { method, body });
+    // Not compressed: Cloudflare gzips the answer to a HEAD of a text, and drops its content-length, which says what arrived.
+    const answer = await send(presign(credentials, { method, url, expires: 60 }), { method, body, headers: { 'accept-encoding': 'identity' } });
     if (!answer.ok && answer.status !== 404) throw new Error(`The bucket answered ${answer.status} to ${method}: ${(await answer.text()).slice(0, 300)}`);
     return answer;
   };

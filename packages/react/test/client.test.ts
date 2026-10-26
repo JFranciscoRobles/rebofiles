@@ -5,7 +5,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDriveHandler, diskStorage, everyone, memoryMetadata, PART_SIZE } from '@rebofiles/server';
+import { createDriveHandler, diskStorage, everyone, memoryMetadata, PART_SIZE, s3Storage } from '@rebofiles/server';
+import { memoryS3 } from '../../server/test/helpers';
 import { RequestError, createDriveClient } from '../src/client';
 import { formatDate, formatSize } from '../src/i18n';
 import { kindOf } from '../src/kinds';
@@ -76,6 +77,28 @@ describe('the client', () => {
     const file = await drive.upload(new File(['hello'], 'hello.txt', { type: 'text/plain' }));
     // Relative to the base, which is a whole address here.
     expect(await drive.url(file.id, { inline: true })).toMatch(/^http:\/\/drive\.test\/api\/files\/bytes\?token=/);
+  });
+});
+
+describe('the client against a bucket', () => {
+  it('sends each part with the headers the bucket signed, the type of a small file among them', async () => {
+    const s3 = memoryS3();
+    const handle = createDriveHandler({
+      storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
+      metadata: memoryMetadata(),
+      ...everyone('ana'),
+      secret: 'u',
+      base: '/api/files',
+    });
+    const origin = 'http://drive.test';
+    const drive = createDriveClient({
+      base: `${origin}/api/files`,
+      fetch: (input, init) => (String(input).startsWith(origin) ? handle(new Request(String(input), init)) : s3.fetch(input, init)),
+    });
+    const small = await drive.upload(new File(['a note'], 'note.txt', { type: 'text/plain' }));
+    const untyped = await drive.upload(new File(['?'], 'blob'));
+    const large = await drive.upload(new File([new Uint8Array(PART_SIZE + 10)], 'big.bin'));
+    expect([small, untyped, large].map((file) => s3.objects.get(file.versions[0].key)?.length)).toEqual([6, 1, PART_SIZE + 10]);
   });
 });
 
