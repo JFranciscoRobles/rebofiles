@@ -1,5 +1,5 @@
 // The drive with the keyboard alone: no click from the first key to the last.
-// Its own person (`?as=keys`), so it starts from a drive of its own.
+// Its own person (`?as=keys-…`), so it starts from a drive of its own.
 
 import { type Page, expect, test } from '@playwright/test';
 
@@ -8,7 +8,8 @@ const said = (page: Page) => page.locator('.rf-sr[aria-live]');
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.textContent?.trim() || document.activeElement?.getAttribute('aria-label'));
 
 test('makes folders from the menu, goes into one, uploads, renames, moves and trashes, by keys', async ({ page }) => {
-  await page.goto('/?as=keys');
+  // A person of its own each time, so it starts from an empty drive however often it runs.
+  await page.goto(`/?as=keys-${Date.now()}`);
   await expect(said(page)).toHaveText('My files · 0 items');
 
   // The menu: the arrows go round it, Escape gives the focus back.
