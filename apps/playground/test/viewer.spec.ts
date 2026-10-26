@@ -4,7 +4,7 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
-import { sampleDocx } from '../../../tools/sample-docx';
+import { sampleDocx, sampleDocxWithPicture } from '../../../tools/sample-docx';
 
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 
@@ -91,4 +91,31 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   await expect(page.locator('.rf-items')).toBeFocused();
   await expect(item(page, 'a-agreement.docx')).toHaveAttribute('aria-selected', 'true');
   expect(tabs).toEqual([]);
+});
+
+test('a Word document’s thumbnail has its pictures in it', async ({ page }) => {
+  await page.goto('/?as=pictures');
+  await page
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'house.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(sampleDocxWithPicture()) });
+  await expect(item(page, 'house.docx')).toBeVisible();
+  let id = '';
+  await expect
+    .poll(async () => {
+      const found = (await (await page.request.get('/api/files/search?q=house', { headers: { 'x-user': 'pictures' } })).json()).entries[0];
+      id = found.id;
+      return found.versions[0].renditions?.length ?? 0;
+    })
+    .toBe(2);
+  // Where the picture is on the page, under the title, the thumbnail is its green.
+  const colour = await page.evaluate(async (file) => {
+    const { url } = await (await fetch(`/api/files/entries/${file}/download?size=640`, { headers: { 'x-user': 'pictures' } })).json();
+    const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d')!;
+    context.drawImage(bitmap, 0, 0);
+    const [r, g, b] = context.getImageData(Math.round(bitmap.width * 0.2), Math.round(bitmap.height * 0.2), 1, 1).data;
+    return [r, g, b];
+  }, id);
+  expect(Math.abs(colour[0] - 14) + Math.abs(colour[1] - 124) + Math.abs(colour[2] - 82)).toBeLessThan(40);
 });

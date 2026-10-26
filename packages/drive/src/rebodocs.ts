@@ -121,7 +121,19 @@ export function thumbDocx(bytes: Uint8Array): Promise<HTMLElement> {
       await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
       const page = box.querySelector<HTMLElement>('.dx-page');
       if (!page) throw new Error('The document has no page to show.');
+      // Its pictures as data while the editor holds them: closed, it lets their addresses go.
+      await Promise.all([...page.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined)));
       const copy = page.cloneNode(true) as HTMLElement;
+      const originals = [...page.querySelectorAll('img')];
+      await Promise.all(
+        [...copy.querySelectorAll('img')].map(async (img, i) => {
+          try {
+            img.src = await dataUrl(await (await fetch(originals[i].src)).blob());
+          } catch {
+            img.remove();
+          }
+        }),
+      );
       copy.dataset.width = String(page.offsetWidth);
       copy.dataset.height = String(page.offsetHeight);
       for (const away of copy.querySelectorAll('[contenteditable], textarea, input, .dx-caret, .dx-sel')) away.remove();
