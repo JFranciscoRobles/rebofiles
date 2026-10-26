@@ -72,6 +72,31 @@ test('in Spanish, at the width of a phone', async ({ page }) => {
   expect.soft(await axe(page)).toEqual([]);
 });
 
+test('dark: the list, the grid, a file selected, and sharing it', async ({ page }) => {
+  await page.goto('/?as=axe&theme=dark');
+  await item(page, 'notes.txt').click();
+  await expect(details(page).getByText('Some notes.')).toBeVisible();
+  expect.soft(await axe(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Grid' }).click();
+  expect.soft(await axe(page)).toEqual([]);
+  await details(page).getByRole('button', { name: 'Share' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('textbox').fill('bea');
+  await dialog.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(dialog.getByRole('combobox', { name: 'Role · bea' })).toBeVisible();
+  expect.soft(await axe(page)).toEqual([]);
+});
+
+test('dark, as the system is', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'dark' });
+  const page = await context.newPage();
+  await page.goto('/?as=axe&theme=auto');
+  await expect(item(page, 'notes.txt')).toBeVisible();
+  expect(await page.locator('.rf-drive').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(31, 30, 28)');
+  expect.soft(await axe(page)).toEqual([]);
+  await context.close();
+});
+
 test('a link, opened signed out', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/?as=axe-link');
@@ -85,6 +110,9 @@ test('a link, opened signed out', async ({ page, context }) => {
   await expect(page.getByRole('status')).toHaveText('Link copied');
   const address = await page.evaluate(() => navigator.clipboard.readText());
   await page.goto(address);
+  await expect(page.getByRole('button', { name: 'linked.txt', exact: true })).toBeVisible();
+  expect.soft(await axe(page)).toEqual([]);
+  await page.goto(`${address}&theme=dark`);
   await expect(page.getByRole('button', { name: 'linked.txt', exact: true })).toBeVisible();
   expect.soft(await axe(page)).toEqual([]);
 });

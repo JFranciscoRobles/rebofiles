@@ -23,8 +23,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 9,
-    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back.',
+    count: 17,
+    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark.',
   },
 ];
 
@@ -39,6 +39,7 @@ export const CHECKED: [string, string][] = [
     'Driven in Chrome with real clicks and keys: a folder made, files uploaded into it, a text previewed, a second upload with the same name as “(2)”, renaming with F2, the trash with Delete and back, search, moving from the dialog, the grid, and the drive in Spanish at the width of a phone.',
   ],
   ['Postgres', 'Two pools on one Postgres 16, as two servers, making twenty folders of one name at once: twenty names, none given twice. Without the lock, ten.'],
+  ['The site', 'axe on the landing, Getting started and this page, at the width of a desktop and of a phone, with motion and with less of it: nothing found.'],
   ['Rebodocs', 'A Word document uploaded, previewed as a page, opened in Rebodocs, changed, saved with ⌘S, and back in the drive as its second version.'],
   ['The demo', 'Acme’s files made in the page, a Word document and a PDF previewed, Claude’s rename and its card, an upload in steps, the trash emptied.'],
   [
@@ -114,7 +115,7 @@ export const ROADMAP: Milestone[] = [
     items: [
       { what: '@rebofiles/drive split out of react, without a framework' },
       { what: 'The headless hooks, documented with a whole screen built from them' },
-      { what: 'Accessible: every action from the keyboard, screen readers, axe, a dark theme; Playwright' },
+      { what: 'Accessible: every action from the keyboard, screen readers, axe, a dark theme; Playwright', done: true },
     ],
   },
   {

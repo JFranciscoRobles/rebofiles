@@ -19,10 +19,12 @@ export interface SharedLinkProps {
   language?: 'en' | 'es';
   texts?: Texts;
   logo?: React.ReactNode;
+  /** Light (the default), dark, or as the system is (`'auto'`). */
+  theme?: 'light' | 'dark' | 'auto';
   className?: string;
 }
 
-export function SharedLink({ base = '/api/files', token, language = 'en', texts, logo, className }: SharedLinkProps) {
+export function SharedLink({ base = '/api/files', token, language = 'en', texts, logo, theme = 'light', className }: SharedLinkProps) {
   const t = useMemo(() => translator(texts ?? TEXTS[language]), [texts, language]);
   const link = useMemo(() => createLinkClient({ base, token }), [base, token]);
   const [folder, setFolder] = useState<EntryId | undefined>(undefined);
@@ -61,7 +63,7 @@ export function SharedLink({ base = '/api/files', token, language = 'en', texts,
   // A link to one file shows that file as the only row.
   const rows = listing ? (listing.root.kind === 'file' ? [listing.root] : listing.entries) : [];
   return (
-    <div className={`rf-drive rf-shared${className ? ` ${className}` : ''}`}>
+    <div className={`rf-drive rf-shared${className ? ` ${className}` : ''}`} data-theme={theme}>
       <style>{CSS}</style>
       <div className="rf-top">
         <div className="rf-title">

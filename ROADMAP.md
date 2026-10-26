@@ -72,7 +72,7 @@ Taken on October 25, 2026, by running `npm test`, every one passing:
 
 ### The interface
 
-`npm run test:browser` · 9 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll. Ana sharing a folder with Bea as an editor, Bea finding it in Shared with me and putting a file in it, a link copied and opened by someone signed out, until it is taken back.
+`npm run test:browser` · 17 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll. Ana sharing a folder with Bea as an editor, Bea finding it in Shared with me and putting a file in it, a link copied and opened by someone signed out, until it is taken back. The drive with the keyboard alone: the menu by its arrows, folders made and opened, an upload, F2, moving from the dialog, the trash, and where one is said at each step. axe, by WCAG 2.2 AA, on every state reached: empty and with files, the list and the grid, each dialog, the trash, Shared with me, a search, Spanish at the width of a phone, a link signed out, and the same in the dark theme, chosen and as the system is.
 
 By hand:
 
@@ -149,9 +149,9 @@ server, the preview of a Word document, a strict typecheck.
 10. **`drive`** split out of `react`, without a framework, as `editor` is in
     Rebodocs.
 11. The headless hooks, documented with a whole drive screen built from them.
-12. **Accessible:** every action from the keyboard, what a screen reader is
-    told, axe on every page with a drive, a dark theme. Tests in Chrome with
-    Playwright.
+12. ✅ **Accessible:** every action from the keyboard, what a screen reader is
+    told, axe on every page with a drive, a dark theme (`theme`). Tests in
+    Chrome with Playwright.
 
 ### 0.4.0 · Assistants
 

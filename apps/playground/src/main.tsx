@@ -2,6 +2,7 @@
 // with Word documents previewed and opened in Rebodocs. Saving in the editor
 // keeps a new version of the file in the drive.
 // `?lang=es` shows it in Spanish, `?view=grid` starts with the grid.
+// `?theme=dark` (or `auto`) shows it dark.
 // `?as=bea` is the drive as Bea sees it, to share with her and look; a link
 // of the drive comes here as `?link=…`, and shows what it reads.
 
@@ -17,6 +18,7 @@ const Editor = lazy(() => import('./Editor'));
 const params = new URLSearchParams(location.search);
 const language = params.get('lang') === 'es' ? 'es' : 'en';
 const as = params.get('as');
+const theme = (['dark', 'auto'].includes(params.get('theme') ?? '') ? params.get('theme') : 'light') as 'light' | 'dark' | 'auto';
 const link = params.get('link');
 
 function Playground() {
@@ -24,6 +26,7 @@ function Playground() {
   return (
     <DriveProvider base="/api/files" language={language} headers={(): Record<string, string> => (as ? { 'x-user': as } : {})}>
       <FileDrive
+        theme={theme}
         title={as ? `Playground · ${as}` : 'Playground'}
         defaultView={params.get('view') === 'grid' ? 'grid' : 'list'}
         previewDocument={previewDocx}
@@ -38,4 +41,7 @@ function Playground() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{link ? <SharedLink token={link} language={language} /> : <Playground />}</StrictMode>);
+// The page behind the drive goes with it (index.html).
+document.body.dataset.theme = theme;
+
+createRoot(document.getElementById('root')!).render(<StrictMode>{link ? <SharedLink token={link} language={language} theme={theme} /> : <Playground />}</StrictMode>);

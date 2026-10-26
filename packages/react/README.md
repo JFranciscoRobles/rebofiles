@@ -39,12 +39,14 @@ the arrows, Enter to open, Delete for the trash, F2 to rename.
 | `language`, `texts` | `'en'` or `'es'`, or texts of your own with the same keys. |
 | `title`, `logo` | What goes in the top bar. |
 | `defaultView` | `'list'` or `'grid'`. |
+| `theme` | `'light'` (the default), `'dark'`, or `'auto'` as the system is. Also on `<SharedLink>`. |
 | `onOpen` | A file opened. Unless given, it opens in a new tab as the browser shows it. |
 | `onOpenDocument` | Gives Word documents an "Open in Rebodocs" button. |
 | `previewDocument` | Reads a Word document for its preview: `previewDocx` of `@rebofiles/react/rebodocs`. |
 | `linkAddress` | Where a link of the drive points: the page of yours with `<SharedLink>`. This page with `?link=` unless given. |
 
-Its colours, radii and fonts are custom properties on `.rf-drive`
+`theme="dark"` shows it dark, and `"auto"` as the system is; light unless
+said. Its colours, radii and fonts are custom properties on `.rf-drive`
 (`--rf-brand`, `--rf-radius`, `--rf-font`…): change them on the element, or
 on a `className` of your own.
 

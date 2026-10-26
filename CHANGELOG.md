@@ -112,6 +112,11 @@ minor version (0.x.0) may change the API; such changes are listed under
   its button. Inside the move dialog, going into a folder puts the focus on
   its first folder, or on "Move here", rather than nowhere. Kept by a test in
   Chrome that makes, opens, uploads, renames, moves and trashes without a click.
+- **A dark theme.** `theme="dark"`, or `"auto"` as the system is, on
+  `<FileDrive>` and `<SharedLink>`; light unless said. Every colour of the
+  drive is a custom property now, the kinds of file, shadows and the toast
+  among them, and the dark ones read at 4.5:1 or more, as axe checks. A page
+  previewed stays paper, with the ink of paper.
 - **What a screen reader is told.** Where one is and how many items are
   there, once a view has loaded; an upload's progress as a progress bar, no
   longer read out at every step; a failed upload as an alert.

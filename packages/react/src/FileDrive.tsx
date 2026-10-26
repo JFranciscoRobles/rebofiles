@@ -24,6 +24,8 @@ export interface FileDriveProps extends Omit<DriveProviderProps, 'children'> {
   onOpenDocument?: (file: FileEntry, url: string) => void;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/react/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
+  /** Light (the default), dark, or as the system is (`'auto'`). Its colours are custom properties either way. */
+  theme?: 'light' | 'dark' | 'auto';
   /** The address a link of the drive is given: where your page that reads it with `<SharedLink>` is. This page with `?link=` unless given. */
   linkAddress?: (token: string) => string;
   className?: string;
@@ -54,7 +56,17 @@ type Dialog = { kind: 'folder' } | { kind: 'rename'; entry: Entry } | { kind: 'm
 /** The type of what is dragged from the drive itself, apart from files dragged in from the computer. */
 const DRAGGED = 'application/x-rebofiles-entry';
 
-function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDocument, previewDocument, linkAddress, className }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
+function Screen({
+  title = 'Files',
+  logo,
+  defaultView = 'list',
+  onOpen,
+  onOpenDocument,
+  previewDocument,
+  linkAddress,
+  theme = 'light',
+  className,
+}: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
   const { t, client } = useDrive();
   const actions = useActions();
   const { uploads, upload } = useUploads();
@@ -160,7 +172,7 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
   const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
 
   return (
-    <div className={`rf-drive${className ? ` ${className}` : ''}`}>
+    <div className={`rf-drive${className ? ` ${className}` : ''}`} data-theme={theme}>
       <style>{CSS}</style>
       <div className="rf-top">
         <div className="rf-title">
