@@ -19,3 +19,5 @@ export { type MemoryOptions, type MemoryClient, createMemoryClient } from './mem
 export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate } from './i18n';
 export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
+export { type DriveOptions, type MountedDrive, mountDrive } from './screen';
+export { type SharedLinkOptions, mountSharedLink } from './link';

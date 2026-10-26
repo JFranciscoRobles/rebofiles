@@ -13,6 +13,9 @@ interface DriveContext {
   changed: () => void;
   t: Translate;
   locale: string;
+  /** The texts `t` says, for a drive mounted inside to say the same. */
+  texts: Texts;
+  language: 'en' | 'es';
 }
 
 const Context = createContext<DriveContext | null>(null);
@@ -36,7 +39,10 @@ export function DriveProvider({ base = '/api/files', client, headers, language =
   const made = useMemo(() => client ?? createDriveClient({ base, headers: () => headersRef.current?.() ?? {} }), [client, base]);
   const [revision, setRevision] = useState(0);
   const changed = useCallback(() => setRevision((n) => n + 1), []);
-  const value = useMemo(() => ({ client: made, revision, changed, t: translator(texts ?? TEXTS[language]), locale: language }), [made, revision, changed, texts, language]);
+  const value = useMemo(
+    () => ({ client: made, revision, changed, t: translator(texts ?? TEXTS[language]), locale: language, texts: texts ?? TEXTS[language], language }),
+    [made, revision, changed, texts, language],
+  );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

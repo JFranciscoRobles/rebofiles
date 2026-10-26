@@ -16,7 +16,8 @@
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.10.0",
-    "react": ">=18"
+    "react": ">=18",
+    "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {

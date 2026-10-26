@@ -119,19 +119,20 @@ and their addresses as `blob:` ones. For a demo, a story or a test:
 
 ## Without React
 
-`createDriveClient({ base })` is the client the hooks use: one function per
-route, and `upload(file, { parent, onProgress })`.
+`<FileDrive>` is the drive of [`@rebofiles/drive`](../drive), mounted on an
+element: the same screen with no framework, which this package gives React's
+provider, words and changes. `createDriveClient({ base })`, from there too, is
+the client the hooks use: one function per route, and
+`upload(file, { parent, onProgress })`.
 
 ## Status
 
-The client tested against the routes themselves in `test/client.test.ts`;
-the component driven by hand in Chrome (see the roadmap). Not on npm yet.
+The component and the hooks driven in Chrome by `npm run test:browser`, with
+axe; the client is tested in `@rebofiles/drive`. Not on npm yet.
 
 ## Where it can improve
 
 - **Choosing several entries** at once, to move or trash them together.
-- **Tests in a browser**, as Rebodocs has for its editor.
-- **A dark theme.**
 - **Uploads that resume** after the page is closed.
 
 ## License

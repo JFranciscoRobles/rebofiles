@@ -1,4 +1,6 @@
-// Icons in Lucide's manner, drawn inline: 24 units, a stroke of 1.8.
+// Icons in Lucide's manner, drawn as SVG: 24 units, a stroke of 1.8.
+
+import { s } from './dom';
 
 const PATHS = {
   folder: ['M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'],
@@ -25,28 +27,37 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      {PATHS[name].map((d) => (
-        <path key={d} d={d} />
-      ))}
-    </svg>
+export function icon(name: IconName, size = 18): SVGElement {
+  return s(
+    'svg',
+    {
+      width: size,
+      height: size,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': 1.8,
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true',
+      focusable: 'false',
+    },
+    ...PATHS[name].map((d) => s('path', { d })),
   );
 }
 
 /** The mark of ReboFiles: Rebodocs' tile with a folder in place of a page. */
-export function Logo({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <rect x="2" y="2" width="28" height="28" rx="8" fill="#E3F4EA" />
-      <path
-        d="M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z"
-        fill="none"
-        stroke="#0E7C52"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
+export function logo(size = 24): SVGElement {
+  return s(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 32 32', 'aria-hidden': 'true', focusable: 'false' },
+    s('rect', { x: 2, y: 2, width: 28, height: 28, rx: 8, fill: '#E3F4EA' }),
+    s('path', {
+      d: 'M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z',
+      fill: 'none',
+      stroke: '#0E7C52',
+      'stroke-width': 1.8,
+      'stroke-linejoin': 'round',
+    }),
   );
 }
