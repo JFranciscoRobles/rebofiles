@@ -219,6 +219,18 @@ minor version (0.x.0) may change the API; such changes are listed under
   same for all the others". `createUploads({ check })`, `lookInDrive`,
   `decide`; `useUploads({ check: true })` in React; `checkUploads: false`
   to upload without asking, as before.
+- **Search by what is written in a file.** As a file is uploaded, the page
+  reads its text: a text file by its type or its name, the first 2 MiB; a
+  Word document with `textOfDocx` of `@rebofiles/drive/rebodocs`
+  (`textDocument`); and sends it after it (`text`, `PUT
+  /entries/:id/text`), kept with the version it is of, the first 100,000
+  characters. A search shows what is found by its name first, then by its
+  text, with a piece of the text around what was found under its name
+  (`GET /search/text`, `searchText`, `textMatch`); every word, without case
+  or accents, as for names. The store keeps the texts (`keepText`,
+  `findText`): SQLite in a table of its full-text search, Postgres with a
+  `tsvector`. An assistant searches them with `search_text`, and what it
+  writes is kept to be found. PDFs are not read yet.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

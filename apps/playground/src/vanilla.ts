@@ -3,7 +3,7 @@
 // `?as=bea`, `?lang=es` and `?theme=dark` as on the other page.
 
 import { mountDrive } from '@rebofiles/drive';
-import { pictureOfDocx, previewDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
 
 const params = new URLSearchParams(location.search);
 const as = params.get('as');
@@ -19,5 +19,6 @@ mountDrive(document.getElementById('root')!, {
   previewDocument: previewDocx,
   viewDocument: viewDocx,
   thumbDocument: thumbDocx,
+  textDocument: textOfDocx,
   pictureDocument: pictureOfDocx,
 });

@@ -18,6 +18,7 @@ import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
 import { type Picked, readChosen, readDropped } from './folders';
 import { type UploadItem, createUploads, formatDuration, lookInDrive } from './uploads';
+import { textOf } from './text';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
@@ -48,6 +49,8 @@ export interface DriveOptions {
   viewDocument?: (element: HTMLElement, bytes: Uint8Array, context: { language: string }) => ShownDocument | Promise<ShownDocument>;
   /** The first page of a Word document, drawn, for its thumbnail in the grid and the details: `thumbDocx` of `@rebofiles/drive/rebodocs`. */
   thumbDocument?: (bytes: Uint8Array) => Promise<HTMLElement>;
+  /** What is written in a Word document, to find it by in a search: `textOfDocx` of '@rebofiles/drive/rebodocs'. Text files are read without it. */
+  textDocument?: (bytes: Uint8Array) => string | Promise<string>;
   /**
    * The first page of a Word document as a picture, its longest side `size` pixels: `pictureOfDocx` of
    * `@rebofiles/drive/rebodocs`. Made when one is uploaded, and kept with it as its thumbnail, in the sizes of the
@@ -227,11 +230,18 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' | 'shared' | 'trash' } | { section: 'search'; query: string; trashed: boolean };
   const viewOf = (): View => (query ? { section: 'search', query, trashed: section === 'trash' } : section === 'files' ? { section, folder } : { section });
+  // What was found by what is written in a file, beside what was found by its name: a piece of the text for each.
+  let snippets = new Map<EntryId, string>();
+  const searchBoth = async (q: string, trashed: boolean) => {
+    const [named, written] = await Promise.all([client.search(q, { trashed }), trashed ? Promise.resolve([]) : client.searchText(q).catch(() => [])]);
+    snippets = new Map(written.map((found) => [found.entry.id, found.snippet]));
+    const seen = new Set(named.map((entry) => entry.id));
+    return [...named, ...written.filter((found) => !seen.has(found.entry.id)).map((found) => found.entry)];
+  };
   const listing = resource((key) => {
     const view = JSON.parse(key) as View;
     if (view.section === 'files') return client.list(view.folder);
-    const asked =
-      view.section === 'search' ? client.search(view.query, { trashed: view.trashed }) : view.section === 'recent' ? client.recent() : view.section === 'shared' ? client.shared() : client.trash();
+    const asked = view.section === 'search' ? searchBoth(view.query, view.trashed) : view.section === 'recent' ? client.recent() : view.section === 'shared' ? client.shared() : client.trash();
     return asked.then((entries) => ({ folder: null, entries, path: [] as FolderEntry[] }));
   });
   const detail = resource((id) => client.entry(id));
@@ -603,7 +613,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // The same bytes anywhere in the drive, and else a file of the same name where it goes: asked about before it goes.
   const lookIn = lookInDrive(client);
   const uploader = createUploads(client, {
-    extra: () => ({ images: settings?.settings.images, renditions: picturesOf }),
+    extra: () => ({ images: settings?.settings.images, renditions: picturesOf, text: (file, name) => textOf(file, name, options.textDocument) }),
     check: (file, parent) => (options.checkUploads === false ? Promise.resolve({}) : lookIn(file, parent)),
     onChange: render,
     onDone: (entry, item) => {
@@ -759,6 +769,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     ];
   }
 
+  /** An entry's name, and, of one found by what is written in it, a piece of that under it. */
+  const named = (entry: Entry) => {
+    const snippet = query ? snippets.get(entry.id) : undefined;
+    return snippet ? h('span', { class: 'rf-name-lines' }, h('span', null, entry.name), h('small', { class: 'rf-snippet' }, snippet)) : h('span', null, entry.name);
+  };
+
   function items(entries: Entry[], loading: boolean, error: Error | null, empty: string) {
     if (error) return h('div', { class: 'rf-empty rf-error', role: 'alert' }, error.message);
     if (!loading && entries.length === 0) return h('div', { class: 'rf-empty' }, h('div', null, icon('folder', 40), h('div', null, empty)));
@@ -874,7 +890,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               item(
                 entry,
                 'rf-row',
-                h('span', { class: 'rf-name' }, tick(entry), tile(entry), h('span', null, entry.name)),
+                h('span', { class: 'rf-name' }, tick(entry), tile(entry), named(entry)),
                 h('span', null, entry.owner),
                 h('span', null, formatDate(entry.modified, locale)),
                 h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
@@ -896,7 +912,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   tick(entry),
                   url ? h('img', { src: url, alt: '', loading: 'lazy' }) : (entry.kind === 'file' && docThumb(entry, 'width', 320)) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
                 ),
-                h('div', { class: 'rf-name' }, tile(entry), h('span', null, entry.name)),
+                h('div', { class: 'rf-name' }, tile(entry), named(entry)),
               );
             }),
           ),

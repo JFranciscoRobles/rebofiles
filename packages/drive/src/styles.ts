@@ -159,6 +159,8 @@ export const CSS = `
 .rf-card[aria-selected='true'] { background: var(--rf-brand-light); border-color: var(--rf-focus); }
 .rf-thumb { height: 96px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 8px; overflow: hidden; }
 .rf-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.rf-name-lines { display: flex; flex-direction: column; min-width: 0; }
+.rf-name .rf-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rf-ink-soft); font-size: 12px; font-weight: 400; }
 .rf-card .rf-name { font-size: 13px; gap: 8px; padding: 0 4px 2px; }
 .rf-card .rf-tile { width: 22px; height: 22px; border-radius: 6px; font-size: 7px; }
 

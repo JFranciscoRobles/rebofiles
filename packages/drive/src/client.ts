@@ -93,6 +93,14 @@ export interface UploadOptions {
   rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
   /** The SHA-256 of its bytes, in hex (`hashOf`): kept with the version, to tell the same file uploaded again. */
   sha256?: string;
+  /** What is written in it, read in the page (`textOf`), sent after it to find it by; undefined for a file with none. */
+  text?: (file: Blob, name: string) => Promise<string | undefined>;
+}
+
+/** A file found by what is written in it, and a piece of that around what was found. */
+export interface TextFound {
+  entry: FileEntry;
+  snippet: string;
 }
 
 /** Where to read a file from, until when, and the size of the smaller picture it is when it is one. */
@@ -207,6 +215,9 @@ export function createDriveClient(options: ClientOptions) {
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
     /** What was done to an entry, and, of a folder, to what is right inside it: the newest first. */
     activity: async (id: EntryId, limit = 50) => (await ask<{ activity: Activity[] }>('GET', `/entries/${encodeURIComponent(id)}/activity?limit=${limit}`)).activity,
+    /** Files by what is written in them, with a piece of it around what was found; none from a server without the route. */
+    searchText: async (query: string, limit = 50) =>
+      (await ask<{ results: TextFound[] }>('GET', `/search/text?q=${encodeURIComponent(query)}&limit=${limit}`).catch(() => ({ results: [] as TextFound[] }))).results,
     /** The files with these bytes already in the drive, of what the one asking may read, by their SHA-256; none from a server without the route. */
     duplicates: async (hashes: string[]) =>
       hashes.length ? (await ask<{ found: Record<string, Entry[]> }>('POST', '/duplicates', { hashes }).catch(() => ({ found: {} as Record<string, Entry[]> }))).found : {},
@@ -356,6 +367,11 @@ export function createDriveClient(options: ClientOptions) {
         } catch (error) {
           if (signal?.aborted) throw error;
         }
+      }
+      // And what is written in it, the same way: found by its name until it is.
+      if (options.text && !options.rendition) {
+        const text = await options.text(file, name).catch(() => undefined);
+        if (text?.trim()) await ask('PUT', `/entries/${encodeURIComponent(entry.id)}/text`, { version: entry.versions[0].id, text }).catch(() => undefined);
       }
       return entry;
     },

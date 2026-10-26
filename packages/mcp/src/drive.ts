@@ -55,6 +55,9 @@ export function driveAt(options: DriveOptions) {
       if (trashed) q.set('trashed', '1');
       return (await ask<{ entries: Entry[] }>('GET', `/search?${q}`)).entries;
     },
+    /** What is written in a file, kept to find it by: what it wrote, as a page reads what it uploads. Not kept by a server without the route. */
+    keepText: (file: FileEntry, text: string) => ask('PUT', `${at(file.id)}/text`, { version: file.versions[0].id, text }).catch(() => undefined),
+    searchText: async (query: string) => (await ask<{ results: { entry: FileEntry; snippet: string }[] }>('GET', `/search/text?q=${encodeURIComponent(query)}`)).results,
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
     activity: async (id: EntryId, limit: number) => (await ask<{ activity: Activity[] }>('GET', `${at(id)}/activity?limit=${limit}`)).activity,

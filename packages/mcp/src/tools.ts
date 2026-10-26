@@ -122,6 +122,21 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'search_text',
+    title: 'Search by what is written',
+    description:
+      'Files whose text has every word of the query, in any case and with or without accents, with a piece of the text around what was found: text files and Word documents, as they were read when uploaded.',
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Words written in the file.' } }, required: ['query'], additionalProperties: false },
+    annotations: READ,
+    async run(drive, args) {
+      const found = await drive.searchText(str(args, 'query'));
+      return {
+        text: found.length ? found.map(({ entry, snippet }) => `${line(entry)}: "${snippet}"`).join('\n') : 'Nothing has that written in it.',
+        data: { results: found.map(({ entry, snippet }) => ({ ...brief(entry), snippet })) },
+      };
+    },
+  },
+  {
     name: 'get_info',
     title: 'Details of a file or folder',
     description: 'One file or folder: its type, size, owner, when it changed and by whom, where it is, who it is shared with, and its versions.',
@@ -223,6 +238,7 @@ export const TOOLS: Tool[] = [
     async run(drive, args) {
       const name = str(args, 'name');
       const made = await drive.upload(new TextEncoder().encode(String(args.text ?? '')), typeOf(name), { name, parent: optional(args, 'folder') });
+      await drive.keepText(made, String(args.text ?? ''));
       return { text: `Wrote ${line(made)}.`, data: brief(made) };
     },
   },
@@ -237,6 +253,7 @@ export const TOOLS: Tool[] = [
       if (entry.kind !== 'file') throw new TypeError(`"${entry.name}" is a folder.`);
       if (!isText(entry.name, entry.type)) throw new TypeError(`"${entry.name}" is ${entry.type}, not a text file to write.`);
       const saved = await drive.upload(new TextEncoder().encode(String(args.text ?? '')), entry.type, { file: entry.id });
+      await drive.keepText(saved, String(args.text ?? ''));
       return { text: `Saved version ${saved.versions.length} of "${saved.name}".`, data: brief(saved) };
     },
   },

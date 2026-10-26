@@ -3,7 +3,7 @@
 // the bytes. The server loads the drive, changes it with core and writes back
 // only what changed.
 
-import { type Activity, type Changes, type Drive, type Entry, type EntryId, driveOf, emptyDrive } from '@rebofiles/core';
+import { type Activity, type Changes, type Drive, type Entry, type EntryId, driveOf, emptyDrive, wordsOf } from '@rebofiles/core';
 
 export interface MetadataStore {
   load(): Promise<Drive>;
@@ -25,7 +25,21 @@ export interface MetadataStore {
   record?(lines: Activity[]): Promise<void>;
   /** What was done to an entry, and, of a folder, to what is right inside it: the newest first, at most `limit`. */
   activity?(id: EntryId, limit: number): Promise<Activity[]>;
+  /** The text of a version of a file, to find it by; in place of what was kept for the file before. Without it and `findText`, kept in the process. */
+  keepText?(id: EntryId, version: string, text: string): Promise<void>;
+  /** The texts that may have every word of the query, at most `limit` of them: more are looked at again by the server, which keeps those that do. */
+  findText?(query: string, limit: number): Promise<KeptText[]>;
 }
+
+/** The text of a file, as a store keeps it. */
+export interface KeptText {
+  id: EntryId;
+  version: string;
+  text: string;
+}
+
+/** Words of a query as a full-text search of SQLite or Postgres takes them: each one the start of a word, all of them there. */
+const prefixes = (query: string) => wordsOf(query);
 
 /** The activity of an entry, from all of it, as a store without a query answers it. */
 export const activityIn = (all: readonly Activity[], id: EntryId, limit: number) => {
@@ -42,8 +56,16 @@ export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
   let drive = driveOf(entries);
   const settings = new Map<string, unknown>();
   const lines: Activity[] = [];
+  const texts = new Map<EntryId, KeptText>();
   let saved = 0;
   return {
+    async keepText(id, version, text) {
+      texts.set(id, { id, version, text });
+    },
+    async findText() {
+      // All of them: the server looks for the words itself.
+      return [...texts.values()];
+    },
     async record(more) {
       lines.push(...more);
     },
@@ -94,7 +116,29 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   for (const column of ['entry', 'parent', 'origin']) db.exec(`CREATE INDEX IF NOT EXISTS rebofiles_activity_${column} ON rebofiles_activity (${column}, seq)`);
   const note = db.prepare('INSERT INTO rebofiles_activity (entry, parent, origin, line) VALUES (?, ?, ?, ?)');
   const about = db.prepare('SELECT line FROM rebofiles_activity WHERE entry = ? OR parent = ? OR origin = ? ORDER BY seq DESC LIMIT ?');
+  // The text of each file in a table of SQLite's full-text search, without minding case or accents.
+  db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS rebofiles_text USING fts5(id UNINDEXED, version UNINDEXED, body, tokenize = 'unicode61 remove_diacritics 2')");
+  const unkeep = db.prepare('DELETE FROM rebofiles_text WHERE id = ?');
+  const keepIt = db.prepare('INSERT INTO rebofiles_text (id, version, body) VALUES (?, ?, ?)');
+  const match = db.prepare('SELECT id, version, body FROM rebofiles_text WHERE rebofiles_text MATCH ? ORDER BY rank LIMIT ?');
   return {
+    async keepText(id, version, text) {
+      db.exec('BEGIN');
+      try {
+        unkeep.run(id);
+        keepIt.run(id, version, text);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+    async findText(query, limit) {
+      const words = prefixes(query);
+      if (!words.length) return [];
+      const rows = match.all(words.map((word) => `"${word}"*`).join(' '), limit) as { id: string; version: string; body: string }[];
+      return rows.map((row) => ({ id: row.id, version: row.version, text: row.body }));
+    },
     async record(more) {
       db.exec('BEGIN');
       try {
@@ -189,6 +233,9 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     await db.query(`INSERT INTO ${table}_revision (id, n) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`);
     await db.query(`CREATE TABLE IF NOT EXISTS ${table}_activity (seq bigserial PRIMARY KEY, entry text NOT NULL, parent text, origin text, line jsonb NOT NULL)`);
     for (const column of ['entry', 'parent', 'origin']) await db.query(`CREATE INDEX IF NOT EXISTS ${table}_activity_${column} ON ${table}_activity (${column}, seq)`);
+    // The text of each file, and its words without case or accents, folded here as the queries are.
+    await db.query(`CREATE TABLE IF NOT EXISTS ${table}_text (id text PRIMARY KEY, version text NOT NULL, body text NOT NULL, words tsvector NOT NULL)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS ${table}_text_words ON ${table}_text USING gin (words)`);
   });
   // One statement: the rows removed and the rows put, together or not at all, without a transaction to hold open.
   // The revision goes up in the same statement: the change and the number that says it, together or not at all.
@@ -222,6 +269,18 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
           `INSERT INTO ${table}_activity (entry, parent, origin, line) SELECT a->>'entry', a->>'parent', a->>'from', a FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS t(a, n) ORDER BY n`,
           [JSON.stringify(more)],
         );
+    },
+    async keepText(id, version, text) {
+      await db.query(
+        `INSERT INTO ${table}_text (id, version, body, words) VALUES ($1, $2, $3, to_tsvector('simple', $4)) ON CONFLICT (id) DO UPDATE SET version = excluded.version, body = excluded.body, words = excluded.words`,
+        [id, version, text, wordsOf(text).join(' ')],
+      );
+    },
+    async findText(query, limit) {
+      const words = prefixes(query);
+      if (!words.length) return [];
+      const { rows } = await db.query(`SELECT id, version, body FROM ${table}_text WHERE words @@ to_tsquery('simple', $1) LIMIT $2`, [words.map((word) => `${word}:*`).join(' & '), limit]);
+      return (rows as { id: string; version: string; body: string }[]).map((row) => ({ id: row.id, version: row.version, text: row.body }));
     },
     async activity(id, limit) {
       const { rows } = await db.query(`SELECT line FROM ${table}_activity WHERE entry = $1 OR parent = $1 OR origin = $1 ORDER BY seq DESC LIMIT $2`, [id, limit]);

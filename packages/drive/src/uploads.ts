@@ -57,8 +57,8 @@ export interface UploadsSummary {
 export interface UploadsOptions {
   /** How many files go at once; each goes in parts, a few at once too. 3 unless said. */
   parallel?: number;
-  /** What every upload is given besides: the drive's settings of pictures, what makes them. */
-  extra?: () => Pick<UploadOptions, 'images' | 'renditions'>;
+  /** What every upload is given besides: the drive's settings of pictures, what makes them, what reads its text. */
+  extra?: () => Pick<UploadOptions, 'images' | 'renditions' | 'text'>;
   /** Called after every change, for what shows them to draw again. */
   onChange: () => void;
   /** Called with each file once it is up. */

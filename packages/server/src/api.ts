@@ -30,6 +30,8 @@
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
 //   GET    /entries/:id/activity?limit=   what was done to it, and in it of a folder, the newest first
+//   GET    /search/text?q=                files by what is written in them, with a piece of it around what was found
+//   PUT    /entries/:id/text              { version, text }: what is written in a file, as the page read it, to find it by
 //   POST   /duplicates                    { hashes }: the files with those bytes already, of what one may read
 //   GET    /shared                        what others shared with the one asking
 //   GET    /shared/new                    how many of those are new since they last looked
@@ -65,7 +67,7 @@ async function passwordIs(kept: unknown, given: string): Promise<boolean> {
 }
 import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
-import { type MetadataStore, activityIn } from './metadata';
+import { type KeptText, type MetadataStore, activityIn } from './metadata';
 import { Refused, answerTo } from './refused';
 import { type FinishedPart, READ_LIFE, type Storage, UploadGone, shownWindow } from './storage';
 import { openToken, sealToken } from './tokens';
@@ -171,6 +173,8 @@ const ZIP_AT_ONCE = 50_000;
 
 /** How many files' addresses are asked for in one request: a page of a grid, and more. */
 const URLS_AT_ONCE = 500;
+/** The most characters of a file's text kept to find it by: the start of a long one is enough. */
+const TEXT_KEPT = 100_000;
 
 /** An upload left halfway is good for this long. */
 const UPLOAD_LIFE = 24 * 60 * 60;
@@ -203,6 +207,11 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     ownActivity.push(...lines);
     if (ownActivity.length > 10_000) ownActivity.splice(0, ownActivity.length - 10_000);
   };
+  // The text of each file, to find it by: kept by the store when it can, else for as long as the process lasts.
+  const ownTexts = new Map<EntryId, KeptText>();
+  const keepText = (id: EntryId, version: string, text: string) =>
+    options.metadata.keepText ? options.metadata.keepText(id, version, text) : (ownTexts.set(id, { id, version, text }), Promise.resolve());
+  const findText = (query: string, limit: number) => (options.metadata.findText ? options.metadata.findText(query, limit) : Promise.resolve([...ownTexts.values()]));
   const activity = (id: EntryId, limit: number) => (options.metadata.activity ? options.metadata.activity(id, limit) : Promise.resolve(activityIn(ownActivity, id, limit)));
 
   /** A change of the drive by `by`, who is told in its activity: someone signed in, or the server itself (`trash`). */
@@ -362,6 +371,31 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const within = url.searchParams.get('within') || undefined;
           const found = core.search(drive, url.searchParams.get('q') ?? '', { within, trashed: url.searchParams.get('trashed') === '1', limit: 200 });
           return Response.json({ entries: await readable(user, found, drive) });
+        }
+        case 'GET /search/text': {
+          // Files by what is written in them, as it is now: the text of a version gone by is not theirs any more.
+          const q = url.searchParams.get('q') ?? '';
+          const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') ?? 50) || 50));
+          const drive = await load();
+          const found: { entry: Entry; snippet: string }[] = [];
+          for (const kept of await findText(q, limit * 4)) {
+            if (found.length >= limit) break;
+            const entry = drive.entries.get(kept.id);
+            if (entry?.kind !== 'file' || entry.versions[0].id !== kept.version || core.isTrashed(drive, entry.id)) continue;
+            const match = core.textMatch(kept.text, q);
+            if (match && (await options.authorize(user, 'read', entry, drive))) found.push({ entry, snippet: match.snippet });
+          }
+          return Response.json({ results: found });
+        }
+        case 'PUT /entries/:id/text': {
+          const asked = await body<{ version?: string; text?: string }>();
+          const drive = await load();
+          const file = core.getFile(drive, id);
+          await allow(user, 'upload', file, drive);
+          if (asked.version !== file.versions[0].id) throw new Refused(409, 'not-current', 'The text of a file is that of the version it is now.');
+          if (typeof asked.text !== 'string') throw new Refused(400, 'bad-text', 'Say the text, as a string.');
+          await keepText(file.id, file.versions[0].id, asked.text.slice(0, TEXT_KEPT));
+          return Response.json({ ok: true });
         }
         case 'GET /usage': {
           const drive = await load();

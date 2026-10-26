@@ -12,6 +12,7 @@ export {
   type UploadMemory,
   type SettingsAnswer,
   type FileAddress,
+  type TextFound,
   type LinkClient,
   type LinkListing,
   RequestError,
@@ -24,6 +25,7 @@ export { type MemoryOptions, type MemoryClient, createMemoryClient } from './mem
 export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate } from './i18n';
 export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
+export { textOf, TEXT_READ } from './text';
 export { type MadeRendition, renditionsOf, makesRenditions } from './images';
 export { type ZipItem, type ZipSink, type ZipOptions, writeZip, blobSink, streamSink, crc32 } from './zip';
 export { type Choice, type Conflict, type UploadItem, type Uploads, type UploadsOptions, type UploadsSummary, createUploads, formatDuration, lookInDrive } from './uploads';

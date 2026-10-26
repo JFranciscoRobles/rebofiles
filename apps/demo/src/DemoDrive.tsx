@@ -7,7 +7,7 @@
 import type { FileEntry } from '@rebofiles/core';
 import { answer, driveAt } from '@rebofiles/mcp';
 import { DriveProvider, FileDrive, type MemoryClient, createMemoryClient, useDrive } from '@rebofiles/react';
-import { pictureOfDocx, previewDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { BASE, routesOver } from './routes';
 import { YOU, seed } from './seed';
@@ -48,6 +48,7 @@ function Demo({ client, defaultView, claudeActivity, language }: Required<DemoDr
         previewDocument={previewDocx}
         viewDocument={viewDocx}
         thumbDocument={thumbDocx}
+        textDocument={textOfDocx}
         pictureDocument={pictureOfDocx}
         onOpenDocument={(file, url) => setOpen({ file, url })}
       />

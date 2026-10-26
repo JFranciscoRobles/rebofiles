@@ -4,7 +4,7 @@
 
 import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, lookInDrive, translator } from '@rebofiles/drive';
+import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, lookInDrive, textOf, translator } from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;
@@ -220,7 +220,7 @@ export function useUploads(how: { /** Each file looked for in the drive before i
   const uploads = useMemo(
     () =>
       createUploads(client, {
-        extra: () => ({ images: images.current }),
+        extra: () => ({ images: images.current, text: (file, name) => textOf(file, name) }),
         check: look,
         onChange: () => redraw((n) => n + 1),
         onDone: (entry, item) => {

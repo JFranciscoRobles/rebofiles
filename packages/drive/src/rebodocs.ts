@@ -22,6 +22,13 @@ export function previewDocx(bytes: Uint8Array): DocumentPreview {
   return { title, paragraphs };
 }
 
+/** What is written in a Word document, a paragraph a line: for the drive to find it by (`textDocument`). */
+export function textOfDocx(bytes: Uint8Array): string {
+  return importDocx(bytes)
+    .paragraphs.map((p) => paragraphText(p))
+    .join('\n');
+}
+
 /** How a document is shown in the viewer: all its pages as many across as fit, or one by one, each whole. */
 export type DocumentLayout = 'all' | 'pages';
 

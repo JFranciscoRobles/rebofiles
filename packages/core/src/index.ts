@@ -54,7 +54,7 @@ export {
   settingsFor,
 } from './settings';
 export { type PackedFile, type Packed, packOf } from './pack';
-export { type SearchOptions, search } from './search';
+export { type SearchOptions, search, textMatch, wordsOf } from './search';
 export { type Changes, changes } from './changes';
 export { type Activity, type ActivityAction, activityOf, activityFor } from './activity';
 export { type Action, type Access, EVERYONE, allows, accessOf, share, unshare, sharedWith, sharedSince, addLink, removeLink, linked, linkOf, useLink, linkSpent, LINK_GRACE } from './sharing';

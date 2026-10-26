@@ -14,7 +14,7 @@ describe('without Rebodocs', () => {
     const init = (await ana.rpc('initialize', { protocolVersion: '2025-11-25' })).result as unknown as { instructions: string };
     expect(init.instructions).not.toContain('Word documents');
     const { tools } = (await ana.rpc('tools/list')).result as unknown as { tools: { name: string }[] };
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(16);
     expect((await ana.rpc('tools/call', { name: 'read_document', arguments: {} })).error).toMatchObject({ code: -32602 });
   });
 });

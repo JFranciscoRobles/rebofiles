@@ -24,6 +24,7 @@ describe('the protocol', () => {
     expect(own.map((t) => t.name)).toEqual([
       'list_folder',
       'search',
+      'search_text',
       'get_info',
       'read_file',
       'list_recent',
@@ -73,6 +74,11 @@ describe('the tools', () => {
     expect(found).toHaveLength(1);
     expect((await ana.call('read_file', { id: found[0].id })).content[0].text).toBe('# Terms\n\nPayment within 30 days.');
     expect((await ana.call('list_recent')).structuredContent.entries[0].name).toBe('terms.md');
+
+    const written30 = await ana.call('search_text', { query: 'payment 30' });
+    expect(written30.content[0].text).toContain('file "terms.md"');
+    expect(written30.content[0].text).toContain('"# Terms Payment within 30 days."');
+    expect((await ana.call('search_text', { query: 'refund' })).content[0].text).toBe('Nothing has that written in it.');
   });
 
   it('write a new version, keep the old one to read, rename, move, trash and restore', async () => {

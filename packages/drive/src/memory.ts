@@ -92,6 +92,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
   let saved = options.settings !== undefined;
   let mine: core.PersonalSettings = {};
   let seenShared: string | undefined;
+  const texts = new Map<EntryId, { version: string; text: string }>();
 
   const client: DriveClient = {
     settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved }),
@@ -116,6 +117,16 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     recent: () => run(() => core.recent(drive)),
     trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
     shared: () => run(() => core.sharedWith(drive, user)),
+    searchText: async (query, limit = 50) => {
+      const found: { entry: FileEntry; snippet: string }[] = [];
+      for (const [entryId, kept] of texts) {
+        const entry = drive.entries.get(entryId);
+        if (entry?.kind !== 'file' || entry.versions[0].id !== kept.version || core.isTrashed(drive, entryId)) continue;
+        const match = core.textMatch(kept.text, query);
+        if (match) found.push({ entry, snippet: match.snippet });
+      }
+      return found.slice(0, limit);
+    },
     activity: async (entryId, limit = 50) => core.activityFor(lines, entryId).reverse().slice(0, limit),
     sharedNew: async () => core.sharedSince(drive, user, seenShared).length,
     sawShared: async () => void (seenShared = context().at),
@@ -224,6 +235,8 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         blobs.set(key, r.blob);
         drive = core.addRendition(drive, made.id, versionId, { size: r.size, width: r.width, height: r.height, key, type: r.blob.type, bytes: r.blob.size });
       }
+      const text = how.text ? await how.text(file, name).catch(() => undefined) : undefined;
+      if (text?.trim()) texts.set(made.id, { version: versionId, text: text.slice(0, 100_000) });
       return smaller.length ? core.getFile(drive, made.id) : made;
     },
   };
