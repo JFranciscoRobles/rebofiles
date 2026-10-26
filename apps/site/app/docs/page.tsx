@@ -14,6 +14,7 @@ const CONTENTS: [string, string][] = [
   ['route', 'The route'],
   ['authorize', 'Who may do what'],
   ['page', 'The page'],
+  ['sharing', 'Sharing'],
   ['rebodocs', 'Word documents'],
   ['trouble', 'When something fails'],
   ['next', 'From here'],
@@ -40,8 +41,8 @@ S3_PREFIX=files/
 # What upload tokens are signed with: long, random, the same in every process
 REBOFILES_SECRET=…`;
 
-const ROUTE = `import { createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
-import { mayI, session } from '@/lib/auth'; // your own
+const ROUTE = `import { byRoles, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
+import { session } from '@/lib/auth'; // your own
 
 const handle = createDriveHandler({
   storage: s3Storage(s3OptionsFrom(process.env)),
@@ -50,7 +51,7 @@ const handle = createDriveHandler({
     const user = await session(request);
     return user ? { id: user.id } : null;
   },
-  authorize: (user, action, entry) => mayI(user, action, entry),
+  authorize: byRoles,
   secret: process.env.REBOFILES_SECRET!,
   base: '/api/files',
 });
@@ -68,15 +69,27 @@ import { createDriveHandler, nodeHandler } from '@rebofiles/server';
 const handle = createDriveHandler({ /* as above */ });
 createServer(nodeHandler(handle)).listen(3000);`;
 
-const AUTHORIZE = `import type { Action, User } from '@rebofiles/server';
-import type { Entry } from '@rebofiles/core';
+const AUTHORIZE = `import { type Action, type User, byRoles } from '@rebofiles/server';
+import type { Drive, Entry } from '@rebofiles/core';
 
-export function mayI(user: User, action: Action, entry: Entry | null): boolean {
-  // The top of the drive: anyone signed in may look at it and put things in it.
-  if (!entry) return action === 'list' || action === 'create' || action === 'upload';
-  // Everything else is its owner's.
-  return entry.owner === user.id;
+export function mayI(user: User, action: Action, entry: Entry | null, drive: Drive): boolean {
+  // Your rules first: an administrator may look at everything, never share it.
+  if (isAdmin(user) && action !== 'share') return ['list', 'read', 'download'].includes(action);
+  return byRoles(user, action, entry, drive);
 }`;
+
+const SHARE = `// The page a link goes to: app/shared/page.tsx
+'use client';
+import { SharedLink } from '@rebofiles/react';
+import { useSearchParams } from 'next/navigation';
+
+export default function Shared() {
+  const token = useSearchParams().get('link') ?? '';
+  return <SharedLink base="/api/files" token={token} />;
+}
+
+// And in the drive, where its links point:
+<FileDrive base="/api/files" linkAddress={(token) => \`\${origin}/shared?link=\${token}\`} />`;
 
 const PAGE = `'use client';
 import { FileDrive } from '@rebofiles/react';
@@ -110,6 +123,8 @@ const ACTIONS: [string, string][] = [
   ['trash, restore', 'Into the trash, and out of it.'],
   ['delete', 'Gone for good: the bytes leave the bucket.'],
   ['download', 'An address to read the file from, for a few minutes.'],
+  ['comment', 'Asked of nothing yet: what a commenter may do beyond a viewer.'],
+  ['share', 'Sharing it, taking it back, and its links.'],
 ];
 
 export default function GettingStarted() {
@@ -208,9 +223,13 @@ npm run storage                                   # the drive, at http://localho
             </tbody>
           </table>
         </div>
-        <p>A drive where each person sees only their own files:</p>
+        <p>
+          <C>byRoles</C> answers from the drive itself: the owner of an entry may do everything to it and to what is inside it, and those it is shared with what their role allows: a viewer looks,
+          reads and downloads, an editor also makes, uploads, renames, moves and puts in the trash, and only the owner deletes for good and shares. Anyone signed in may look at the top of the drive
+          and put things there; it shows each person their own. Ask it from rules of your own:
+        </p>
         <Code code={AUTHORIZE} file="lib/auth.ts" />
-        <p>Roles shared down the tree, editor, commenter and viewer, come in 0.2. Until then, the fourth argument is the whole drive, for rules that look at the folders an entry is in.</p>
+        <p>The fourth argument is the whole drive, for rules that look at the folders an entry is in.</p>
       </Section>
 
       <Section id="page" title="The page">
@@ -222,6 +241,18 @@ npm run storage                                   # the drive, at http://localho
         </p>
         <p>When your session is a token rather than a cookie, give the headers for every request to your server; they are never sent to the bucket:</p>
         <Code lang="tsx" code={HEADERS} />
+      </Section>
+
+      <Section id="sharing" title="Sharing">
+        <p>
+          <strong>Share</strong>, in the details of an entry, gives it to someone by the id your <C>identify</C> gives them, as viewer, commenter or editor, or to everyone signed in; what is in a
+          folder goes with it. It shows in their <strong>Shared with me</strong>, not in their My files, which is theirs alone. For one drive of a whole team instead, give the server{' '}
+          <C>top: &apos;everyone&apos;</C>.
+        </p>
+        <p>
+          A <strong>link</strong> lets anyone who has it look and download, without signing in, for seven days or until it is removed. Its address goes to a page of yours that shows it:
+        </p>
+        <Code lang="tsx" code={SHARE} />
       </Section>
 
       <Section id="rebodocs" title="Word documents">
@@ -248,6 +279,9 @@ npm run storage                                   # the drive, at http://localho
             Small files go up and large ones do not: <C>ExposeHeaders</C> needs <C>ETag</C>.
           </Trouble>
           <Trouble says="The bucket answered 403 to …">The key: it may not write in that bucket, or the endpoint, region or bucket name are not the ones it was made for.</Trouble>
+          <Trouble says="This link does not work any more.">
+            It was removed, it expired, what it read went to the trash, or its address was changed on the way: which one, a link does not say to whoever holds it.
+          </Trouble>
           <Trouble says="Sign in first. · You may not do that here.">
             401 is <C>identify</C> returning null; 403 is <C>authorize</C> returning false.
           </Trouble>

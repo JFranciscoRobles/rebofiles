@@ -42,10 +42,26 @@ the arrows, Enter to open, Delete for the trash, F2 to rename.
 | `onOpen` | A file opened. Unless given, it opens in a new tab as the browser shows it. |
 | `onOpenDocument` | Gives Word documents an "Open in Rebodocs" button. |
 | `previewDocument` | Reads a Word document for its preview: `previewDocx` of `@rebofiles/react/rebodocs`. |
+| `linkAddress` | Where a link of the drive points: the page of yours with `<SharedLink>`. This page with `?link=` unless given. |
 
 Its colours, radii and fonts are custom properties on `.rf-drive`
 (`--rf-brand`, `--rf-radius`, `--rf-font`…): change them on the element, or
 on a `className` of your own.
+
+## Sharing
+
+**Share**, in the details, gives an entry to someone by their id, as viewer,
+commenter or editor, or to everyone signed in, and makes links that anyone
+may open for seven days without signing in. What others share is in
+**Shared with me**. The server decides with `byRoles` of `@rebofiles/server`.
+
+A link opens in a page of yours, with what it reads and nothing to change:
+
+```tsx
+import { SharedLink } from '@rebofiles/react';
+
+<SharedLink base="/api/files" token={new URLSearchParams(location.search).get('link')!} />
+```
 
 ## With Rebodocs
 

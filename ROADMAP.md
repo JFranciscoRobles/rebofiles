@@ -66,13 +66,13 @@ The same rules:
 
 Taken on October 25, 2026, by running `npm test`, every one passing:
 
-- `packages/core` · 31 · Names, the tree, renaming and moving, the trash, versions, search, changes.
-- `packages/server` · 26 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, Postgres on PGlite, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
-- `packages/react` · 16 · The client against the routes: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
+- `packages/core` · 43 · Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles inherited down the tree, Shared with me, links.
+- `packages/server` · 38 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people through the routes and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
+- `packages/react` · 19 · The client against the routes: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
 
 ### The interface
 
-`npm run test:browser` · 7 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll.
+`npm run test:browser` · 9 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll. Ana sharing a folder with Bea as an editor, Bea finding it in Shared with me and putting a file in it, a link copied and opened by someone signed out, until it is taken back.
 
 By hand:
 
@@ -102,7 +102,10 @@ Uploads
 
 Sharing
 
-- Owners only, and what `authorize()` decides. Roles come in 0.2.
+- People are named by the id the application gives them; there are no groups but everyone signed in (`*`).
+- Links are for viewers only. A commenter may do what a viewer may, as there is nothing to comment on yet.
+- An editor who moves something of someone else's to the top of the drive puts it in its owner's My files.
+- Sharing is asked of `byRoles`, or of an `authorize()` of the application's that asks it; one that answers yes to all lets anyone share anything.
 
 ## Roadmap
 
@@ -133,9 +136,11 @@ server, the preview of a Word document, a strict typecheck.
 
 ### 0.2.0 · Sharing
 
-7. Owner, editor, commenter and viewer, on files and folders, inherited down
-   the tree. "Shared with me" and "Recent".
-8. Links with an expiry, signed by the server.
+7. ✅ Owner, editor, commenter and viewer, on files and folders, inherited
+   down the tree (`byRoles`). "Shared with me", and My files of one's own
+   (`top: 'everyone'` for one drive of a whole team).
+8. ✅ Links with an expiry, signed by the server, taken back by removing them;
+   `<SharedLink>` for who opens one.
 9. ✅ Metadata on Postgres (`postgresMetadata`), with a lock of the database
    for more than one process.
 

@@ -52,6 +52,7 @@ it cannot be done.
 | **The trash** | `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `trash`, `isTrashed`. What is inside a trashed folder goes with it; deleting gives the storage keys no version uses any more. |
 | **Versions** | `addVersion`, `restoreVersion` (a new version with the old bytes, the storage untouched), `versionNumber`. |
 | **Search** | `search`, every word somewhere in the name, inside a folder or in the trash. |
+| **Sharing** | `share`, `unshare`, `accessOf`, `allows`, `sharedWith`, `EVERYONE`; `addLink`, `removeLink`, `linked`. An entry shared as viewer, commenter or editor is shared with what is inside it; the owner of a folder owns what is in it as far as access goes. The top of the drive is each owner's: a name someone else has there is free. |
 | **Stores** | `changes`, `driveOf`: what changed between two drives, and a drive again from the entries a store keeps. |
 
 ## Status

@@ -96,6 +96,34 @@ minor version (0.x.0) may change the API; such changes are listed under
   Neon or PGlite do. A change is one statement. Given a pool, each change
   holds a lock of the database, so any number of servers may share a drive;
   a `MetadataStore` of your own may give `lock(work)` for the same.
+- **Sharing.** An entry shared with someone, or with everyone signed in, as
+  viewer, commenter or editor, with what is inside it (`share`, `unshare`,
+  `accessOf`, `allows`, `sharedWith` in core). `byRoles` is an `authorize`
+  from the drive itself. Shared with me, as a route, a method of the client
+  and a section of `<FileDrive>`, whose details have **Share**: the people,
+  their roles, and links.
+- **Links.** Read an entry and what is inside it without signing in, until
+  they expire, from a day to ninety, or are removed. Their token is signed by
+  the server and the same every time. `createLinkClient` reads through one,
+  and `<SharedLink>` shows it; `linkAddress` on `<FileDrive>` says where.
+
+### Changed
+
+- **My files is one's own.** At the top of the drive the server lists only
+  what the one asking owns; what others share is in Shared with me. For one
+  drive of a whole team, as before, give `top: 'everyone'` to
+  `createDriveHandler` (and to `createMemoryClient`).
+- **The top of the drive is each owner's for names.** A name someone else
+  has there is free, and not told: two people may both have "Contracts".
+  `takenBy` and `uniqueName` take the owner as a last argument.
+- **One's trash** lists what one owns or put there, not what others threw
+  away in a folder shared with one.
+- **Where an entry is** (`path`) starts from where it was shared with the one
+  asking, not from folders they may not read.
+- **`Action`** comes from core and has `comment` and `share`. An `authorize`
+  of your own is now asked `share` for sharing and links: answer it.
+- **`DriveErrorCode`** has `invalid-share`: a map of every code needs it.
+
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes

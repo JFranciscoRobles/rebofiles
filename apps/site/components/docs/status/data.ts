@@ -6,21 +6,25 @@
 export const MEASURED = 'October 25, 2026';
 
 export const TESTS: { where: string; count: number; what: string }[] = [
-  { where: 'packages/core', count: 31, what: 'Names, the tree, renaming and moving, the trash, versions, search, changes.' },
+  {
+    where: 'packages/core',
+    count: 43,
+    what: 'Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me, links.',
+  },
   {
     where: 'packages/server',
-    count: 26,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
+    count: 38,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
   },
   {
     where: 'packages/react',
-    count: 16,
-    what: 'The client against the routes and against a bucket: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
+    count: 19,
+    what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
   {
     where: 'npm run test:browser',
-    count: 7,
-    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone.',
+    count: 9,
+    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back.',
   },
 ];
 
@@ -64,7 +68,14 @@ export const LIMITS: { area: string; items: string[] }[] = [
     ],
   },
   { area: 'Uploads', items: ['Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.', 'No resuming yet after the page is closed.'] },
-  { area: 'Sharing', items: ['Owners only, and what `authorize()` decides. Roles come in 0.2.'] },
+  {
+    area: 'Sharing',
+    items: [
+      'People are named by the id the application gives them; no groups but everyone signed in.',
+      'Links are for viewers only; a commenter has nothing to comment on yet.',
+      'An editor who moves something of someone else’s to the top puts it in its owner’s My files.',
+    ],
+  },
 ];
 
 export interface Milestone {
@@ -92,8 +103,8 @@ export const ROADMAP: Milestone[] = [
     version: '0.2.0',
     name: 'Sharing',
     items: [
-      { what: 'Owner, editor, commenter and viewer, inherited down the tree; “Shared with me”' },
-      { what: 'Links with an expiry, signed by the server' },
+      { what: 'Owner, editor, commenter and viewer, inherited down the tree; “Shared with me”', done: true },
+      { what: 'Links with an expiry, signed by the server', done: true },
       { what: 'Metadata on Postgres', done: true },
     ],
   },
