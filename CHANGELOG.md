@@ -129,6 +129,22 @@ minor version (0.x.0) may change the API; such changes are listed under
   `authorize` decides for it as for them. `createMcpHandler` serves them over
   HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
   The playground serves them at `/api/mcp`.
+- **Several picked at once.** ⌘ or Ctrl and a click add one or take it out,
+  Shift a range; a box to tick on each, seen under the mouse; Shift and the
+  arrows, ⌘/Ctrl+A for all, Space with ⌘/Ctrl and the arrows. A bar over the
+  list says how many, with what may be done to all of them: download, move,
+  put in the trash, or, in the trash, restore and delete for good; dragged,
+  they go together. Done one after another, said once, with how many could
+  not be done and why.
+- **A viewer in the drive.** A file opened is shown over the drive, not in a
+  tab: a picture at its large size (a click for its real size), a PDF in the
+  browser's own viewer, video and audio, Markdown as a page (made of
+  elements, never of HTML, its links only to http, https and mail), a CSV as
+  a table, JSON laid out, code and text; a Word document in its pages, by
+  Rebodocs' editor read only, with `viewDocument: viewDocx` of
+  `@rebofiles/drive/rebodocs`. The arrows go to the files before and after;
+  a tab of its own, when wanted, is a button away. New kinds: `video`,
+  `audio`, and code among `text`.
 - **Settings, on a screen of their own.** A button at the top of the drive
   opens them over it, as Rebodocs' menu is over a document, the parts down
   one side: Language, Appearance and Pictures. Each person chooses their own
@@ -182,6 +198,8 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Changed
 
+- **A file opened is shown in the drive**, not in a new tab. Give `onOpen`
+  to open it your own way, as before.
 - **The language and theme of `<FileDrive>`** are over the drive's settings
   and under each person's own: the provider's `language` no longer defaults
   to English, and `theme` no longer to light, so the drive's settings say

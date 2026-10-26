@@ -9,7 +9,7 @@
 
 import type { FileEntry } from '@rebofiles/core';
 import { DriveProvider, FileDrive, SharedLink, createDriveClient } from '@rebofiles/react';
-import { previewDocx } from '@rebofiles/react/rebodocs';
+import { previewDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode, Suspense, lazy, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -35,6 +35,7 @@ function Playground() {
         title={as ? `Playground · ${as}` : 'Playground'}
         defaultView={params.get('view') === 'grid' ? 'grid' : 'list'}
         previewDocument={previewDocx}
+        viewDocument={viewDocx}
         onOpenDocument={(file, url) => setOpen({ file, url })}
       />
       {open && (

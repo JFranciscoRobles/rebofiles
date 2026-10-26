@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@rebodocs/core": "^0.11.0",
+    "@rebodocs/editor": "^0.11.0",
     "@rebodocs/mcp": "^0.11.0",
     "@rebodocs/react": "^0.11.0",
     "@rebofiles/core": "0.1.0",

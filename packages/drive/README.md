@@ -41,6 +41,19 @@ after each change made from it, for what else in the page shows the drive.
 
 `mountSharedLink(element, { token })` is what someone sent a link sees.
 
+## Picking several, and the viewer
+
+⌘ or Ctrl with a click adds one to what is picked, Shift picks a range, and a
+box to tick shows on each under the mouse; with the keyboard, Shift and the
+arrows, ⌘/Ctrl+A, and Space. A bar over the list then does to all of them
+what can be done: download, move, the trash, restore, delete for good.
+
+A file opened, by a double click or Enter, is shown over the drive: pictures,
+PDF, video, audio, Markdown, CSV, JSON, code and text, and Word documents in
+their pages with `viewDocument: viewDocx` (from `@rebofiles/drive/rebodocs`,
+with `@rebodocs/editor` installed); ← and → go to the next. `onOpen` opens
+files your own way instead.
+
 ## Settings
 
 A button at the top of the drive opens its settings, a screen of their own

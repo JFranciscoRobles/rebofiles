@@ -3,7 +3,7 @@
 // drive without Rebodocs does not carry its engine.
 //
 //   import { previewDocx } from '@rebofiles/drive/rebodocs';
-//   mountDrive(element, { previewDocument: previewDocx });
+//   mountDrive(element, { previewDocument: previewDocx, viewDocument: viewDocx });
 
 import { importDocx, outline, paragraphText } from '@rebodocs/core';
 import type { DocumentPreview } from './kinds';
@@ -20,4 +20,15 @@ export function previewDocx(bytes: Uint8Array): DocumentPreview {
   const title = titlePara >= 0 ? texts[titlePara] : '';
   const paragraphs = texts.filter((text, i) => text && i !== titlePara).slice(0, SHOWN);
   return { title, paragraphs };
+}
+
+/**
+ * A Word document's pages, by Rebodocs' editor, read only, for the viewer of the drive:
+ * `mountDrive(element, { viewDocument: viewDocx })`. Its engine is loaded the first time one is shown.
+ */
+export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise<() => void> {
+  const { Editor } = await import('@rebodocs/editor');
+  const editor = new Editor(element, importDocx(bytes));
+  editor.readOnly = true;
+  return () => editor.destroy();
 }

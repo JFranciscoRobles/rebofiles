@@ -14,6 +14,7 @@ import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
 import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, badgeOf, kindOf } from './kinds';
+import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
 export interface DriveOptions {
@@ -32,10 +33,15 @@ export interface DriveOptions {
   /** What goes before the title; ReboFiles' mark unless given. */
   logo?: Node;
   defaultView?: 'list' | 'grid';
-  /** A file opened with a double click or Enter. Unless given, it opens in a new tab, as the browser shows it. */
+  /** A file opened with a double click or Enter. Unless given, it is shown in the drive's own viewer. */
   onOpen?: (file: FileEntry, url: string) => void;
   /** Gives Word documents an "Open in Rebodocs" button, which calls this with an address to read the file from. */
   onOpenDocument?: (file: FileEntry, url: string) => void;
+  /**
+   * Shows a Word document's pages in the viewer, in `element`, and gives what takes them down: `viewDocx` of
+   * `@rebofiles/drive/rebodocs`, by Rebodocs' engine. Without it, the viewer shows what `previewDocument` reads.
+   */
+  viewDocument?: (element: HTMLElement, bytes: Uint8Array) => (() => void) | undefined | Promise<(() => void) | undefined>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -62,9 +68,9 @@ type Section = 'files' | 'recent' | 'shared' | 'trash';
 type Dialog =
   | { kind: 'folder'; name: string }
   | { kind: 'rename'; entry: Entry; name: string }
-  | { kind: 'move'; entry: Entry; at: EntryId | null }
+  | { kind: 'move'; entries: Entry[]; at: EntryId | null }
   | { kind: 'share'; entry: Entry; who: string; role: Role }
-  | { kind: 'delete'; entry: Entry }
+  | { kind: 'delete'; entries: Entry[] }
   | { kind: 'empty' }
   | null;
 
@@ -83,6 +89,8 @@ interface Upload {
 const DRAGGED = 'application/x-rebofiles-entry';
 /** Larger documents are not read for a preview: they would cost more than a glance is worth. */
 const PREVIEW_LIMIT = 20 * 1024 * 1024;
+/** How much of a text the viewer reads: enough for any file a person reads, not a log of a year. */
+const VIEW_LIMIT = 2 * 1024 * 1024;
 const ROLES: Role[] = ['viewer', 'commenter', 'editor'];
 const defaultAddress = (token: string) => `${location.origin}${location.pathname}?link=${encodeURIComponent(token)}`;
 /** An id inside a selector's quotes. */
@@ -121,7 +129,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let section: Section = 'files';
   let folder: EntryId | null = null;
   let from: 'files' | 'shared' = 'files';
+  /** The one the keyboard is on, and whose details are shown when it is the only one picked. */
   let selected: EntryId | null = null;
+  /** What is picked, for an action on all of it: the one selected, and those added with Ctrl, ⌘ or Shift. */
+  let picked = new Set<EntryId>();
+  /** Where a range picked with Shift starts. */
+  let anchor: EntryId | null = null;
   let layout: 'list' | 'grid' = options.defaultView ?? 'list';
   let typed = '';
   let query = '';
@@ -226,6 +239,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     section = next;
     folder = to;
     selected = null;
+    picked = new Set();
+    anchor = null;
     typed = '';
     query = '';
     clearTimeout(searchTimer);
@@ -242,10 +257,65 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     }, 200);
     render();
   };
+  /** The one picked, alone; null for none. */
   const select = (id: EntryId | null) => {
     if (id !== selected) tab = 'details';
     selected = id;
+    anchor = id;
+    picked = new Set(id ? [id] : []);
     render();
+  };
+  /** One added to what is picked, or taken out of it. */
+  const toggle = (id: EntryId) => {
+    picked = new Set(picked);
+    if (picked.has(id)) picked.delete(id);
+    else picked.add(id);
+    selected = id;
+    anchor = id;
+    render();
+  };
+  /** Everything from where the range started to `id`, in the order shown; with `adding`, besides what was picked. */
+  const pickRange = (entries: Entry[], id: EntryId, adding = false) => {
+    const from = Math.max(
+      0,
+      entries.findIndex((entry) => entry.id === (anchor ?? id)),
+    );
+    const to = entries.findIndex((entry) => entry.id === id);
+    const range = entries.slice(Math.min(from, to), Math.max(from, to) + 1).map((entry) => entry.id);
+    picked = new Set([...(adding ? picked : []), ...range]);
+    selected = id;
+    render();
+  };
+  /** What the view shows now, for what is dragged to find its entries. */
+  let shownEntries: Entry[] = [];
+  /** The entries dragged from the drive itself: one, or all that was picked. */
+  const dragged = (event: DragEvent): Entry[] =>
+    (event.dataTransfer?.getData(DRAGGED) ?? '')
+      .split('\n')
+      .filter(Boolean)
+      .map((id) => shownEntries.find((entry) => entry.id === id) ?? ({ id, name: id } as Entry));
+  /** One action on each of what is picked, one after another: said once, with how many it could not do and why. */
+  const each = async (entries: Entry[], work: (entry: Entry) => Promise<unknown>, done: 'movedMany' | 'trashedMany' | 'restoredMany' | 'deletedMany') => {
+    let failed = 0;
+    let why = '';
+    for (const entry of entries) {
+      try {
+        await work(entry);
+      } catch (error) {
+        failed++;
+        why = error instanceof Error ? error.message : String(error);
+      }
+    }
+    if (done !== 'movedMany') picked = new Set();
+    if (done !== 'movedMany') selected = null;
+    say(
+      failed
+        ? t('notAll', { done: entries.length - failed, n: entries.length, why })
+        : entries.length === 1 && done === 'trashedMany'
+          ? t('movedToTrash', { name: entries[0].name })
+          : t(done, { n: entries.length }),
+    );
+    changed();
   };
 
   const open = async (entry: Entry) => {
@@ -253,14 +323,23 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       if (section === 'trash') return;
       return go('files', entry.id);
     }
-    // A window opened before the address is known, so the browser takes it as the click's.
-    const tabOpened = options.onOpen ? null : window.open('about:blank', '_blank');
+    // Shown in the drive itself, unless the application opens files its own way.
+    if (!options.onOpen) return view(entry.id);
     try {
-      const url = await client.url(entry.id, { inline: true });
-      if (options.onOpen) options.onOpen(entry, url);
-      else if (tabOpened) tabOpened.location.href = url;
+      options.onOpen(entry, await client.url(entry.id, { inline: true }));
     } catch (error) {
-      tabOpened?.close();
+      say((error as Error).message);
+    }
+  };
+  /** In a tab of its own, as the browser shows it: from the viewer, for what it cannot show or to keep beside. */
+  const openInTab = async (file: FileEntry) => {
+    // A window opened before the address is known, so the browser takes it as the click's.
+    const opened = window.open('about:blank', '_blank');
+    try {
+      const url = await client.url(file.id, { inline: true });
+      if (opened) opened.location.href = url;
+    } catch (error) {
+      opened?.close();
       say((error as Error).message);
     }
   };
@@ -280,10 +359,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       const send = () => {
         queue = queue.then(async () => {
           set(id, { state: 'sending', error: undefined, retry: undefined });
+          const before = selected;
           try {
             const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: settings?.settings.images });
             set(id, { state: 'done', sent: file.size });
-            selected = entry.id;
+            // Shown once it is up, unless the person picked something else meanwhile.
+            if (selected === before && picked.size <= 1 && !viewing) select(entry.id);
             say(t('uploaded', { name: entry.name }));
           } catch (error) {
             set(id, { state: 'failed', error: (error as Error).message, retry: send });
@@ -310,8 +391,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       event.stopPropagation();
       (event.currentTarget as HTMLElement).classList.remove('rf-drop');
       dropping = false;
-      const moved = event.dataTransfer?.getData(DRAGGED);
-      if (moved && moved !== target) void attempt(() => client.move(moved, target));
+      const moved = dragged(event).filter((entry) => entry.id !== target);
+      if (moved.length) void each(moved, (entry) => client.move(entry.id, target), 'movedMany');
       else if (event.dataTransfer?.files.length) uploadInto(event.dataTransfer.files, target);
     },
   });
@@ -405,25 +486,53 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       const columns = layout === 'grid' ? Math.max(1, Math.floor((box?.clientWidth ?? 600) / 162)) : 1;
       const step: Record<string, number> = { ArrowDown: columns, ArrowUp: -columns, ...(layout === 'grid' ? { ArrowRight: 1, ArrowLeft: -1 } : {}) };
       const current = entries[index];
+      const many = entries.filter((entry) => picked.has(entry.id));
+      // With Shift, the arrows and Home and End pick everything on the way; with Ctrl or ⌘, they only move, and Space picks.
+      const goTo = (next: Entry | undefined) => {
+        if (!next) return;
+        if (event.shiftKey) pickRange(entries, next.id);
+        else if (event.ctrlKey || event.metaKey) (selected = next.id), render();
+        else select(next.id);
+      };
       if (event.key in step) {
         event.preventDefault();
-        const next = index < 0 ? 0 : Math.min(entries.length - 1, Math.max(0, index + step[event.key]));
-        if (entries[next]) select(entries[next].id);
+        goTo(entries[index < 0 ? 0 : Math.min(entries.length - 1, Math.max(0, index + step[event.key]))]);
       } else if (event.key === 'Home' || event.key === 'End') {
         event.preventDefault();
-        const next = event.key === 'Home' ? entries[0] : entries[entries.length - 1];
-        if (next) select(next.id);
+        goTo(event.key === 'Home' ? entries[0] : entries[entries.length - 1]);
+      } else if (event.key.toLowerCase() === 'a' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        picked = new Set(entries.map((entry) => entry.id));
+        render();
+      } else if (event.key === ' ' && current) {
+        event.preventDefault();
+        toggle(current.id);
       } else if (event.key === 'Enter' && current) {
         event.preventDefault();
         void open(current);
-      } else if ((event.key === 'Delete' || event.key === 'Backspace') && current) {
+      } else if ((event.key === 'Delete' || event.key === 'Backspace') && many.length) {
         event.preventDefault();
-        if (section !== 'trash') void attempt(() => client.moveToTrash(current.id), t('movedToTrash', { name: current.name }));
+        if (section !== 'trash') void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany');
       } else if (event.key === 'F2' && current) {
         event.preventDefault();
         if (section !== 'trash') (dialog = { kind: 'rename', entry: current, name: current.name }), render();
       } else if (event.key === 'Escape') select(null);
     };
+    /** A box to tick, for a mouse: the keyboard picks with Space, and a screen reader is told by aria-selected. */
+    const tick = (entry: Entry) =>
+      h(
+        'span',
+        {
+          class: 'rf-tick',
+          'aria-hidden': 'true',
+          onClick: (event: MouseEvent) => {
+            event.stopPropagation();
+            toggle(entry.id);
+          },
+          onDblclick: (event: MouseEvent) => event.stopPropagation(),
+        },
+        icon('check', 14),
+      );
     const item = (entry: Entry, className: string, ...children: Child[]) =>
       h(
         'div',
@@ -433,12 +542,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           id: `${prefix}-${entry.id}`,
           'data-id': entry.id,
           role: 'option',
-          'aria-selected': entry.id === selected,
+          'aria-selected': picked.has(entry.id),
+          'data-current': entry.id === selected,
           draggable: draggable ? 'true' : 'false',
-          onClick: () => select(entry.id),
+          onClick: (event: MouseEvent) => (event.shiftKey ? pickRange(entries, entry.id, event.ctrlKey || event.metaKey) : event.ctrlKey || event.metaKey ? toggle(entry.id) : select(entry.id)),
           onDblclick: () => void open(entry),
           onDragstart: (event: DragEvent) => {
-            event.dataTransfer?.setData(DRAGGED, entry.id);
+            // What is picked goes together, when the one dragged is among it.
+            const dragged = picked.has(entry.id) && picked.size > 1 ? entries.filter((e) => picked.has(e.id)).map((e) => e.id) : [entry.id];
+            event.dataTransfer?.setData(DRAGGED, dragged.join('\n'));
             if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
           },
           ...(entry.kind === 'folder' && section === 'files' ? dropTarget(entry.id) : {}),
@@ -448,9 +560,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     return h(
       'div',
       {
+        // Keyed: the bar of what is picked comes and goes before it, and the list must stay the same element, with the focus.
+        key: 'items',
         class: 'rf-items',
         role: 'listbox',
         'aria-label': t('name'),
+        'aria-multiselectable': 'true',
+        'data-picking': picked.size > 1,
         tabindex: '0',
         'aria-activedescendant': selected && index >= 0 ? `${prefix}-${selected}` : undefined,
         onKeydown,
@@ -463,7 +579,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               item(
                 entry,
                 'rf-row',
-                h('span', { class: 'rf-name' }, tile(entry), h('span', null, entry.name)),
+                h('span', { class: 'rf-name' }, tick(entry), tile(entry), h('span', null, entry.name)),
                 h('span', null, entry.owner),
                 h('span', null, formatDate(entry.modified, locale)),
                 h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
@@ -479,7 +595,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               return item(
                 entry,
                 'rf-card',
-                h('div', { class: `rf-thumb rf-k-${kind}` }, url ? h('img', { src: url, alt: '', loading: 'lazy' }) : icon(entry.kind === 'folder' ? 'folder' : 'doc', 34)),
+                h('div', { class: `rf-thumb rf-k-${kind}` }, tick(entry), url ? h('img', { src: url, alt: '', loading: 'lazy' }) : icon(entry.kind === 'folder' ? 'folder' : 'doc', 34)),
                 h('div', { class: 'rf-name' }, tile(entry), h('span', null, entry.name)),
               );
             }),
@@ -540,6 +656,75 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
 
+  /** Each file downloaded, one after another: a browser asks once whether a page may download several. */
+  const downloadEach = async (files: Entry[]) => {
+    for (const file of files.filter((entry): entry is FileEntry => entry.kind === 'file')) {
+      const link = document.createElement('a');
+      link.href = await client.url(file.id);
+      link.download = file.name;
+      link.click();
+      await new Promise((done) => setTimeout(done, 250));
+    }
+  };
+  /** What can be done to all that is picked at once. */
+  const pickedActions = (many: Entry[], wide = false): Child[] => {
+    const cls = (extra = '') => `rf-btn${wide ? '' : ' rf-small'}${extra}`;
+    // In the bar, the words go on a narrow screen and the icons stay, the words still their names.
+    const labelled = (name: IconName, text: string): Child => (wide ? withIcon(name, text) : [icon(name, 16), h('span', { class: 'rf-btn-text' }, text)]);
+    const files = many.filter((entry) => entry.kind === 'file');
+    return section === 'trash'
+      ? [
+          button(labelled('restore', t('restore')), () => void each(many, (entry) => client.restore(entry.id), 'restoredMany'), { class: cls(' rf-primary'), title: t('restore') }),
+          button(labelled('trash', t('deleteForever')), () => ((dialog = { kind: 'delete', entries: many }), render()), { class: cls(' rf-text rf-danger'), title: t('deleteForever') }),
+        ]
+      : [
+          files.length > 0 &&
+            button(labelled('download', files.length === many.length ? t('download') : t('downloadFiles', { n: files.length })), () => void attempt(() => downloadEach(files)), {
+              class: cls(),
+              title: t('download'),
+            }),
+          button(labelled('move', t('move')), () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render()), { class: cls(), title: t('move') }),
+          button(labelled('trash', t('moveToTrash')), () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), { class: cls(' rf-text rf-danger'), title: t('moveToTrash') }),
+        ];
+  };
+  function pickedBar(many: Entry[]) {
+    return h(
+      'div',
+      { key: 'picked', class: 'rf-head rf-picking', role: 'toolbar', 'aria-label': t('pickedN', { n: many.length }) },
+      button(icon('close', 16), () => select(null), { class: 'rf-btn rf-small rf-icon', 'aria-label': t('clearPicked'), title: t('clearPicked') }),
+      h('strong', { class: 'rf-picked-count' }, t('pickedN', { n: many.length })),
+      h('span', { class: 'rf-grow' }),
+      ...pickedActions(many),
+    );
+  }
+  function pickedDetails(many: Entry[]) {
+    const size = many.reduce((sum, entry) => sum + (entry.kind === 'file' ? entry.versions[0].size : 0), 0);
+    const folders = many.filter((entry) => entry.kind === 'folder').length;
+    const SHOWN = 8;
+    return h(
+      'aside',
+      { class: 'rf-details', 'aria-label': t('details') },
+      h(
+        'div',
+        { class: 'rf-details-in' },
+        h('h2', null, t('pickedN', { n: many.length })),
+        h(
+          'div',
+          { class: 'rf-preview rf-stack', 'aria-hidden': 'true' },
+          many.slice(0, 3).map((entry, i) => h('span', { key: entry.id, class: 'rf-stack-card', style: `--rf-i: ${i}` }, tile(entry))),
+        ),
+        h('div', { class: 'rf-actions' }, ...pickedActions(many, true)),
+        h('dl', { class: 'rf-props' }, h('dt', null, t('size')), h('dd', null, formatSize(size, locale)), folders > 0 && [h('dt', null, t('folders')), h('dd', null, String(folders))]),
+        h(
+          'ul',
+          { class: 'rf-picked-list' },
+          many.slice(0, SHOWN).map((entry) => h('li', { key: entry.id }, tile(entry), h('span', null, entry.name))),
+          many.length > SHOWN && h('li', { key: 'more', class: 'rf-hint' }, t('andMore', { n: many.length - SHOWN })),
+        ),
+      ),
+    );
+  }
+
   function details(listed: Entry | null) {
     const found = listed ? detail(listed.id) : null;
     // The entry as the server says it is now, once it has said; as the list had it until then.
@@ -572,7 +757,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           inTrash
             ? [
                 button(withIcon('restore', t('restore')), () => void attempt(() => client.restore(entry.id).then(gone), t('restored', { name: entry.name })), { class: 'rf-btn rf-primary' }),
-                button(t('deleteForever'), () => ((dialog = { kind: 'delete', entry }), render()), { class: 'rf-btn rf-text rf-danger' }),
+                button(t('deleteForever'), () => ((dialog = { kind: 'delete', entries: [entry] }), render()), { class: 'rf-btn rf-text rf-danger' }),
               ]
             : [
                 file &&
@@ -582,9 +767,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                     class: 'rf-btn rf-docs rf-wide',
                   }),
                 file && button(withIcon('download', t('download')), () => void attempt(download), { class: 'rf-btn' }),
-                button(withIcon('external', t('open')), () => void open(entry), { class: 'rf-btn' }),
+                button(withIcon(file ? 'eye' : 'external', t('open')), () => void open(entry), { class: 'rf-btn' }),
                 button(withIcon('pencil', t('rename')), () => ((dialog = { kind: 'rename', entry, name: entry.name }), render()), { class: 'rf-btn' }),
-                button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entry, at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
+                button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entries: [entry], at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
                 button(withIcon('users', t('share')), () => ((dialog = { kind: 'share', entry, who: '', role: 'viewer' }), render()), { class: 'rf-btn' }),
                 button(withIcon('trash', t('moveToTrash')), () => void attempt(() => client.moveToTrash(entry.id).then(gone), t('movedToTrash', { name: entry.name })), {
                   class: 'rf-btn rf-text rf-danger',
@@ -721,11 +906,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // Gone into a folder in the move dialog, the button pressed is gone too: the focus goes to its first folder, or to "Move here".
   let movedInto = false;
-  function moveDialog(entry: Entry, at: EntryId | null) {
+  function moveDialog(moved: Entry[], at: EntryId | null) {
     const listed = moving(JSON.stringify(at));
     const folders = (listed.value?.entries ?? []).filter((e): e is FolderEntry => e.kind === 'folder');
     const path = listed.value?.path ?? [];
-    const label = t('moveTo', { name: entry.name });
+    const label = moved.length === 1 ? t('moveTo', { name: moved[0].name }) : t('moveMany', { n: moved.length });
     const goTo = (id: EntryId | null) => {
       if (dialog?.kind === 'move') dialog.at = id;
       movedInto = true;
@@ -743,7 +928,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           onSubmit: (event: Event) => {
             event.preventDefault();
             closeDialog();
-            void attempt(() => client.move(entry.id, at));
+            void each(moved, (entry) => client.move(entry.id, at), 'movedMany');
           },
         },
         h('h2', null, label),
@@ -767,11 +952,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             h(
               'li',
               { key: f.id },
-              button([h('span', { class: 'rf-tile rf-k-folder', 'aria-hidden': 'true' }, icon('folder', 16)), f.name], () => goTo(f.id), { disabled: f.id === entry.id }),
+              button([h('span', { class: 'rf-tile rf-k-folder', 'aria-hidden': 'true' }, icon('folder', 16)), f.name], () => goTo(f.id), { disabled: moved.some((entry) => entry.id === f.id) }),
             ),
           ),
         ),
-        actionsRow(cancel(), h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: at === entry.parent }, t('moveHere'))),
+        actionsRow(cancel(), h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: moved.every((entry) => entry.parent === at) }, t('moveHere'))),
       ),
     );
   }
@@ -858,6 +1043,237 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           : h('p', { class: 'rf-hint' }, t('noLinks')),
         button(withIcon('link', t('createLink', { n: 7 })), () => void attempt(async () => copy((await client.createLink(of.id, 7)).token), t('linkCopied')), { class: 'rf-btn' }),
         actionsRow(button(t('done'), closeDialog, { class: 'rf-btn rf-primary' })),
+      ),
+    );
+  }
+
+  // ---- The viewer: a file shown whole over the drive, and the others of the view before and after it ----
+
+  let viewing: EntryId | null = null;
+  let zoomed = false;
+  /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
+  const fullTexts = new Map<string, string | null | Error>();
+  /** What took down the last document shown in pages, to do before the next. */
+  let undoDocument: (() => void) | undefined;
+
+  const view = (id: EntryId) => {
+    viewing = id;
+    zoomed = false;
+    if (picked.size <= 1) select(id);
+    afterRender.push(() => element.querySelector<HTMLElement>('.rf-view')?.focus());
+    render();
+  };
+  const closeView = () => {
+    undoDocument?.();
+    undoDocument = undefined;
+    const back = viewing;
+    viewing = null;
+    if (back && picked.size <= 1) select(back);
+    afterRender.push(() => element.querySelector<HTMLElement>('.rf-items')?.focus());
+    render();
+  };
+
+  /** All of a text, once: the beginning is not enough to read a file. */
+  const fullText = (file: FileEntry, url: string | null) => {
+    const key = `${file.id}:${file.versions[0].id}`;
+    if (url && !fullTexts.has(key)) {
+      fullTexts.set(key, null);
+      fetch(url)
+        .then(async (answer) => {
+          if (!answer.ok) throw new Error(`${answer.status}`);
+          const bytes = new Uint8Array(await answer.arrayBuffer());
+          return new TextDecoder().decode(bytes.length > VIEW_LIMIT ? bytes.slice(0, VIEW_LIMIT) : bytes);
+        })
+        .then(
+          (text) => (fullTexts.set(key, text), render()),
+          (error: Error) => (fullTexts.set(key, error), render()),
+        );
+    }
+    return fullTexts.get(key);
+  };
+
+  function viewed(file: FileEntry): Child {
+    const kind = kindOf(file);
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const none = (why = t('noPreview')) =>
+      h(
+        'div',
+        { class: 'rf-view-none' },
+        h('span', { class: `rf-tile rf-k-${kind} rf-tile-big`, 'aria-hidden': 'true' }, badgeOf(file)),
+        h('p', null, why),
+        button(withIcon('download', t('download')), () => void attempt(() => downloadEach([file])), { class: 'rf-btn rf-primary' }),
+      );
+    if (kind === 'image') {
+      const url = urlOf(file, 2048);
+      return url
+        ? h(
+            'div',
+            { class: `rf-view-image${zoomed ? ' rf-zoomed' : ''}` },
+            h('img', { key: url, src: url, alt: file.name, onClick: () => ((zoomed = !zoomed), render()), title: zoomed ? t('fit') : t('zoom') }),
+          )
+        : h('div', { class: 'rf-view-wait' }, t('loading'));
+    }
+    if (kind === 'pdf' || kind === 'video' || kind === 'audio') {
+      const url = urlOf(file);
+      if (!url) return h('div', { class: 'rf-view-wait' }, t('loading'));
+      if (kind === 'pdf') return h('iframe', { key: url, class: 'rf-view-pdf', src: url, title: file.name });
+      if (kind === 'video') return h('video', { key: url, class: 'rf-view-video', src: url, controls: true, preload: 'metadata' });
+      return h(
+        'div',
+        { class: 'rf-view-audio' },
+        h('span', { class: 'rf-tile rf-k-audio rf-tile-big', 'aria-hidden': 'true' }, badgeOf(file)),
+        h('audio', { key: url, src: url, controls: true, preload: 'metadata' }),
+      );
+    }
+    const reads = kind === 'text' || ext === 'csv' || ext === 'tsv';
+    if (reads && file.versions[0].size > VIEW_LIMIT * 5) return none(t('tooLargeToShow'));
+    if (reads) {
+      const text = fullText(file, urlOf(file));
+      if (text === undefined || text === null) return h('div', { class: 'rf-view-wait' }, t('loading'));
+      if (text instanceof Error) return none(t('couldNotRead'));
+      const cut = file.versions[0].size > VIEW_LIMIT && h('p', { class: 'rf-view-cut' }, t('shownFirst', { size: formatSize(VIEW_LIMIT, locale) }));
+      if (ext === 'md' || ext === 'markdown') return h('div', { class: 'rf-view-doc' }, h('article', { class: 'rf-view-sheet' }, markdown(text)), cut);
+      if (ext === 'csv' || ext === 'tsv') {
+        const rows = rowsOf(text, ext === 'tsv' ? '\t' : ',');
+        const [first = [], ...rest] = rows;
+        return h(
+          'div',
+          { class: 'rf-view-table' },
+          h(
+            'table',
+            null,
+            h(
+              'thead',
+              null,
+              h(
+                'tr',
+                null,
+                first.map((cell) => h('th', { scope: 'col' }, cell)),
+              ),
+            ),
+            h(
+              'tbody',
+              null,
+              rest.map((row) =>
+                h(
+                  'tr',
+                  null,
+                  row.map((cell) => h('td', null, cell)),
+                ),
+              ),
+            ),
+          ),
+          rows.length >= 1000 && h('p', { class: 'rf-view-cut' }, t('shownRows', { n: 1000 })),
+        );
+      }
+      let shown = text;
+      if (ext === 'json') {
+        try {
+          shown = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {}
+      }
+      return h('div', { class: 'rf-view-code' }, h('pre', null, shown), cut);
+    }
+    if (kind === 'docx' && (options.viewDocument || options.previewDocument)) {
+      const url = urlOf(file);
+      if (!url) return h('div', { class: 'rf-view-wait' }, t('loading'));
+      if (options.viewDocument) {
+        const show = options.viewDocument;
+        // Its pages, by Rebodocs' engine, in an element of its own that the drive does not draw again.
+        return h('div', {
+          key: `doc:${url}`,
+          class: 'rf-view-pages',
+          mount: (node: HTMLElement) => {
+            undoDocument?.();
+            undoDocument = undefined;
+            fetch(url)
+              .then((answer) => answer.arrayBuffer())
+              .then((bytes) => show(node, new Uint8Array(bytes)))
+              .then(
+                (undo) => {
+                  if (viewing === file.id) undoDocument = undo ?? undefined;
+                  else undo?.();
+                },
+                () => node.replaceChildren(h('p', { class: 'rf-view-cut' }, t('couldNotRead'))),
+              );
+          },
+        });
+      }
+      preview(file);
+      const page = pages.get(`${file.id}:${file.versions[0].id}`);
+      return page
+        ? h(
+            'div',
+            { class: 'rf-view-doc' },
+            h(
+              'article',
+              { class: 'rf-view-sheet' },
+              page.title && h('h1', null, page.title),
+              page.paragraphs.map((p) => h('p', null, p)),
+            ),
+            h('p', { class: 'rf-view-cut' }, t('firstParagraphs')),
+          )
+        : h('div', { class: 'rf-view-wait' }, t('loading'));
+    }
+    return none();
+  }
+
+  function viewer(id: EntryId) {
+    const files = shownEntries.filter((entry): entry is FileEntry => entry.kind === 'file');
+    const at = files.findIndex((entry) => entry.id === id);
+    const file = files[at];
+    if (!file) {
+      // Gone from the view, by a change made meanwhile.
+      queueMicrotask(closeView);
+      return null;
+    }
+    const step = (by: number) => {
+      const next = files[(at + by + files.length) % files.length];
+      if (next && next.id !== id) {
+        undoDocument?.();
+        undoDocument = undefined;
+        view(next.id);
+      }
+    };
+    const kind = kindOf(file);
+    return h(
+      'section',
+      {
+        key: 'viewer',
+        class: 'rf-view',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-label': file.name,
+        tabindex: '-1',
+        onKeydown: (event: KeyboardEvent) => {
+          const inside = (event.target as HTMLElement).closest('video, audio, input, select, textarea, .rf-view-pages');
+          if (event.key === 'Escape') event.stopPropagation(), closeView();
+          else if (!inside && event.key === 'ArrowRight') event.preventDefault(), step(1);
+          else if (!inside && event.key === 'ArrowLeft') event.preventDefault(), step(-1);
+        },
+      },
+      h(
+        'div',
+        { class: 'rf-view-bar' },
+        button(icon('back', 18), closeView, { class: 'rf-btn rf-icon', 'aria-label': t('backToDrive'), title: t('backToDrive') }),
+        h('span', { class: `rf-tile rf-k-${kind}`, 'aria-hidden': 'true' }, badgeOf(file)),
+        h('div', { class: 'rf-view-title' }, h('strong', null, file.name), h('span', null, `${formatSize(file.versions[0].size, locale)} · ${formatDate(file.modified, locale)} · ${file.modifiedBy}`)),
+        files.length > 1 && h('span', { class: 'rf-view-count', 'aria-live': 'polite' }, t('nOfM', { n: at + 1, m: files.length })),
+        options.onOpenDocument &&
+          kind === 'docx' &&
+          button(withIcon('doc', t('openInRebodocs')), () => void attempt(async () => options.onOpenDocument?.(file, await client.url(file.id, { inline: true }))), {
+            class: 'rf-btn rf-docs rf-small',
+          }),
+        button(icon('download', 18), () => void attempt(() => downloadEach([file])), { class: 'rf-btn rf-icon', 'aria-label': t('download'), title: t('download') }),
+        button(icon('external', 18), () => void openInTab(file), { class: 'rf-btn rf-icon', 'aria-label': t('openInTab'), title: t('openInTab') }),
+        button(icon('close', 18), closeView, { class: 'rf-btn rf-icon', 'aria-label': t('close'), title: t('close') }),
+      ),
+      h(
+        'div',
+        { class: 'rf-view-stage' },
+        files.length > 1 && button(icon('back', 22), () => step(-1), { class: 'rf-view-step rf-view-prev', 'aria-label': t('previous'), title: t('previous') }),
+        h('div', { key: file.id, class: 'rf-view-content' }, viewed(file)),
+        files.length > 1 && button(icon('chevron', 22), () => step(1), { class: 'rf-view-step rf-view-next', 'aria-label': t('next'), title: t('next') }),
       ),
     );
   }
@@ -1160,12 +1576,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         return nameDialog(t('rename'), t('newName'), entry.name, t('save'), dialog.name, (name) => void attempt(() => client.rename(entry.id, name)));
       }
       case 'move':
-        return moveDialog(dialog.entry, dialog.at);
+        return moveDialog(dialog.entries, dialog.at);
       case 'share':
         return shareDialog(dialog.entry, dialog.who, dialog.role);
       case 'delete': {
-        const { entry } = dialog;
-        return confirmDialog(t('confirmDelete', { name: entry.name }), t('deleteForever'), () => void attempt(() => client.deleteForever(entry.id).then(() => (selected = null)), t('deleted')));
+        const gone = dialog.entries;
+        const text = gone.length === 1 ? t('confirmDelete', { name: gone[0].name }) : t('confirmDeleteMany', { n: gone.length });
+        return confirmDialog(text, t('deleteForever'), () => void each(gone, (entry) => client.deleteForever(entry.id), 'deletedMany'));
       }
       case 'empty':
         return confirmDialog(t('confirmEmpty'), t('emptyTrash'), () => void attempt(() => client.emptyTrash().then(() => (selected = null)), t('deleted')));
@@ -1182,7 +1599,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const { value, loading, error } = listing(key);
     const entries = value?.entries ?? [];
     const path = value?.path ?? [];
-    const selectedEntry = entries.find((entry) => entry.id === selected) ?? null;
+    shownEntries = entries;
+    const pickedEntries = entries.filter((entry) => picked.has(entry.id));
+    const selectedEntry = pickedEntries.length > 1 ? null : (entries.find((entry) => entry.id === selected) ?? null);
     const sending = uploads.find((u) => u.state === 'sending' || u.state === 'waiting');
     const failed = uploads.find((u) => u.state === 'failed');
     const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
@@ -1203,7 +1622,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       settings?.settings.brand ? h('style', { key: `brand${settings.settings.brand}` }, brandStyle(`.rf-drive[data-rf="${prefix}"]`, settings.settings.brand)) : null,
       h(
         'div',
-        { class: 'rf-top', inert: Boolean(settingsPart) },
+        { class: 'rf-top', inert: Boolean(settingsPart || viewing) },
         h('div', { class: 'rf-title' }, options.logo ?? mark(), h('span', null, title)),
         h(
           'label',
@@ -1224,7 +1643,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       ),
       h(
         'div',
-        { class: 'rf-body', inert: Boolean(settingsPart) },
+        { class: 'rf-body', inert: Boolean(settingsPart || viewing) },
         h(
           'nav',
           { class: 'rf-side', 'aria-label': title },
@@ -1249,8 +1668,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             onDrop: (event: DragEvent) => {
               event.preventDefault();
               (event.currentTarget as HTMLElement).classList.remove('rf-drop');
-              const id = event.dataTransfer?.getData(DRAGGED);
-              if (id) void attempt(() => client.moveToTrash(id));
+              const gone = dragged(event);
+              if (gone.length) void each(gone, (entry) => client.moveToTrash(entry.id), 'trashedMany');
             },
           }),
           storage && h('div', { class: 'rf-storage' }, t('location'), h('code', null, storage)),
@@ -1272,36 +1691,38 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               render();
             },
           },
-          h(
-            'div',
-            { class: 'rf-head' },
-            h(
-              'div',
-              { class: 'rf-crumbs' },
-              heading
-                ? h('h2', { class: 'rf-crumb', style: 'margin: 0' }, heading)
-                : [
-                    from === 'shared'
-                      ? button(t('sharedWithMe'), () => go('shared'), { class: 'rf-crumb', key: 'from-shared' })
-                      : button(t('myFiles'), () => go('files'), { class: 'rf-crumb', key: 'from-files', ...dropTarget(null) }),
-                    path.map((step) =>
-                      h(
-                        'span',
-                        { key: step.id, style: 'display: contents' },
-                        icon('chevron', 16),
-                        button(step.name, () => go('files', step.id), { class: 'rf-crumb', 'aria-current': step.id === folder ? 'page' : undefined, ...dropTarget(step.id) }),
-                      ),
-                    ),
-                  ],
-            ),
-            section === 'trash' && entries.length > 0 && !query && button(t('emptyTrash'), () => ((dialog = { kind: 'empty' }), render()), { class: 'rf-btn rf-danger' }),
-            h(
-              'div',
-              { class: 'rf-seg', role: 'group', 'aria-label': `${t('list')} / ${t('grid')}` },
-              button(icon('list'), () => ((layout = 'list'), render()), { 'aria-pressed': layout === 'list', 'aria-label': t('list'), title: t('list') }),
-              button(icon('grid'), () => ((layout = 'grid'), render()), { 'aria-pressed': layout === 'grid', 'aria-label': t('grid'), title: t('grid') }),
-            ),
-          ),
+          pickedEntries.length > 1
+            ? pickedBar(pickedEntries)
+            : h(
+                'div',
+                { key: 'head', class: 'rf-head' },
+                h(
+                  'div',
+                  { class: 'rf-crumbs' },
+                  heading
+                    ? h('h2', { class: 'rf-crumb', style: 'margin: 0' }, heading)
+                    : [
+                        from === 'shared'
+                          ? button(t('sharedWithMe'), () => go('shared'), { class: 'rf-crumb', key: 'from-shared' })
+                          : button(t('myFiles'), () => go('files'), { class: 'rf-crumb', key: 'from-files', ...dropTarget(null) }),
+                        path.map((step) =>
+                          h(
+                            'span',
+                            { key: step.id, style: 'display: contents' },
+                            icon('chevron', 16),
+                            button(step.name, () => go('files', step.id), { class: 'rf-crumb', 'aria-current': step.id === folder ? 'page' : undefined, ...dropTarget(step.id) }),
+                          ),
+                        ),
+                      ],
+                ),
+                section === 'trash' && entries.length > 0 && !query && button(t('emptyTrash'), () => ((dialog = { kind: 'empty' }), render()), { class: 'rf-btn rf-danger' }),
+                h(
+                  'div',
+                  { class: 'rf-seg', role: 'group', 'aria-label': `${t('list')} / ${t('grid')}` },
+                  button(icon('list'), () => ((layout = 'list'), render()), { 'aria-pressed': layout === 'list', 'aria-label': t('list'), title: t('list') }),
+                  button(icon('grid'), () => ((layout = 'grid'), render()), { 'aria-pressed': layout === 'grid', 'aria-label': t('grid'), title: t('grid') }),
+                ),
+              ),
           items(
             entries,
             loading,
@@ -1310,13 +1731,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           ),
           dropping && h('div', { class: 'rf-dropzone' }, t('dropHere')),
         ),
-        details(selectedEntry),
+        pickedEntries.length > 1 ? pickedDetails(pickedEntries) : details(selectedEntry),
       ),
       // Said once a view has loaded: where one is and how much is there. Not the progress of an upload, which would be read out at every step.
       h('span', { class: 'rf-sr', 'aria-live': 'polite' }, loading ? '' : `${heading ?? path.at(-1)?.name ?? t('myFiles')} · ${count}`),
       h(
         'div',
-        { class: 'rf-status', inert: Boolean(settingsPart) },
+        { class: 'rf-status', inert: Boolean(settingsPart || viewing) },
         h('span', { class: 'rf-grow' }, count, storage && h('span', { class: 'rf-where' }, ` · ${storage}`)),
         sending
           ? [
@@ -1347,6 +1768,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       ),
       toast && h('div', { class: 'rf-toast', role: 'status' }, toast),
       dialogs(),
+      viewing && viewer(viewing),
       settingsPart && settings && settingsScreen(settingsPart),
     );
   }

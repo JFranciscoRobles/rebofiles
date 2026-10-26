@@ -3,6 +3,6 @@
 // does not carry it.
 //
 //   import { previewDocx } from '@rebofiles/react/rebodocs';
-//   <FileDrive previewDocument={previewDocx} />
+//   <FileDrive previewDocument={previewDocx} viewDocument={viewDocx} />
 
-export { previewDocx } from '@rebofiles/drive/rebodocs';
+export { previewDocx, viewDocx } from '@rebofiles/drive/rebodocs';

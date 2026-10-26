@@ -28,7 +28,7 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 26,
+    count: 29,
     what: 'The demo of the landing: Claude’s calls to the MCP tools, the rename seen, and left alone when the person renamed first. The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark; the drive with no framework; a drive from the hooks alone.',
   },
 ];

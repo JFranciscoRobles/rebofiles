@@ -14,10 +14,14 @@
     "@rebofiles/core": "0.1.0"
   },
   "peerDependencies": {
-    "@rebodocs/core": ">=0.11.0"
+    "@rebodocs/core": ">=0.11.0",
+    "@rebodocs/editor": ">=0.11.0"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {
+      "optional": true
+    },
+    "@rebodocs/editor": {
       "optional": true
     }
   },

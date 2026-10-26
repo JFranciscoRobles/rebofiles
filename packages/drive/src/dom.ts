@@ -116,25 +116,30 @@ function morphChildren(parent: Element, next: Element) {
   const used = new Set<Node>();
   let at = 0;
   const wanted = [...next.childNodes];
-  wanted.forEach((want, i) => {
+  // What each new one becomes, first: an old one of its key, or the next old one without a key, of the same kind.
+  const matches = wanted.map((want) => {
     let match: Node | undefined;
     if (keyOf(want) !== undefined) match = keyed.get(keyOf(want)!);
     else {
-      // The next old one not taken, without a key, of the same kind.
       while (at < olds.length && (used.has(olds[at]) || keyOf(olds[at]) !== undefined)) at++;
       if (at < olds.length && same(olds[at], want)) match = olds[at++];
     }
-    if (match && same(match, want) && !used.has(match)) {
-      used.add(match);
+    if (!match || !same(match, want) || used.has(match)) return undefined;
+    used.add(match);
+    return match;
+  });
+  // What goes is taken out before anything is put in its place, so what stays seldom moves: a node moved loses the focus.
+  for (const node of olds) if (!used.has(node)) node.parentNode === parent && parent.removeChild(node);
+  wanted.forEach((want, i) => {
+    const match = matches[i];
+    if (match) {
       morph(match, want);
       if (parent.childNodes[i] !== match) parent.insertBefore(match, parent.childNodes[i] ?? null);
     } else {
       parent.insertBefore(want, parent.childNodes[i] ?? null);
-      used.add(want);
       mounted(want);
     }
   });
-  for (const node of olds) if (!used.has(node)) node.parentNode === parent && parent.removeChild(node);
 }
 
 /** The first rendering in its element: its `mount`s called, as for anything new. */

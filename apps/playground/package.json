@@ -10,11 +10,12 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@rebodocs/editor": "^0.11.0",
+    "@rebodocs/react": "^0.11.0",
     "@rebofiles/core": "0.1.0",
     "@rebofiles/drive": "0.1.0",
     "@rebofiles/mcp": "0.1.0",
     "@rebofiles/react": "0.1.0",
-    "@rebofiles/server": "0.1.0",
-    "@rebodocs/react": "^0.11.0"
+    "@rebofiles/server": "0.1.0"
   }
 }
