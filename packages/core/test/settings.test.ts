@@ -75,3 +75,34 @@ describe('the smaller pictures of a version', () => {
     expect(gone.keys).toContain('logo@160');
   });
 });
+
+describe('the space and the trash', () => {
+  it('counts the bytes one owns, every version and picture once, in the trash too', async () => {
+    const { addVersion, moveToTrash, restoreVersion, usageOf } = await import('../src');
+    let drive = demoDrive();
+    const before = usageOf(drive, 'ana');
+    drive = addVersion(drive, 'logo', v(500), ana);
+    const first = getFile(drive, 'logo').versions[1];
+    drive = restoreVersion(drive, 'logo', first.id, 'again', ana);
+    // The version brought back shares the bytes of the one it was: counted once.
+    expect(usageOf(drive, 'ana')).toBe(before + 500);
+    drive = moveToTrash(drive, 'logo', ana);
+    expect(usageOf(drive, 'ana')).toBe(before + 500);
+    expect(usageOf(drive, 'nobody')).toBe(0);
+  });
+
+  it('empties what has been in the trash since before a time, with what is in it', async () => {
+    const { moveToTrash, purgeTrash } = await import('../src');
+    let drive = moveToTrash(demoDrive(), 'clients', { by: 'ana', at: '2026-01-01T00:00:00.000Z' });
+    drive = moveToTrash(drive, 'receipt', { by: 'ana', at: '2026-03-01T00:00:00.000Z' });
+    const gone = purgeTrash(drive, '2026-02-01T00:00:00.000Z');
+    expect(gone.removed.sort()).toEqual(['clients', 'contract', 'northwind']);
+    expect(gone.drive.entries.has('receipt')).toBe(true);
+  });
+
+  it('takes a quota and days of the trash, or none', () => {
+    expect(readDriveSettings({ quota: 5 * 1024 ** 3, trashDays: 30 })).toMatchObject({ quota: 5 * 1024 ** 3, trashDays: 30 });
+    expect(readDriveSettings({ quota: null, trashDays: null }, readDriveSettings({ quota: 2 ** 30 }))).toMatchObject({ quota: null, trashDays: null });
+    for (const bad of [{ quota: 10 }, { quota: 'a lot' }, { trashDays: 0 }, { trashDays: 1.5 }]) expect(() => readDriveSettings(bad)).toThrow(DriveError);
+  });
+});

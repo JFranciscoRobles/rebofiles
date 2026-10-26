@@ -25,6 +25,7 @@
 //   POST   /zip                           { ids }: what an archive of them holds, folders with what is in them, at their paths
 //   POST   /urls                          { ids, inline, size }: the addresses of many files at once, for a grid; until when each is good
 //   GET    /info                          where the bytes are, as a person reads it
+//   GET    /usage                         the bytes the one asking keeps, and how many they may
 //   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
@@ -134,6 +135,12 @@ interface Address {
   height?: number;
 }
 
+/** How often the trash is looked at for what has been there longer than the settings let it. */
+const SWEEP_EVERY = 10 * 60_000;
+
+/** Bytes as a person reads them, in a message: "1.2 GB". */
+const bytes = (n: number) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1024 ** 2))} MB`);
+
 /** How many files and folders go in one archive. */
 const ZIP_AT_ONCE = 50_000;
 
@@ -216,8 +223,24 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   /** The same address for a link every time, as its token is sealed until the link expires. */
   const linkToken = (link: { id: string; expires: string }) => sealToken(options.secret, { purpose: 'link', link: link.id } satisfies LinkToken, 0, Date.parse(link.expires));
 
+  // The trash emptying itself, as the settings say: looked at now and then, as requests come, not on a timer of its own.
+  let sweptAt = 0;
+  const sweep = async () => {
+    if (Date.now() - sweptAt < SWEEP_EVERY) return;
+    sweptAt = Date.now();
+    const days = (await driveSettings()).trashDays;
+    if (!days) return;
+    const before = new Date(Date.parse(now()) - days * 86_400_000).toISOString();
+    const keys = await change(async (drive) => {
+      const gone = core.purgeTrash(drive, before);
+      return { drive: gone.removed.length ? gone.drive : drive, answer: gone.keys };
+    });
+    if (keys.length) await options.storage.remove(keys);
+  };
+
   return async (request) => {
     try {
+      await sweep().catch(() => undefined);
       const url = new URL(request.url);
       if (!url.pathname.startsWith(base)) return new Response('Not here.', { status: 404 });
       const path = url.pathname.slice(base.length) || '/';
@@ -287,6 +310,11 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const found = core.search(drive, url.searchParams.get('q') ?? '', { within, trashed: url.searchParams.get('trashed') === '1', limit: 200 });
           return Response.json({ entries: await readable(user, found, drive) });
         }
+        case 'GET /usage': {
+          const drive = await load();
+          return Response.json({ used: core.usageOf(drive, user.id), quota: (await driveSettings()).quota });
+        }
+
         case 'GET /settings': {
           const drive = await load();
           const kept = await getSetting('drive');
@@ -376,6 +404,13 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             await allow(user, 'upload', parent, drive);
             if (parent && core.isTrashed(drive, parent.id)) throw new Refused(409, 'in-trash', 'That folder is in the trash.');
             pending = { versionId, size, type, user: user.id, file: { id: newId(), name, parent: parent?.id ?? null } };
+          }
+          // Room in the space of whoever owns it: one's own for a new file, the owner's for a version of theirs.
+          const quota = (await driveSettings()).quota;
+          if (quota !== null) {
+            const owner = pending.of ? core.getEntry(drive, pending.of).owner : user.id;
+            const used = core.usageOf(drive, owner);
+            if (used + size > quota) throw new Refused(413, 'over-quota', `There is no room for it: ${bytes(used)} of ${bytes(quota)} are used, and it is ${bytes(size)}.`);
           }
           const key = `${pending.of ?? pending.file!.id}/${versionId}`;
           const plan = await options.storage.startUpload(key, type, size, base);

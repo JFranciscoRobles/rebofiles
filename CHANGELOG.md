@@ -175,6 +175,14 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **Space for each person, and the trash emptying itself.** In Storage, in
+  the settings, whoever configures the drive gives each person a quota and
+  a number of days after which the trash deletes for good what has been in
+  it (`quota`, `trashDays`; none unless set). An upload past one's quota is
+  refused before anything goes (`over-quota`); the side of the drive shows
+  the space one uses, of how much (`GET /usage`, `usageOf`). The trash is
+  looked at now and then as requests come (`purgeTrash`), the bytes going
+  with what goes.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

@@ -69,6 +69,9 @@ export const CSS = `
 .rf-nav:hover { background: var(--rf-hover); }
 .rf-nav[aria-current='true'] { background: var(--rf-brand-light); color: var(--rf-brand); font-weight: 600; }
 .rf-nav.rf-drop { box-shadow: inset 0 0 0 2px var(--rf-brand); }
+.rf-usage { display: flex; flex-direction: column; gap: 6px; margin: auto 12px 10px; font-size: 12px; color: var(--rf-muted); }
+.rf-usage .rf-bar { width: 100%; }
+.rf-bar.rf-full span { background: var(--rf-danger); }
 .rf-storage { margin-top: auto; padding: 12px 14px; font-size: 12px; color: var(--rf-muted); }
 .rf-storage code { display: block; margin-top: 4px; font: 11px var(--rf-mono); color: var(--rf-muted); overflow: hidden; text-overflow: ellipsis; }
 

@@ -233,6 +233,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     return asked.then((entries) => ({ folder: null, entries, path: [] as FolderEntry[] }));
   });
   const detail = resource((id) => client.entry(id));
+  // The space one keeps: asked again after each change, as uploads and the trash change it.
+  const usage = resource(() => client.usage());
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
   // Addresses to show a file in the page, by its version and the size it is shown at: kept until a minute before they
   // are no longer good, and asked for together, those of one rendering in one request.
@@ -1677,7 +1679,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // ---- The settings: a screen of their own over the drive, as Rebodocs' menu is over a document ----
 
-  type SettingsPart = 'language' | 'appearance' | 'pictures';
+  type SettingsPart = 'language' | 'appearance' | 'pictures' | 'storage';
   let settingsPart: SettingsPart | null = null;
   let settingsNote: { text: string; error: boolean } | null = null;
   /** What is typed in the sizes, before it is saved. */
@@ -1703,7 +1705,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       await work();
       await loadSettings();
       settingsNote = { text: t('settingsSaved'), error: false };
-      options.onChange?.();
+      // Asked again, as what a setting changes, the space one may keep, is shown elsewhere.
+      changed();
     } catch (error) {
       settingsNote = { text: (error as Error).message, error: true };
     }
@@ -1739,7 +1742,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const parts: [SettingsPart, IconName, string][] = [
       ['language', 'globe', t('language')],
       ['appearance', 'contrast', t('appearance')],
-      ...(canConfigure ? ([['pictures', 'image', t('pictures')]] as [SettingsPart, IconName, string][]) : []),
+      ...(canConfigure
+        ? ([
+            ['pictures', 'image', t('pictures')],
+            ['storage', 'drive', t('storageSettings')],
+          ] as [SettingsPart, IconName, string][])
+        : []),
     ];
     const show = (next: SettingsPart) => {
       settingsPart = next;
@@ -1832,6 +1840,42 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             low && h('p', { class: 'rf-set-hint rf-set-warn' }, t('lowContrast')),
           ),
         ),
+      ];
+    } else if (part === 'storage') {
+      intro = t('storageIntro');
+      const GB = 1024 ** 3;
+      const number = (label: string, hint: string, value: number | null, unit: string, save: (value: number | null) => void, step: string) =>
+        field(
+          label,
+          hint,
+          h(
+            'span',
+            { class: 'rf-set-px' },
+            h('input', {
+              type: 'number',
+              min: step,
+              step,
+              'aria-label': label,
+              placeholder: t('noLimit'),
+              value: value === null ? '' : String(value),
+              onChange: (event: Event) => {
+                const typed = (event.target as HTMLInputElement).value.trim();
+                save(typed === '' ? null : Number(typed));
+              },
+            }),
+            unit,
+          ),
+        );
+      body = [
+        number(
+          t('quotaLabel'),
+          t('quotaHint'),
+          drive.quota === null ? null : Math.round((drive.quota / GB) * 10) / 10,
+          'GB',
+          (gb) => saveDrive({ quota: gb === null ? null : Math.round(gb * GB) }),
+          '0.1',
+        ),
+        number(t('trashDaysLabel'), t('trashDaysHint'), drive.trashDays, t('days'), (days) => saveDrive({ trashDays: days }), '1'),
       ];
     } else {
       intro = t('picturesIntro');
@@ -2161,6 +2205,25 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               if (gone.length) void each(gone, (entry) => client.moveToTrash(entry.id), 'trashedMany');
             },
           }),
+          (() => {
+            const space = usage('').value;
+            if (!space) return null;
+            const pct = space.quota ? Math.min(100, Math.round((space.used / space.quota) * 100)) : 0;
+            return h(
+              'div',
+              { class: 'rf-usage' },
+              space.quota
+                ? [
+                    h('span', null, t('usedOf', { used: formatSize(space.used, locale), quota: formatSize(space.quota, locale) })),
+                    h(
+                      'span',
+                      { class: `rf-bar${pct >= 90 ? ' rf-full' : ''}`, role: 'progressbar', 'aria-label': t('space'), 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct) },
+                      h('span', { style: `width: ${pct}%` }),
+                    ),
+                  ]
+                : h('span', null, t('used', { used: formatSize(space.used, locale) })),
+            );
+          })(),
           storage && h('div', { class: 'rf-storage' }, t('location'), h('code', null, storage)),
         ),
         h(

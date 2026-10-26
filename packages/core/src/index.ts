@@ -35,6 +35,8 @@ export {
   restore,
   deleteForever,
   emptyTrash,
+  purgeTrash,
+  usageOf,
 } from './ops';
 export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor } from './versions';
 export {

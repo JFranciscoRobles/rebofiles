@@ -45,7 +45,7 @@ describe('the settings', () => {
 
     expect((await bea.ask('PUT', '/api/files/settings', { language: 'es' })).status).toBe(403);
     const changed = await ana.ask('PUT', '/api/files/settings', { language: 'es', brand: '#1D4ED8', images: { sizes: [2000, 100, 400, 900], format: 'original' } });
-    expect(changed.body.drive).toEqual({ language: 'es', theme: 'light', brand: '#1d4ed8', images: { sizes: [100, 400, 900, 2000], format: 'original', quality: 0.82, enabled: true } });
+    expect(changed.body.drive).toEqual({ language: 'es', theme: 'light', brand: '#1d4ed8', images: { sizes: [100, 400, 900, 2000], format: 'original', quality: 0.82, enabled: true }, quota: null, trashDays: null });
     // A change is over what was there: what is left out stays.
     expect(((await ana.ask('PUT', '/api/files/settings', { theme: 'auto' })).body.drive as { language: string }).language).toBe('es');
 
@@ -140,5 +140,47 @@ describe('the smaller pictures of an image', () => {
     await ana.ask('POST', `/api/files/entries/${photo.id}/trash`);
     await ana.ask('DELETE', `/api/files/entries/${photo.id}`);
     expect(await readdir(join(at, photo.id)).catch(() => [])).toEqual([]);
+  });
+});
+
+describe('the space each person keeps', () => {
+  it('is said, and an upload past the quota is refused before anything is sent', async () => {
+    const handle = drive();
+    const ana = client(handle, 'ana');
+    const send = (url: string, init: RequestInit) => handle(new Request(url.startsWith('/') ? `http://drive.test${url}` : url, init));
+    await ana.ask('PUT', '/api/files/settings', { quota: 2 * 1024 * 1024 });
+    await ana.upload(bytesOf(1024 * 1024), { name: 'one.bin', parent: null }, send);
+    expect((await ana.ask('GET', '/api/files/usage')).body).toEqual({ used: 1024 * 1024, quota: 2 * 1024 * 1024 });
+    const refused = await ana.ask('POST', '/api/files/uploads', { name: 'two.bin', parent: null, size: 1.5 * 1024 * 1024 });
+    expect([refused.status, refused.body.error]).toEqual([413, 'over-quota']);
+    expect(refused.body.message).toContain('1 MB of 2 MB are used');
+    // Bea's space is her own.
+    expect((await client(handle, 'bea').ask('GET', '/api/files/usage')).body).toEqual({ used: 0, quota: 2 * 1024 * 1024 });
+  });
+});
+
+describe('the trash emptying itself', () => {
+  it('deletes for good what has been there longer than the settings say, bytes and all', async () => {
+    const { vi } = await import('vitest');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const at = join(folder, String(Math.random()));
+      const handle = drive({ at });
+      const ana = client(handle, 'ana');
+      const send = (url: string, init: RequestInit) => handle(new Request(url.startsWith('/') ? `http://drive.test${url}` : url, init));
+      await ana.ask('PUT', '/api/files/settings', { trashDays: 30 });
+      const old = (await ana.upload(bytesOf(10), { name: 'old.txt', parent: null }, send)).body.entry;
+      const fresh = (await ana.upload(bytesOf(10), { name: 'fresh.txt', parent: null }, send)).body.entry;
+      await ana.ask('POST', `/api/files/entries/${old.id}/trash`);
+      vi.setSystemTime(new Date('2026-01-25T00:00:00Z'));
+      await ana.ask('POST', `/api/files/entries/${fresh.id}/trash`);
+      vi.setSystemTime(new Date('2026-02-05T00:00:00Z'));
+      const names = (await ana.ask('GET', '/api/files/trash')).body.entries.map((entry: { name: string }) => entry.name);
+      expect(names).toEqual(['fresh.txt']);
+      expect(await readdir(join(at, old.id)).catch(() => [])).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

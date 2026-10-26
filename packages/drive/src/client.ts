@@ -245,6 +245,8 @@ export function createDriveClient(options: ClientOptions) {
       return urls;
     },
 
+    /** The bytes the one asking keeps, in the trash too, and how many they may: null for no limit. */
+    usage: () => ask<{ used: number; quota: number | null }>('GET', '/usage'),
     /** What an archive of these holds: each file, each folder with what is in it, at their paths; what may not be read left out. */
     pack: (ids: EntryId[]) => ask<Packed>('POST', '/zip', { ids }),
 

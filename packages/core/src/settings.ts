@@ -26,6 +26,10 @@ export interface DriveSettings {
   /** The colour of buttons and of what is selected, as #rrggbb; null for the drive's own green. */
   brand: string | null;
   images: ImageSettings;
+  /** The bytes each person may keep, in the trash too; null for no limit. */
+  quota: number | null;
+  /** After how many days what is in the trash is deleted for good; null for never. */
+  trashDays: number | null;
 }
 
 /** What a person changes for themselves; what they leave out is the drive's. */
@@ -44,6 +48,8 @@ export const DEFAULT_SETTINGS: DriveSettings = {
   theme: 'light',
   brand: null,
   images: { sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.82, enabled: true },
+  quota: null,
+  trashDays: null,
 };
 
 const refuse = (message: string): never => {
@@ -71,6 +77,10 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
   const quality = images.quality === undefined ? over.images.quality : Number(images.quality);
   if (!(quality >= 0.1 && quality <= 1)) refuse('"images.quality" must be from 0.1 to 1.');
   if (images.enabled !== undefined && typeof images.enabled !== 'boolean') refuse('"images.enabled" must be true or false.');
+  const quota = given.quota === undefined ? over.quota : given.quota === null ? null : Number(given.quota);
+  if (quota !== null && !(Number.isSafeInteger(quota) && quota >= 1024 * 1024)) refuse('"quota" must be a number of bytes, a megabyte or more, or null for no limit.');
+  const trashDays = given.trashDays === undefined ? over.trashDays : given.trashDays === null ? null : Number(given.trashDays);
+  if (trashDays !== null && !(Number.isInteger(trashDays) && trashDays >= 1 && trashDays <= 3650)) refuse('"trashDays" must be a number of days from 1 to 3650, or null for never.');
   return {
     language: oneOf(given.language, LANGUAGES, '"language"') ?? over.language,
     theme: oneOf(given.theme, THEMES, '"theme"') ?? over.theme,
@@ -81,6 +91,8 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
       quality,
       enabled: (images.enabled as boolean | undefined) ?? over.images.enabled,
     },
+    quota,
+    trashDays,
   };
 }
 

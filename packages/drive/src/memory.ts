@@ -155,6 +155,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
     pack: (ids) => run(() => core.packOf(drive, ids)),
+    usage: async () => ({ used: core.usageOf(drive, user), quota: settings.quota }),
     urls: async (ids, found = {}) => {
       const urls: Record<EntryId, { url: string; expires: string }> = {};
       // Addresses of the page itself, good as long as it is open.

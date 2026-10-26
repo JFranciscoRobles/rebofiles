@@ -138,6 +138,33 @@ export function deleteForever(drive: Drive, id: EntryId): Removed {
   return remove(drive, subtree(drive, id));
 }
 
+/** What has been in the trash since before `before` (ISO 8601) gone for good, with what is in it: the trash emptying itself. */
+export function purgeTrash(drive: Drive, before: string): Removed {
+  return remove(
+    drive,
+    trash(drive)
+      .filter((entry) => entry.trashed!.at < before)
+      .flatMap((entry) => subtree(drive, entry.id)),
+  );
+}
+
+/**
+ * The bytes kept for what `owner` owns, in the trash too: every version and every smaller picture of it, each key
+ * once, as a version brought back shares the bytes of the one it was.
+ */
+export function usageOf(drive: Drive, owner: string): number {
+  const keys = new Map<string, number>();
+  for (const entry of drive.entries.values())
+    if (entry.kind === 'file' && entry.owner === owner)
+      for (const version of entry.versions) {
+        keys.set(version.key, version.size);
+        for (const rendition of version.renditions ?? []) keys.set(rendition.key, rendition.bytes);
+      }
+  let total = 0;
+  for (const bytes of keys.values()) total += bytes;
+  return total;
+}
+
 /** Everything in the trash gone for good; with `user`, what is in their trash (see `trash`). */
 export function emptyTrash(drive: Drive, user?: string): Removed {
   return remove(

@@ -30,7 +30,7 @@ const picture = (page: Page, width: number, height: number) =>
   );
 
 test.afterAll(async ({ request }) => {
-  await request.put('/api/files/settings', { data: { brand: null, images: { sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.82, enabled: true } } });
+  await request.put('/api/files/settings', { data: { brand: null, images: { sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.82, enabled: true }, quota: null, trashDays: null } });
   await request.put('/api/files/settings/mine', { data: {} });
 });
 
@@ -130,3 +130,24 @@ test('someone else changes only their own', async ({ page }) => {
   await expect(screen.getByRole('tab', { name: 'Pictures' })).toHaveCount(0);
   expect((await page.request.put('/api/files/settings', { headers: { 'x-user': 'bea-settings' }, data: { brand: '#000000' } })).status()).toBe(403);
 });
+
+test('a quota and days of the trash, from Storage, and the space used in the side', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.rf-usage')).toContainText(/used$/);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const screen = settings(page);
+  await screen.getByRole('tab', { name: 'Storage' }).click();
+  await screen.getByRole('spinbutton', { name: 'Space for each person' }).fill('0.5');
+  await screen.getByRole('spinbutton', { name: 'Space for each person' }).press('Tab');
+  await expect(screen.getByRole('status')).toHaveText('Saved');
+  await screen.getByRole('spinbutton', { name: 'Empty the trash after' }).fill('30');
+  await screen.getByRole('spinbutton', { name: 'Empty the trash after' }).press('Tab');
+  await expect(screen.getByRole('status')).toHaveText('Saved');
+  expect.soft((await new AxeBuilder({ page }).analyze()).violations.map((v) => v.id)).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.rf-usage')).toContainText(/of 537 MB used/);
+  await expect(page.getByRole('progressbar', { name: 'Space used' })).toBeVisible();
+  const saved = (await (await page.request.get('/api/files/settings')).json()).drive;
+  expect([saved.quota, saved.trashDays]).toEqual([536870912, 30]);
+});
+
