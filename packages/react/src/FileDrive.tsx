@@ -3,7 +3,7 @@
 // It is built from the hooks of `headless.tsx` and nothing else, so a screen
 // of your own can do what this one does.
 
-import { type Entry, type EntryId, type FileEntry, type FolderEntry, versionNumber } from '@rebofiles/core';
+import { EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type Role, versionNumber } from '@rebofiles/core';
 import { type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { RequestError } from './client';
 import { DriveProvider, type DriveProviderProps, type View, useActions, useDrive, useEntries, useEntry, useOuterDrive, useUploads } from './headless';
@@ -24,6 +24,8 @@ export interface FileDriveProps extends Omit<DriveProviderProps, 'children'> {
   onOpenDocument?: (file: FileEntry, url: string) => void;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/react/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
+  /** The address a link of the drive is given: where your page that reads it with `<SharedLink>` is. This page with `?link=` unless given. */
+  linkAddress?: (token: string) => string;
   className?: string;
 }
 
@@ -46,18 +48,20 @@ export function FileDrive({ base, client, headers, language, texts, ...props }: 
   );
 }
 
-type Section = 'files' | 'recent' | 'trash';
-type Dialog = { kind: 'folder' } | { kind: 'rename'; entry: Entry } | { kind: 'move'; entry: Entry } | { kind: 'delete'; entry: Entry } | { kind: 'empty' } | null;
+type Section = 'files' | 'recent' | 'shared' | 'trash';
+type Dialog = { kind: 'folder' } | { kind: 'rename'; entry: Entry } | { kind: 'move'; entry: Entry } | { kind: 'share'; entry: Entry } | { kind: 'delete'; entry: Entry } | { kind: 'empty' } | null;
 
 /** The type of what is dragged from the drive itself, apart from files dragged in from the computer. */
 const DRAGGED = 'application/x-rebofiles-entry';
 
-function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDocument, previewDocument, className }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
+function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDocument, previewDocument, linkAddress, className }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
   const { t, client } = useDrive();
   const actions = useActions();
   const { uploads, upload } = useUploads();
   const [section, setSection] = useState<Section>('files');
   const [folder, setFolder] = useState<EntryId | null>(null);
+  // Where a folder was opened from: My files, or Shared with me, whose crumb then leads back there.
+  const [from, setFrom] = useState<'files' | 'shared'>('files');
   const [selected, setSelected] = useState<EntryId | null>(null);
   const [layout, setLayout] = useState(defaultView);
   const [typed, setTyped] = useState('');
@@ -89,6 +93,7 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
   const selectedEntry = entries.find((entry) => entry.id === selected) ?? null;
 
   const go = (next: Section, to: EntryId | null = null) => {
+    if (next === 'shared' || (next === 'files' && to === null)) setFrom(next === 'shared' ? 'shared' : 'files');
     setSection(next);
     setFolder(to);
     setSelected(null);
@@ -152,7 +157,7 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
 
   const sending = uploads.find((u) => u.state === 'sending' || u.state === 'waiting');
   const failed = uploads.find((u) => u.state === 'failed');
-  const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'trash' ? t('trash') : null;
+  const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
 
   return (
     <div className={`rf-drive${className ? ` ${className}` : ''}`}>
@@ -187,9 +192,13 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
               event.target.value = '';
             }}
           />
-          <button type="button" className="rf-nav" aria-current={section === 'files' && !query} onClick={() => go('files')} {...dropTarget(null)}>
+          <button type="button" className="rf-nav" aria-current={section === 'files' && from === 'files' && !query} onClick={() => go('files')} {...dropTarget(null)}>
             <Icon name="drive" />
             {t('myFiles')}
+          </button>
+          <button type="button" className="rf-nav" aria-current={(section === 'shared' || (section === 'files' && from === 'shared')) && !query} onClick={() => go('shared')}>
+            <Icon name="users" />
+            {t('sharedWithMe')}
           </button>
           <button type="button" className="rf-nav" aria-current={section === 'recent' && !query} onClick={() => go('recent')}>
             <Icon name="clock" />
@@ -242,9 +251,15 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
                 </h2>
               ) : (
                 <>
-                  <button type="button" className="rf-crumb" onClick={() => go('files')} {...dropTarget(null)}>
-                    {t('myFiles')}
-                  </button>
+                  {from === 'shared' ? (
+                    <button type="button" className="rf-crumb" onClick={() => go('shared')}>
+                      {t('sharedWithMe')}
+                    </button>
+                  ) : (
+                    <button type="button" className="rf-crumb" onClick={() => go('files')} {...dropTarget(null)}>
+                      {t('myFiles')}
+                    </button>
+                  )}
                   {path.map((step) => (
                     <span key={step.id} style={{ display: 'contents' }}>
                       <Icon name="chevron" size={16} />
@@ -277,7 +292,7 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
             layout={layout}
             loading={loading}
             error={error}
-            empty={query ? t('noResults') : section === 'trash' ? t('trashIsEmpty') : section === 'recent' ? t('noRecent') : t('emptyFolder')}
+            empty={query ? t('noResults') : section === 'trash' ? t('trashIsEmpty') : section === 'recent' ? t('noRecent') : section === 'shared' ? t('noShared') : t('emptyFolder')}
             selected={selected}
             onSelect={setSelected}
             onOpen={open}
@@ -347,6 +362,7 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
         />
       )}
       {dialog?.kind === 'move' && <MoveDialog entry={dialog.entry} onClose={() => setDialog(null)} onMove={(to) => attempt(() => actions.move(dialog.entry.id, to))} />}
+      {dialog?.kind === 'share' && <ShareDialog id={dialog.entry.id} name={dialog.entry.name} linkAddress={linkAddress} attempt={attempt} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'delete' && (
         <ConfirmDialog
           text={t('confirmDelete', { name: dialog.entry.name })}
@@ -742,6 +758,10 @@ function Details({ entry: listed, inTrash, onOpen, onOpenDocument, previewDocume
                 <Icon name="move" size={16} />
                 {t('move')}
               </button>
+              <button type="button" className="rf-btn" onClick={() => onDialog({ kind: 'share', entry })}>
+                <Icon name="users" size={16} />
+                {t('share')}
+              </button>
               <button type="button" className="rf-btn rf-text rf-danger" onClick={() => attempt(() => actions.moveToTrash(entry.id).then(onGone), t('movedToTrash', { name: entry.name }))}>
                 <Icon name="trash" size={16} />
                 {t('moveToTrash')}
@@ -796,6 +816,12 @@ function Details({ entry: listed, inTrash, onOpen, onOpenDocument, previewDocume
             )}
             <dt>{t('owner')}</dt>
             <dd>{entry.owner}</dd>
+            {entry.shares?.length ? (
+              <>
+                <dt>{t('sharedWith')}</dt>
+                <dd>{entry.shares.map((s) => `${s.with === EVERYONE ? t('everyone') : s.with} · ${roleName(s.role, t)}`).join(', ')}</dd>
+              </>
+            ) : null}
             <dt>{t('modified')}</dt>
             <dd>
               {formatDate(entry.modified, locale)} · {entry.modifiedBy}
@@ -891,6 +917,124 @@ function ConfirmDialog({ text, action, onClose, onConfirm }: { text: string; act
           </button>
           <button type="submit" className="rf-btn rf-primary" style={{ background: 'var(--rf-danger)', borderColor: 'var(--rf-danger)' }}>
             {action}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+const ROLES: Role[] = ['viewer', 'commenter', 'editor'];
+const roleName = (role: Role, t: ReturnType<typeof useDrive>['t']) => t(role === 'viewer' ? 'roleViewer' : role === 'commenter' ? 'roleCommenter' : 'roleEditor');
+const defaultAddress = (token: string) => `${location.origin}${location.pathname}?link=${encodeURIComponent(token)}`;
+
+/** Who an entry is shared with and as what, and its links: each change made at once, the dialog staying open. */
+function ShareDialog({
+  id,
+  name,
+  linkAddress = defaultAddress,
+  attempt,
+  onClose,
+}: {
+  id: EntryId;
+  name: string;
+  linkAddress?: (token: string) => string;
+  attempt: (work: () => Promise<unknown>, done?: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { t, locale } = useDrive();
+  const actions = useActions();
+  const found = useEntry(id);
+  const entry = found?.entry;
+  const [who, setWho] = useState('');
+  const [role, setRole] = useState<Role>('viewer');
+  const label = t('shareTitle', { name });
+  const copy = async (token: string) => {
+    await navigator.clipboard.writeText(linkAddress(token));
+  };
+  // Emptied once shared, unless the next one was typed meanwhile.
+  const add = (user: string) =>
+    attempt(() => actions.share(id, user, role).then(() => setWho((typed) => (typed.trim() === user ? '' : typed))), t('shared', { who: user === EVERYONE ? t('everyone') : user }));
+  const roles = (value: Role, onChange: (role: Role) => void, labelled: string) => (
+    <select className="rf-select" aria-label={labelled} value={value} onChange={(event) => onChange(event.target.value as Role)}>
+      {ROLES.map((r) => (
+        <option key={r} value={r}>
+          {roleName(r, t)}
+        </option>
+      ))}
+    </select>
+  );
+  return (
+    <Modal label={label} onClose={onClose}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (who.trim()) void add(who.trim());
+        }}
+      >
+        <h2>{label}</h2>
+        <h3 className="rf-sub">{t('people')}</h3>
+        {entry?.shares?.length ? (
+          <ul className="rf-shares">
+            {entry.shares.map((s) => {
+              const person = s.with === EVERYONE ? t('everyone') : s.with;
+              return (
+                <li key={s.with}>
+                  <span className="rf-grow">{person}</span>
+                  {roles(s.role, (next) => void attempt(() => actions.share(id, s.with, next)), `${t('role')} · ${person}`)}
+                  <button type="button" className="rf-link" aria-label={`${t('remove')} · ${person}`} onClick={() => attempt(() => actions.unshare(id, s.with))}>
+                    {t('remove')}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="rf-hint">{t('onlyOwner')}</p>
+        )}
+        <div className="rf-share-add">
+          <input type="text" aria-label={t('addPerson')} placeholder={t('addPerson')} value={who} onChange={(event) => setWho(event.target.value)} />
+          {roles(role, setRole, t('role'))}
+          <button type="submit" className="rf-btn rf-primary" disabled={!who.trim()}>
+            {t('share')}
+          </button>
+        </div>
+        {!entry?.shares?.some((s) => s.with === EVERYONE) && (
+          <button type="button" className="rf-link" onClick={() => add(EVERYONE)}>
+            + {t('everyone')} · {roleName(role, t)}
+          </button>
+        )}
+
+        <h3 className="rf-sub">{t('links')}</h3>
+        {entry?.links?.length ? (
+          <ul className="rf-shares">
+            {entry.links.map((link) => {
+              const until = t('linkUntil', { date: formatDate(link.expires, locale) });
+              return (
+                <li key={link.id}>
+                  <Icon name="link" size={16} />
+                  <span className="rf-grow">{until}</span>
+                  <button type="button" className="rf-link" aria-label={`${t('copyLink')} · ${until}`} onClick={() => attempt(async () => copy(await actions.linkToken(id, link.id)), t('linkCopied'))}>
+                    {t('copyLink')}
+                  </button>
+                  <button type="button" className="rf-link" aria-label={`${t('remove')} · ${until}`} onClick={() => attempt(() => actions.removeLink(id, link.id))}>
+                    {t('remove')}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="rf-hint">{t('noLinks')}</p>
+        )}
+        <button type="button" className="rf-btn" onClick={() => attempt(async () => copy((await actions.createLink(id, 7)).token), t('linkCopied'))}>
+          <Icon name="link" size={16} />
+          {t('createLink', { n: 7 })}
+        </button>
+
+        <div className="rf-row-end">
+          <button type="button" className="rf-btn rf-primary" onClick={onClose}>
+            {t('done')}
           </button>
         </div>
       </form>

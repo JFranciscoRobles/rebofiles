@@ -152,6 +152,24 @@ export const CSS = `
 .rf-folders button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; background: none; text-align: left; border-bottom: 1px solid var(--rf-divider); font: inherit; color: inherit; cursor: pointer; }
 .rf-folders button:hover { background: var(--rf-surface); }
 .rf-folders button:disabled { color: var(--rf-faint); cursor: default; }
+.rf-dialog .rf-sub { margin: 4px 0 -6px; font-size: 13px; font-weight: 600; color: var(--rf-muted); }
+.rf-dialog .rf-hint { margin: 0; color: var(--rf-muted); font-size: 13px; }
+.rf-dialog .rf-link { align-self: flex-start; cursor: pointer; font: inherit; font-weight: 600; }
+.rf-shares { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rf-border); border-radius: 12px; }
+.rf-shares li { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--rf-divider); min-width: 0; }
+.rf-shares li:last-child { border-bottom: 0; }
+.rf-shares .rf-grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-share-add { display: flex; gap: 8px; }
+.rf-share-add input[type='text'] { flex: 1; min-width: 0; }
+.rf-select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rf-border-strong); background: var(--rf-bg); color: inherit; }
+.rf-select:focus-visible { outline: none; border-color: var(--rf-brand); box-shadow: 0 0 0 3px var(--rf-focus); }
+
+.rf-shared .rf-body { grid-template-columns: minmax(0,1fr); }
+.rf-link-rows { list-style: none; margin: 0; padding: 0; }
+.rf-link-rows .rf-row { grid-template-columns: minmax(0,1fr) 110px 80px 40px; border-bottom: 1px solid var(--rf-divider); }
+.rf-link-rows button.rf-name { border: 0; background: none; padding: 0; text-align: left; }
+.rf-link-rows button.rf-name:hover span:last-child { text-decoration: underline; }
+.rf-link-rows .rf-btn { padding: 6px; }
 
 @media (max-width: 900px) {
   .rf-body { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(320px,1fr) auto; overflow: auto; }
@@ -164,6 +182,8 @@ export const CSS = `
   .rf-title span { display: none; }
   .rf-cols, .rf-row { grid-template-columns: minmax(0,1fr) 80px; }
   .rf-cols > :nth-child(2), .rf-cols > :nth-child(3), .rf-row > :nth-child(2), .rf-row > :nth-child(3) { display: none; }
+  .rf-link-rows .rf-row { grid-template-columns: minmax(0,1fr) 80px 40px; }
+  .rf-link-rows .rf-row > :nth-child(3) { display: revert; }
 }
 @media (prefers-reduced-motion: reduce) { .rf-drive *, .rf-toast { transition: none !important; animation: none !important; } }
 `;

@@ -51,7 +51,7 @@ export function useDrive(): DriveContext {
 }
 
 /** What a list shows: a folder, the recent files, the trash, or what a search found. */
-export type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' } | { section: 'trash' } | { section: 'search'; query: string; trashed?: boolean };
+export type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' } | { section: 'shared' } | { section: 'trash' } | { section: 'search'; query: string; trashed?: boolean };
 
 export interface Entries {
   entries: Entry[];
@@ -76,9 +76,11 @@ export function useEntries(view: View): Entries {
         ? client.list(view.folder)
         : view.section === 'recent'
           ? client.recent().then((entries) => ({ entries, path: [] }))
-          : view.section === 'trash'
-            ? client.trash().then((entries) => ({ entries, path: [] }))
-            : client.search(view.query, { trashed: view.trashed }).then((entries) => ({ entries, path: [] }));
+          : view.section === 'shared'
+            ? client.shared().then((entries) => ({ entries, path: [] }))
+            : view.section === 'trash'
+              ? client.trash().then((entries) => ({ entries, path: [] }))
+              : client.search(view.query, { trashed: view.trashed }).then((entries) => ({ entries, path: [] }));
     asked.then(
       ({ entries, path }) => live && setState({ entries, path, loading: false, error: null }),
       (error: Error) => live && setState({ entries: [], path: [], loading: false, error }),
@@ -131,6 +133,11 @@ export function useActions() {
       deleteForever: then(client.deleteForever),
       emptyTrash: then(client.emptyTrash),
       restoreVersion: then(client.restoreVersion),
+      share: then(client.share),
+      unshare: then(client.unshare),
+      createLink: then(client.createLink),
+      removeLink: then(client.removeLink),
+      linkToken: client.linkToken,
       /** A file sent up, or a new version of one with `{ file: id }`; for many with a bar of progress, `useUploads`. */
       upload: then(client.upload),
       url: client.url,

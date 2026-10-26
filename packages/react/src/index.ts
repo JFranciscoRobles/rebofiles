@@ -3,6 +3,7 @@
 // a change to this list is a change of the API.
 
 export { type FileDriveProps, type DocumentPreview, FileDrive } from './FileDrive';
+export { type SharedLinkProps, SharedLink } from './SharedLink';
 export { type DriveProviderProps, type View, type Entries, type Upload, DriveProvider, useDrive, useOuterDrive, useEntries, useEntry, useActions, useUploads } from './headless';
 export {
   type ClientOptions,
