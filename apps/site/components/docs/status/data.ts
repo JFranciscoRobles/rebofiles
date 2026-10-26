@@ -13,11 +13,11 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/server',
-    count: 38,
+    count: 39,
     what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
   },
   {
-    where: 'packages/react',
+    where: 'packages/drive',
     count: 19,
     what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
@@ -28,8 +28,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 17,
-    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark.',
+    count: 19,
+    what: 'The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark; the drive with no framework; a drive from the hooks alone.',
   },
 ];
 
@@ -118,8 +118,8 @@ export const ROADMAP: Milestone[] = [
     version: '0.3.0',
     name: 'Your own UI',
     items: [
-      { what: '@rebofiles/drive split out of react, without a framework' },
-      { what: 'The headless hooks, documented with a whole screen built from them' },
+      { what: '@rebofiles/drive split out of react, without a framework', done: true },
+      { what: 'The headless hooks, documented with a whole screen built from them', done: true },
       { what: 'Accessible: every action from the keyboard, screen readers, axe, a dark theme; Playwright', done: true },
     ],
   },

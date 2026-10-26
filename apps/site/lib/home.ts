@@ -54,7 +54,7 @@ export interface Package {
 /** In the order of the table. */
 export const PACKAGES: Package[] = [
   { name: '@rebofiles/core', what: 'The file model: folders, names, versions, the trash and search. No dependencies.', tag: 'No DOM', color: 'blue' },
-  { name: '@rebofiles/drive', what: 'A file browser for the browser: list and grid, uploads, previews and status bar.', tag: 'No framework', color: 'yellow', comes: '0.3' },
+  { name: '@rebofiles/drive', what: 'The whole drive with no framework, mounted on an element, and the client it is built on.', tag: 'No framework', color: 'yellow' },
   { name: '@rebofiles/react', what: 'The drive as a React component, or as headless hooks, with uploads and previews inside.', tag: 'React', color: 'green' },
   { name: '@rebofiles/server', what: 'The routes, authorize(), signed addresses, the bytes on S3 or a disk and the metadata in SQLite.', tag: 'Node', color: 'pink' },
   { name: '@rebofiles/desktop', what: 'A folder on disk kept like a folder of the drive, in a Tauri app.', tag: 'Desktop', color: 'purple', comes: '0.6' },

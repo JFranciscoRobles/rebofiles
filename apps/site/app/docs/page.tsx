@@ -295,8 +295,8 @@ npm run storage                                   # the drive, at http://localho
       <Section id="next" title="From here">
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong>Your own interface.</strong> <C>&lt;FileDrive&gt;</C> is built from <C>DriveProvider</C>, <C>useEntries</C>, <C>useEntry</C>, <C>useActions</C> and <C>useUploads</C>, and nothing
-            else; <a href={`${REPO}/tree/main/packages/react#readme`}>the README of @rebofiles/react</a> has them.
+            <strong>Your own interface.</strong> <C>DriveProvider</C>, <C>useEntries</C>, <C>useEntry</C>, <C>useActions</C> and <C>useUploads</C>, one by one, and a whole drive built from them:{' '}
+            <a href="/docs/hooks/">the guide to the hooks</a>. Without React, <C>mountDrive</C> of <C>@rebofiles/drive</C>.
           </li>
           <li>
             <strong>No server.</strong> <C>createMemoryClient()</C> answers as the server does, from the page, for demos, stories and tests: <C>&lt;FileDrive client=&#123;…&#125; /&gt;</C>.

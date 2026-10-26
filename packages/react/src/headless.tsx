@@ -116,7 +116,8 @@ export function useEntry(id: EntryId | null) {
       live = false;
     };
   }, [client, id, revision]);
-  return state;
+  // Not the last entry's while this one is asked for: null until it comes.
+  return state && state.entry.id === id ? state : null;
 }
 
 /** The changes, each telling the provider when it is done so that every hook asks again. */

@@ -112,6 +112,15 @@ minor version (0.x.0) may change the API; such changes are listed under
   its button. Inside the move dialog, going into a folder puts the focus on
   its first folder, or on "Move here", rather than nowhere. Kept by a test in
   Chrome that makes, opens, uploads, renames, moves and trashes without a click.
+- **`@rebofiles/drive`, the drive without a framework.** `mountDrive(element,
+  options)` is the whole screen, and `mountSharedLink` what a link shows,
+  with no framework; and the client, the drive kept in the page, the words
+  and the stylesheet, moved here from `@rebofiles/react`, which gives them
+  again. `<FileDrive>` and `<SharedLink>` mount them. The playground has a
+  page with no framework, `vanilla.html`.
+- **The guide to the hooks** (`/docs/hooks/`): each hook, and a whole drive
+  built from them alone, in a look of its own (`apps/playground/headless.html`),
+  tested in Chrome.
 - **`@rebofiles/mcp`, the drive for an assistant.** Tools to list, search,
   read (text, and Word documents with Rebodocs), see Recent and Shared with
   me, make folders, write text files and new versions of them, rename, move,
@@ -147,11 +156,15 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **`Action`** comes from core and has `comment` and `share`. An `authorize`
   of your own is now asked `share` for sharing and links: answer it.
 - **`DriveErrorCode`** has `invalid-share`: a map of every code needs it.
+- **`react-dom` is a peer of `@rebofiles/react`**, which puts a logo of
+  React's inside the drive with a portal.
 
 ### Fixed
 
 - **A view said loading while it is.** In the render after the view changes,
-  `useEntries` gave the last view's entries as if they were this one's.
+  `useEntries` gave the last view's entries as if they were this one's; and
+  `useEntry(id)` the last entry until the one asked for came, so what was
+  done to "it" was done to the one before.
 
 - **The client outside a browser.** An address a storage on the disk makes
   is relative; it is now taken relative to `base` when that is a whole

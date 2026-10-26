@@ -30,7 +30,7 @@ function backend(): Plugin {
 
 export default defineConfig({
   plugins: [react(), backend()],
-  // Two pages: the drive in React, and without a framework (vanilla.html).
-  build: { rollupOptions: { input: { main: 'index.html', vanilla: 'vanilla.html' } } },
+  // Three pages: the drive in React, without a framework (vanilla.html), and built from the hooks (headless.html).
+  build: { rollupOptions: { input: { main: 'index.html', vanilla: 'vanilla.html', headless: 'headless.html' } } },
   server: { port: PORT, strictPort: true },
 });

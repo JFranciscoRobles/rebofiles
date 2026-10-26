@@ -25,8 +25,8 @@ other as source, so there is no build step while developing.
   function with a test.
 - What reaches a storage or a database, and who may do what, belongs in
   `packages/server`, using only the public API of core.
-- What a person sees or touches will belong in `packages/drive`;
-  `packages/react` will hold no logic of its own: it mounts the drive and
+- What a person sees or touches belongs in `packages/drive`, without a
+  framework; `packages/react` holds no logic of its own: it mounts the drive and
   exposes it.
 
 Each package's README ends with a list of where it can improve. Those are
@@ -60,7 +60,7 @@ sources stays the one the repository uses.
 
 ```bash
 npm run build:packages                          # dist/ of every package
-npm publish ./packages/core/dist                # then server, react, mcp, in that order
+npm publish ./packages/core/dist                # then server, drive, react, mcp, in that order
 ```
 
 Before a release: `npm test`, `npm run typecheck`, `npm run lint`; the
