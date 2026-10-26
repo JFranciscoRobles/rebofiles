@@ -79,14 +79,16 @@ export function SharedLink({ base = '/api/files', token, language = 'en', texts,
             <>
               <div className="rf-head">
                 <div className="rf-crumbs">
-                  {listing?.path.map((step, i) => (
-                    <span key={step.id} style={{ display: 'contents' }}>
-                      {i > 0 && <Icon name="chevron" size={16} />}
-                      <button type="button" className="rf-crumb" aria-current={step.id === listing.folder.id ? 'page' : undefined} onClick={() => setFolder(i === 0 ? undefined : step.id)}>
-                        {step.name}
-                      </button>
-                    </span>
-                  ))}
+                  {/* A link to a file has no folders to go back up: the file is its only row. */}
+                  {listing?.root.kind === 'folder' &&
+                    listing.path.map((step, i) => (
+                      <span key={step.id} style={{ display: 'contents' }}>
+                        {i > 0 && <Icon name="chevron" size={16} />}
+                        <button type="button" className="rf-crumb" aria-current={step.id === listing.folder.id ? 'page' : undefined} onClick={() => setFolder(i === 0 ? undefined : step.id)}>
+                          {step.name}
+                        </button>
+                      </span>
+                    ))}
                 </div>
               </div>
               <ul className="rf-items rf-link-rows" aria-label={t('name')}>

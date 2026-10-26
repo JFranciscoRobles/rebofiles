@@ -225,7 +225,8 @@ export default async function Home() {
               )}
             </p>
           </div>
-          <div className="reveal overflow-x-auto rounded-2xl border border-border">
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways on a phone, and a keyboard has to reach what is hidden (WCAG 2.1.1) */}
+          <section className="reveal overflow-x-auto rounded-2xl border border-border" aria-label="Packages" tabIndex={0}>
             <table className="w-full min-w-[680px] border-collapse text-left text-[15px]">
               <colgroup>
                 <col className="w-[27%]" />
@@ -260,7 +261,7 @@ export default async function Home() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </section>
         </section>
 
         <section id="status" className="mx-auto max-w-[1180px] px-6 pb-25 pt-15">

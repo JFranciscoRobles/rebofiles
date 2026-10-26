@@ -211,7 +211,8 @@ npm run storage                                   # the drive, at http://localho
           ReboFiles has no users of its own. <C>identify</C> says who is asking, from your session; returning null answers 401. <C>authorize</C> is asked on every route, with the entry it is about,
           and returning false answers 403. These are the actions:
         </p>
-        <div className="overflow-x-auto rounded-[14px] border border-border">
+        {/* biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways on a phone, and a keyboard has to reach what is hidden (WCAG 2.1.1) */}
+        <section className="overflow-x-auto rounded-[14px] border border-border" aria-label="Actions" tabIndex={0}>
           <table className="w-full min-w-[520px] border-collapse text-left text-[15px]">
             <tbody>
               {ACTIONS.map(([action, what]) => (
@@ -222,7 +223,7 @@ npm run storage                                   # the drive, at http://localho
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
         <p>
           <C>byRoles</C> answers from the drive itself: the owner of an entry may do everything to it and to what is inside it, and those it is shared with what their role allows: a viewer looks,
           reads and downloads, an editor also makes, uploads, renames, moves and puts in the trash, and only the owner deletes for good and shares. Anyone signed in may look at the top of the drive

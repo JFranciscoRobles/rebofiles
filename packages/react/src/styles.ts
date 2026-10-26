@@ -44,7 +44,7 @@ export const CSS = `
 .rf-nav[aria-current='true'] { background: var(--rf-brand-light); color: var(--rf-brand); font-weight: 600; }
 .rf-nav.rf-drop { box-shadow: inset 0 0 0 2px var(--rf-brand); }
 .rf-storage { margin-top: auto; padding: 12px 14px; font-size: 12px; color: var(--rf-muted); }
-.rf-storage code { display: block; margin-top: 4px; font: 11px var(--rf-mono); color: var(--rf-faint); overflow: hidden; text-overflow: ellipsis; }
+.rf-storage code { display: block; margin-top: 4px; font: 11px var(--rf-mono); color: var(--rf-muted); overflow: hidden; text-overflow: ellipsis; }
 
 .rf-main, .rf-details { background: var(--rf-bg); border: 1px solid var(--rf-border); border-radius: var(--rf-radius); min-height: 0; display: flex; flex-direction: column; }
 .rf-main { position: relative; }
