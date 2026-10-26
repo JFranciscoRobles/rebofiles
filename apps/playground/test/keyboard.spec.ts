@@ -62,7 +62,10 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
+  // The folders come once the dialog has asked for them: tabbing before would go round what is there without them.
+  await expect(dialog.getByRole('button', { name: 'Archive' })).toBeVisible();
   for (let i = 0; i < 8 && (await focused(page)) !== 'Archive'; i++) await page.keyboard.press('Tab');
+  expect(await focused(page)).toBe('Archive');
   await page.keyboard.press('Enter');
   // Inside Archive, which has no folders, the focus is on what is left to do.
   await expect(dialog.getByRole('button', { name: 'Move here' })).toBeFocused();
