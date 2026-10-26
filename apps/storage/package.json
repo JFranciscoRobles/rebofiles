@@ -1,0 +1,18 @@
+{
+  "name": "@rebofiles/storage",
+  "version": "0.1.0",
+  "description": "The drive against a real bucket (R2, S3, MinIO): the bytes there, the entries in SQLite on this computer.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "vite-node scripts/check.ts",
+    "seed": "vite-node scripts/seed.ts"
+  },
+  "dependencies": {
+    "@rebofiles/core": "0.1.0",
+    "@rebofiles/react": "0.1.0",
+    "@rebofiles/server": "0.1.0"
+  }
+}

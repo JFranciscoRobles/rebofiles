@@ -64,11 +64,11 @@ The same rules:
 
 ## What is checked
 
-Taken on October 24, 2026, by running `npm test`, every one passing:
+Taken on October 25, 2026, by running `npm test`, every one passing:
 
 - `packages/core` · 31 · Names, the tree, renaming and moving, the trash, versions, search, changes.
 - `packages/server` · 19 · The routes on the disk and on an S3 kept in memory, uploads in parts, who may do what, SQLite across two processes, and the signature against AWS's example.
-- `packages/react` · 13 · The client against the routes: folders, uploads in parts with progress, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
+- `packages/react` · 15 · The client against the routes: folders, uploads in parts with progress, the headers a bucket signed, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
 
 ### The interface
 
@@ -76,7 +76,7 @@ Driven in Chrome without a window, with real clicks and keys, on the playground:
 
 ## What is not
 
-- `A real bucket.` The S3 storage is tested against one kept in memory, which does not check signatures; nothing has been sent to R2, AWS or MinIO yet.
+- `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, the deletion), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
 - `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone.
 - `Tests in a browser.` The walk through the interface was a script run by hand, not a test the repository keeps.
 - `Two processes on one database.` SQLite was opened by two handlers one after the other, not at once.
@@ -119,8 +119,8 @@ install command.
    upload, the details panel and its versions, the trash.
 4. ✅ **Previews** of pictures and PDF with what the browser has; of DOCX with
    `@rebodocs/core` when it is installed. "Open in Rebodocs".
-5. **`apps/demo` ✅, `apps/playground` ✅, `apps/storage`**, and the storage one
-   run by hand against Cloudflare R2.
+5. ✅ **`apps/demo`, `apps/playground`, `apps/storage`**, and the storage one
+   run by hand against Cloudflare R2 (`npm run storage:check`, then the page).
 6. **`apps/site`:** the landing of the handoff ✅, Getting started, and the
    status page. Until those two are written, the landing links to the README
    and to this file.

@@ -69,9 +69,23 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **Builds to publish** (`npm run build:packages`), made as Rebodocs makes
   its own: each package's `dist/` is the package, with its types, and was
   installed from its tarball in an empty project and used there.
+- **Against a real bucket** (`apps/storage`, `npm run storage`): the drive
+  with its bytes in the bucket `.env` says (R2, S3, MinIO), with its
+  `.env.example` and `cors.json`. `npm run storage:check` goes the whole way a
+  file goes from Node, a small file, one in parts, a version, a download shown
+  in the page and the deletion, and says what the bucket answered when it
+  refuses; `npm run storage:seed` puts a few files there.
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes
   is relative; it is now taken relative to `base` when that is a whole
   address, so the client works in Node and on a server, not only in a page.
+- **A file of one part, sent to a bucket.** Its type is signed with its
+  address, but the part went without it, which a real bucket refuses. Each
+  part now goes with the type the server was told. The S3 kept in memory for
+  the tests refuses a header signed and not sent, as S3 does.
+- **R2 and a text file.** Cloudflare compressed its answer to the HEAD the
+  server makes to see what arrived, and left out the length, so every text
+  file was refused as empty. The server now asks the bucket for answers not
+  compressed.
 

@@ -5,6 +5,11 @@ dist
 *.tsbuildinfo
 *.tgz
 
+# Keys to a bucket, and whatever else a .env holds. The example is kept.
+.env
+.env.*
+!.env.example
+
 # Real files to try things with: they can be confidential. Tests make their own.
 /files/
 
