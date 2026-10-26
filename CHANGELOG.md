@@ -90,6 +90,12 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **Tests in Chrome** (`npm run test:browser`): the playground driven by
   Playwright, in the Chrome of the machine, on a port and a folder of its own.
   The playground takes `PORT` and `REBOFILES_STORAGE`.
+- **Metadata on Postgres.** `postgresMetadata(db)` keeps the entries in one
+  table of jsonb, made the first time, with the driver of the application:
+  anything with `query(text, values)` that answers `{ rows }`, as `pg`,
+  Neon or PGlite do. A change is one statement. Given a pool, each change
+  holds a lock of the database, so any number of servers may share a drive;
+  a `MetadataStore` of your own may give `lock(work)` for the same.
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes

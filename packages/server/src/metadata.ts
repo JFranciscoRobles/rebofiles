@@ -8,6 +8,11 @@ import { type Changes, type Drive, type Entry, driveOf, emptyDrive } from '@rebo
 export interface MetadataStore {
   load(): Promise<Drive>;
   save(changes: Changes): Promise<void>;
+  /**
+   * `work`, a load and a save, while no other process changes the drive: for a store more than one process
+   * writes to. Without it, changes are put in order inside one process only.
+   */
+  lock?<T>(work: () => Promise<T>): Promise<T>;
 }
 
 /** In memory: gone when the process ends. For tests and demos. */
@@ -51,5 +56,70 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
         throw error;
       }
     },
+  };
+}
+
+/** What `postgresMetadata` asks of a database: `pg`'s Client or Pool, Neon's, PGlite, or a line around another. */
+export interface PostgresClient {
+  query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+/** A pool, whose connections hold a lock for a change: with one, any number of processes may share the drive. */
+export interface PostgresPool extends PostgresClient {
+  connect(): Promise<PostgresClient & { release(): void }>;
+}
+
+export interface PostgresOptions {
+  /** The table, made when it is not there: `rebofiles_entries` unless said. */
+  table?: string;
+}
+
+/**
+ * A database of Postgres: one table, an entry per row as jsonb. A change is written in one statement, so it is
+ * whole or not at all; given a pool, each change also holds a lock of the database, so two processes never change
+ * the drive at once. The driver is the application's: nothing of it is imported here.
+ */
+export async function postgresMetadata(db: PostgresClient | PostgresPool, options: PostgresOptions = {}): Promise<MetadataStore> {
+  const table = options.table ?? 'rebofiles_entries';
+  if (!/^[a-z_][a-z0-9_]*$/i.test(table)) throw new Error(`"${table}" cannot be the name of a table here: letters, digits and _ only.`);
+  const pool = 'connect' in db ? db : undefined;
+  /** `work` while no other process holds the lock of this table; as it is, without a pool to hold it on. */
+  const exclusive = async <T>(work: () => Promise<T>): Promise<T> => {
+    if (!pool) return work();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Let go of when the transaction ends, or when the connection does, should the process die holding it.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [table]);
+      const done = await work();
+      await client.query('COMMIT');
+      return done;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+  // Under the lock too: two processes starting at once would both make the table, and one of them fail.
+  await exclusive(async () => {
+    await db.query(`CREATE TABLE IF NOT EXISTS ${table} (id text PRIMARY KEY, parent text, entry jsonb NOT NULL)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS ${table}_parent ON ${table} (parent)`);
+  });
+  // One statement: the rows removed and the rows put, together or not at all, without a transaction to hold open.
+  const write = `WITH removed AS (DELETE FROM ${table} WHERE id = ANY($2::text[]))
+    INSERT INTO ${table} (id, parent, entry) SELECT e->>'id', e->>'parent', e FROM jsonb_array_elements($1::jsonb) AS e
+    ON CONFLICT (id) DO UPDATE SET parent = excluded.parent, entry = excluded.entry`;
+  return {
+    async load() {
+      const { rows } = await db.query(`SELECT entry FROM ${table}`);
+      // jsonb comes parsed from most drivers, and as text from some.
+      const entries = (rows as { entry: Entry | string }[]).map((row) => (typeof row.entry === 'string' ? (JSON.parse(row.entry) as Entry) : row.entry));
+      return entries.length ? driveOf(entries) : emptyDrive();
+    },
+    async save({ put, removed }) {
+      if (put.length || removed.length) await db.query(write, [JSON.stringify(put), removed]);
+    },
+    lock: pool ? exclusive : undefined,
   };
 }

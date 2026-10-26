@@ -67,7 +67,7 @@ The same rules:
 Taken on October 25, 2026, by running `npm test`, every one passing:
 
 - `packages/core` · 31 · Names, the tree, renaming and moving, the trash, versions, search, changes.
-- `packages/server` · 23 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, and the signature against AWS's example.
+- `packages/server` · 26 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, Postgres on PGlite, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
 - `packages/react` · 16 · The client against the routes: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
 
 ### The interface
@@ -82,7 +82,7 @@ Driven in Chrome without a window, with real clicks and keys, on the playground:
 
 - `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
 - `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone.
-- `Two processes on one database.` SQLite was opened by two handlers one after the other, not at once.
+- `Two processes on SQLite.` SQLite was opened by two handlers one after the other, not at once; for more than one process, Postgres.
 
 ## Known limits
 
@@ -93,7 +93,7 @@ Storage
 Metadata
 
 - The whole drive is loaded on each request, and each change copies the map of entries: fine for tens of thousands of entries.
-- Changes are put in order inside one process only.
+- Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.
 
 Uploads
 
@@ -136,7 +136,8 @@ server, the preview of a Word document, a strict typecheck.
 7. Owner, editor, commenter and viewer, on files and folders, inherited down
    the tree. "Shared with me" and "Recent".
 8. Links with an expiry, signed by the server.
-9. Metadata on Postgres.
+9. ✅ Metadata on Postgres (`postgresMetadata`), with a lock of the database
+   for more than one process.
 
 ### 0.3.0 · Your own UI
 

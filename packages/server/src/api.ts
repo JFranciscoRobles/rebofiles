@@ -88,12 +88,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   // Changes go one at a time, each on the drive the last one left; reads take the drive as it is.
   let queue: Promise<unknown> = Promise.resolve();
   const change = <T>(work: (drive: Drive) => Promise<{ drive: Drive; answer: T }>): Promise<T> => {
-    const run = queue.then(async () => {
+    const step = async () => {
       const before = await options.metadata.load();
       const { drive, answer } = await work(before);
       if (drive !== before) await options.metadata.save(core.changes(before, drive));
       return answer;
-    });
+    };
+    // In order here, and under the store's lock when it has one, for the other processes on the same store.
+    const run = queue.then(() => (options.metadata.lock ? options.metadata.lock(step) : step()));
     queue = run.catch(() => undefined);
     return run;
   };

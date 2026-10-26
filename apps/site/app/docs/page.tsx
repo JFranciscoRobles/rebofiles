@@ -57,6 +57,11 @@ const handle = createDriveHandler({
 
 export { handle as GET, handle as POST, handle as PATCH, handle as PUT, handle as DELETE };`;
 
+const POSTGRES = `import pg from 'pg';
+import { postgresMetadata } from '@rebofiles/server';
+
+metadata: await postgresMetadata(new pg.Pool({ connectionString: process.env.DATABASE_URL })),`;
+
 const NODE = `import { createServer } from 'node:http';
 import { createDriveHandler, nodeHandler } from '@rebofiles/server';
 
@@ -175,6 +180,11 @@ npm run storage                                   # the drive, at http://localho
           <C>sqliteMetadata</C> keeps the folders, names, owners, versions and the trash in one file, for an application on one server. The key of a file in the bucket is its id, never its path, so
           renaming and moving never touch the bytes.
         </p>
+        <p>
+          For more than one server, or a host without a disk of its own, keep them on Postgres with the driver you already use. Given a pool, each change holds a lock of the database, so two servers
+          never change the drive at once:
+        </p>
+        <Code code={POSTGRES} />
         <p>
           On <C>node:http</C>, or Express and what is built on it, <C>nodeHandler</C> makes it a listener:
         </p>

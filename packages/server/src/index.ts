@@ -6,5 +6,5 @@ export { nodeHandler } from './node';
 export { type Storage, type UploadPart, type UploadPlan, type FinishedPart, PART_SIZE } from './storage';
 export { type S3Options, s3Storage, s3OptionsFrom } from './s3';
 export { type DiskOptions, diskStorage } from './disk';
-export { type MetadataStore, memoryMetadata, sqliteMetadata } from './metadata';
+export { type MetadataStore, type PostgresClient, type PostgresPool, type PostgresOptions, memoryMetadata, sqliteMetadata, postgresMetadata } from './metadata';
 export { Refused } from './refused';

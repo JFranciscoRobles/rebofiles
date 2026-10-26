@@ -9,8 +9,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   { where: 'packages/core', count: 31, what: 'Names, the tree, renaming and moving, the trash, versions, search, changes.' },
   {
     where: 'packages/server',
-    count: 23,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, and the signature against AWS’s example.',
+    count: 26,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
   },
   {
     where: 'packages/react',
@@ -34,6 +34,7 @@ export const CHECKED: [string, string][] = [
     'The interface',
     'Driven in Chrome with real clicks and keys: a folder made, files uploaded into it, a text previewed, a second upload with the same name as “(2)”, renaming with F2, the trash with Delete and back, search, moving from the dialog, the grid, and the drive in Spanish at the width of a phone.',
   ],
+  ['Postgres', 'Two pools on one Postgres 16, as two servers, making twenty folders of one name at once: twenty names, none given twice. Without the lock, ten.'],
   ['Rebodocs', 'A Word document uploaded, previewed as a page, opened in Rebodocs, changed, saved with ⌘S, and back in the drive as its second version.'],
   ['The demo', 'Acme’s files made in the page, a Word document and a PDF previewed, Claude’s rename and its card, an upload in steps, the trash emptied.'],
   [
@@ -45,7 +46,7 @@ export const CHECKED: [string, string][] = [
 export const NOT_CHECKED: [string, string][] = [
   ['Other buckets', 'Cloudflare R2 only. Not AWS, MinIO or Backblaze yet.'],
   ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone.'],
-  ['Two processes on one database', 'SQLite was opened by two handlers one after the other, not at once.'],
+  ['Two processes on SQLite', 'Opened by two handlers one after the other, not at once; for more than one process, Postgres.'],
 ];
 
 export const LIMITS: { area: string; items: string[] }[] = [
@@ -57,7 +58,10 @@ export const LIMITS: { area: string; items: string[] }[] = [
   },
   {
     area: 'Metadata',
-    items: ['The whole drive is loaded on each request, and each change copies the map of entries: fine for tens of thousands of entries.', 'Changes are put in order inside one process only.'],
+    items: [
+      'The whole drive is loaded on each request, and each change copies the map of entries: fine for tens of thousands of entries.',
+      'Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.',
+    ],
   },
   { area: 'Uploads', items: ['Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.', 'No resuming yet after the page is closed.'] },
   { area: 'Sharing', items: ['Owners only, and what `authorize()` decides. Roles come in 0.2.'] },
@@ -87,7 +91,11 @@ export const ROADMAP: Milestone[] = [
   {
     version: '0.2.0',
     name: 'Sharing',
-    items: [{ what: 'Owner, editor, commenter and viewer, inherited down the tree; “Shared with me”' }, { what: 'Links with an expiry, signed by the server' }, { what: 'Metadata on Postgres' }],
+    items: [
+      { what: 'Owner, editor, commenter and viewer, inherited down the tree; “Shared with me”' },
+      { what: 'Links with an expiry, signed by the server' },
+      { what: 'Metadata on Postgres', done: true },
+    ],
   },
   {
     version: '0.3.0',
