@@ -145,7 +145,8 @@ minor version (0.x.0) may change the API; such changes are listed under
   `@rebofiles/drive/rebodocs`: all of its pages at once, as large as lets
   them all fit on the screen (at the editor's least zoom, a quarter, for a
   long one), or one by one, each whole. Its thumbnail, in the grid and the
-  details, is its first page as Rebodocs draws it (`thumbDocument:
+  details, is the top of its first page as Rebodocs draws it, large, its
+  side margins left out (`thumbDocument:
   thumbDocx`), made once for each version. A picture is always whole on the
   screen, with nothing to scroll; a click shows its real size. The arrows go to the files before and after;
   a tab of its own, when wanted, is a button away. New kinds: `video`,

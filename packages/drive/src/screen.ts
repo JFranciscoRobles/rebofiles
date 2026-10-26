@@ -243,8 +243,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         const copy = page.cloneNode(true) as HTMLElement;
         const width = Number(page.dataset.width) || 816;
         const height = Number(page.dataset.height) || 1056;
-        const scale = fit === 'width' ? box.clientWidth / width : Math.min(box.clientWidth / width, box.clientHeight / height);
-        copy.style.cssText = `width:${width}px;height:${height}px;transform:scale(${scale});transform-origin:top left;position:absolute;left:${Math.max(0, (box.clientWidth - width * scale) / 2)}px;top:${fit === 'width' ? 0 : Math.max(0, (box.clientHeight - height * scale) / 2)}px`;
+        // Its top, the side margins left out so the text is as large as it can be; or the whole page.
+        const SHOWN = 0.8;
+        const scale = fit === 'width' ? box.clientWidth / (width * SHOWN) : Math.min(box.clientWidth / width, box.clientHeight / height);
+        const left = fit === 'width' ? -(width * scale - box.clientWidth) / 2 : Math.max(0, (box.clientWidth - width * scale) / 2);
+        const top = fit === 'width' ? -height * scale * 0.04 : Math.max(0, (box.clientHeight - height * scale) / 2);
+        copy.style.cssText = `width:${width}px;height:${height}px;transform:scale(${scale});transform-origin:top left;position:absolute;left:${left}px;top:${top}px`;
         box.appendChild(copy);
       },
     });
@@ -651,7 +655,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   function preview(file: FileEntry) {
-    const thumb = docThumb(file, 'page');
+    // The top of its first page, as wide as the box: large enough to read, the rest in the viewer.
+    const thumb = docThumb(file, 'width');
     if (thumb) return h('div', { class: 'rf-preview rf-preview-doc' }, thumb);
     const kind = kindOf(file);
     const reads = kind === 'text' || (kind === 'docx' && options.previewDocument && file.versions[0].size <= PREVIEW_LIMIT);

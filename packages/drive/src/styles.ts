@@ -151,11 +151,11 @@ export const CSS = `
 .rf-details-in { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .rf-details h2 { margin: 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
 .rf-none { padding: 24px 16px; color: var(--rf-muted); }
-.rf-doc-thumb { position: absolute; inset: 0; overflow: hidden; }
+.rf-doc-thumb { position: absolute; inset: 0; overflow: hidden; background: #fff; }
 .rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
 .rf-thumb .rf-doc-thumb { inset: 8px 10px 0; border-radius: 6px 6px 0 0; }
-.rf-preview.rf-preview-doc { position: relative; height: 220px; }
-.rf-preview-doc .rf-doc-thumb { inset: 12px; }
+.rf-preview.rf-preview-doc { position: relative; height: 240px; }
+.rf-preview-doc .rf-doc-thumb { inset: 12px 12px 0; border-radius: 6px 6px 0 0; }
 .rf-preview { height: 150px; border-radius: 12px; background: var(--rf-surface); display: grid; place-items: center; overflow: hidden; border: 1px solid var(--rf-border); }
 .rf-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
 /* A page is paper in either theme, with the ink of paper. */
