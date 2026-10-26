@@ -107,6 +107,15 @@ minor version (0.x.0) may change the API; such changes are listed under
   the server and the same every time. `createLinkClient` reads through one,
   and `<SharedLink>` shows it; `linkAddress` on `<FileDrive>` says where.
 
+- **The drive with the keyboard alone.** The Upload menu goes round with the
+  arrows, Home and End, as a menu does, and Escape gives the focus back to
+  its button. Inside the move dialog, going into a folder puts the focus on
+  its first folder, or on "Move here", rather than nowhere. Kept by a test in
+  Chrome that makes, opens, uploads, renames, moves and trashes without a click.
+- **What a screen reader is told.** Where one is and how many items are
+  there, once a view has loaded; an upload's progress as a progress bar, no
+  longer read out at every step; a failed upload as an alert.
+
 ### Changed
 
 - **My files is one's own.** At the top of the drive the server lists only
@@ -127,6 +136,9 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **`DriveErrorCode`** has `invalid-share`: a map of every code needs it.
 
 ### Fixed
+
+- **A view said loading while it is.** In the render after the view changes,
+  `useEntries` gave the last view's entries as if they were this one's.
 
 - **The client outside a browser.** An address a storage on the disk makes
   is relative; it is now taken relative to `base` when that is a whole

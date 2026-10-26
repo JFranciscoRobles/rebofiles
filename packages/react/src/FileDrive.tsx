@@ -316,7 +316,11 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
         />
       </div>
 
-      <div className="rf-status" aria-live="polite">
+      {/* Said once a view has loaded: where one is and how much is there. Not the progress of an upload, which would be read out at every step. */}
+      <span className="rf-sr" aria-live="polite">
+        {loading ? '' : `${heading ?? path.at(-1)?.name ?? t('myFiles')} · ${entries.length === 1 ? t('item') : t('items', { n: entries.length })}`}
+      </span>
+      <div className="rf-status">
         <span className="rf-grow">
           {entries.length === 1 ? t('item') : t('items', { n: entries.length })}
           {storage && <span className="rf-where"> · {storage}</span>}
@@ -324,12 +328,12 @@ function Screen({ title = 'Files', logo, defaultView = 'list', onOpen, onOpenDoc
         {sending ? (
           <>
             <span>{t('uploading', { name: sending.name, pct: Math.round((sending.sent / Math.max(1, sending.size)) * 100) })}</span>
-            <span className="rf-bar">
+            <span className="rf-bar" role="progressbar" aria-label={sending.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((sending.sent / Math.max(1, sending.size)) * 100)}>
               <span style={{ width: `${(sending.sent / Math.max(1, sending.size)) * 100}%` }} />
             </span>
           </>
         ) : failed ? (
-          <span className="rf-error">
+          <span className="rf-error" role="alert">
             {failed.name}: {failed.error}
           </span>
         ) : null}
@@ -387,6 +391,21 @@ function NewMenu({ onFolder, onUpload, disabled }: { onFolder: () => void; onUpl
   const { t } = useDrive();
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  /** The arrows go round the items, as a menu's do; Escape gives the focus back to the button, Tab goes on from it. */
+  const onKeyDown = (event: KeyboardEvent) => {
+    const items = [...(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[event.key];
+    if (to !== undefined) {
+      event.preventDefault();
+      items[(to + items.length) % items.length]?.focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (event.key === 'Tab') setOpen(false);
+  };
   useEffect(() => {
     if (!open) return;
     menu.current?.querySelector('button')?.focus();
@@ -400,17 +419,26 @@ function NewMenu({ onFolder, onUpload, disabled }: { onFolder: () => void; onUpl
   };
   return (
     <>
-      <button type="button" className="rf-new" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(!open)}>
+      <button
+        ref={trigger}
+        type="button"
+        className="rf-new"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(event) => event.key === 'ArrowDown' && (event.preventDefault(), setOpen(true))}
+      >
         <Icon name="plus" size={20} />
         {t('upload')}
       </button>
       {open && (
-        <div ref={menu} className="rf-menu" role="menu" tabIndex={-1} onKeyDown={(event) => event.key === 'Escape' && setOpen(false)}>
-          <button type="button" role="menuitem" onClick={pick(onUpload)}>
+        <div ref={menu} className="rf-menu" role="menu" tabIndex={-1} onKeyDown={onKeyDown}>
+          <button type="button" role="menuitem" tabIndex={-1} onClick={pick(onUpload)}>
             <Icon name="upload" />
             {t('uploadFiles')}
           </button>
-          <button type="button" role="menuitem" onClick={pick(onFolder)}>
+          <button type="button" role="menuitem" tabIndex={-1} onClick={pick(onFolder)}>
             <Icon name="folderPlus" />
             {t('newFolder')}
           </button>
@@ -1046,9 +1074,22 @@ function ShareDialog({
 function MoveDialog({ entry, onClose, onMove }: { entry: Entry; onClose: () => void; onMove: (to: EntryId | null) => void }) {
   const { t } = useDrive();
   const [at, setAt] = useState<EntryId | null>(null);
-  const { entries, path } = useEntries({ section: 'files', folder: at });
+  const { entries, path, loading } = useEntries({ section: 'files', folder: at });
   const folders = useMemo(() => entries.filter((e): e is FolderEntry => e.kind === 'folder'), [entries]);
   const label = t('moveTo', { name: entry.name });
+  const list = useRef<HTMLUListElement>(null);
+  const here = useRef<HTMLButtonElement>(null);
+  const went = useRef(false);
+  const goTo = (id: EntryId | null) => {
+    went.current = true;
+    setAt(id);
+  };
+  // Gone into a folder, the button pressed is gone too: the focus goes to its first folder, or to "Move here".
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked again when the folder shown changes and has loaded, which `at` and `loading` say
+  useEffect(() => {
+    if (!went.current || loading) return;
+    (list.current?.querySelector<HTMLButtonElement>('button:not(:disabled)') ?? here.current)?.focus();
+  }, [at, loading]);
   return (
     <Modal label={label} onClose={onClose}>
       <form
@@ -1060,22 +1101,22 @@ function MoveDialog({ entry, onClose, onMove }: { entry: Entry; onClose: () => v
       >
         <h2>{label}</h2>
         <div className="rf-crumbs" style={{ flexWrap: 'wrap' }}>
-          <button type="button" className="rf-crumb" style={{ fontSize: 14 }} onClick={() => setAt(null)}>
+          <button type="button" className="rf-crumb" style={{ fontSize: 14 }} onClick={() => goTo(null)}>
             {t('myFiles')}
           </button>
           {path.map((step) => (
             <span key={step.id} style={{ display: 'contents' }}>
               <Icon name="chevron" size={14} />
-              <button type="button" className="rf-crumb" style={{ fontSize: 14 }} onClick={() => setAt(step.id)}>
+              <button type="button" className="rf-crumb" style={{ fontSize: 14 }} onClick={() => goTo(step.id)}>
                 {step.name}
               </button>
             </span>
           ))}
         </div>
-        <ul className="rf-folders">
+        <ul ref={list} className="rf-folders">
           {folders.map((folder) => (
             <li key={folder.id}>
-              <button type="button" disabled={folder.id === entry.id} onClick={() => setAt(folder.id)}>
+              <button type="button" disabled={folder.id === entry.id} onClick={() => goTo(folder.id)}>
                 <span className="rf-tile rf-k-folder" aria-hidden="true">
                   <Icon name="folder" size={16} />
                 </span>
@@ -1088,7 +1129,7 @@ function MoveDialog({ entry, onClose, onMove }: { entry: Entry; onClose: () => v
           <button type="button" className="rf-btn" onClick={onClose}>
             {t('cancel')}
           </button>
-          <button type="submit" className="rf-btn rf-primary" disabled={at === entry.parent}>
+          <button ref={here} type="submit" className="rf-btn rf-primary" disabled={at === entry.parent}>
             {t('moveHere')}
           </button>
         </div>

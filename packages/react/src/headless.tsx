@@ -65,8 +65,9 @@ export interface Entries {
 /** The entries of a view, asked again after every change made through the provider. */
 export function useEntries(view: View): Entries {
   const { client, revision, changed } = useDrive();
-  const [state, setState] = useState<Omit<Entries, 'refresh'>>({ entries: [], path: [], loading: true, error: null });
   const key = JSON.stringify(view);
+  // Which view the state is of: in the render after the view changes, and before its effect asks, it is still the last one's.
+  const [state, setState] = useState<Omit<Entries, 'refresh'> & { of: string }>({ entries: [], path: [], loading: true, error: null, of: key });
   // biome-ignore lint/correctness/useExhaustiveDependencies: the view is compared by its JSON, so a new object of the same view does not ask again
   useEffect(() => {
     let live = true;
@@ -82,14 +83,16 @@ export function useEntries(view: View): Entries {
               ? client.trash().then((entries) => ({ entries, path: [] }))
               : client.search(view.query, { trashed: view.trashed }).then((entries) => ({ entries, path: [] }));
     asked.then(
-      ({ entries, path }) => live && setState({ entries, path, loading: false, error: null }),
-      (error: Error) => live && setState({ entries: [], path: [], loading: false, error }),
+      ({ entries, path }) => live && setState({ entries, path, loading: false, error: null, of: key }),
+      (error: Error) => live && setState({ entries: [], path: [], loading: false, error, of: key }),
     );
     return () => {
       live = false;
     };
   }, [client, key, revision]);
-  return { ...state, refresh: changed };
+  const { of, ...entries } = state;
+  // What the last view had, shown while this one loads, but said to be loading: not taken for this view's.
+  return { ...entries, loading: entries.loading || of !== key, refresh: changed };
 }
 
 /** One entry as it is now, and where it is; null while it loads or when there is none. */
