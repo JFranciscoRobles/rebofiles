@@ -29,6 +29,7 @@
 //   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
+//   GET    /entries/:id/activity?limit=   what was done to it, and in it of a folder, the newest first
 //   GET    /shared                        what others shared with the one asking
 //   GET    /shared/new                    how many of those are new since they last looked
 //   POST   /shared/seen                   they looked: none is new any more
@@ -63,7 +64,7 @@ async function passwordIs(kept: unknown, given: string): Promise<boolean> {
 }
 import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
-import type { MetadataStore } from './metadata';
+import { type MetadataStore, activityIn } from './metadata';
 import { Refused, answerTo } from './refused';
 import { type FinishedPart, READ_LIFE, type Storage, UploadGone, shownWindow } from './storage';
 import { openToken, sealToken } from './tokens';
@@ -191,12 +192,25 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
 
   // Changes go one at a time, each on the drive the last one left; reads take the drive as it is.
   let queue: Promise<unknown> = Promise.resolve();
-  const change = <T>(work: (drive: Drive) => Promise<{ drive: Drive; answer: T }>): Promise<T> => {
+  // What was done, kept by the store when it can, else for as long as the process lasts, the last ten thousand.
+  const ownActivity: core.Activity[] = [];
+  const record = async (lines: core.Activity[]) => {
+    if (!lines.length) return;
+    if (options.metadata.record) return options.metadata.record(lines);
+    ownActivity.push(...lines);
+    if (ownActivity.length > 10_000) ownActivity.splice(0, ownActivity.length - 10_000);
+  };
+  const activity = (id: EntryId, limit: number) => (options.metadata.activity ? options.metadata.activity(id, limit) : Promise.resolve(activityIn(ownActivity, id, limit)));
+
+  /** A change of the drive by `by`, who is told in its activity: someone signed in, or the server itself (`trash`). */
+  const change = <T>(work: (drive: Drive) => Promise<{ drive: Drive; answer: T }>, by = 'drive'): Promise<T> => {
     const step = async () => {
       const before = await load();
       const { drive, answer } = await work(before);
       if (drive !== before) {
         await options.metadata.save(core.changes(before, drive));
+        // Its activity after it, as what is kept beside: a change kept with no line of it is better than a line of none.
+        await record(core.activityOf(before, drive, by, now())).catch((error) => console.error('The activity could not be kept:', error));
         // What was saved is what is held, under the lock that kept others out meanwhile: nothing to load for it.
         if (options.metadata.revision) held = { revision: await options.metadata.revision(), drive };
       }
@@ -255,7 +269,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     const keys = await change(async (drive) => {
       const gone = core.purgeTrash(drive, before);
       return { drive: gone.removed.length ? gone.drive : drive, answer: gone.keys };
-    });
+    }, 'trash');
     if (keys.length) await options.storage.remove(keys);
   };
 
@@ -305,6 +319,13 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             path: folder ? await pathOf(user, drive, [...core.ancestors(drive, folder.id), folder]) : [],
             entries: await readable(user, shown, drive),
           });
+        }
+        case 'GET /entries/:id/activity': {
+          const drive = await load();
+          const entry = core.getEntry(drive, id);
+          await allow(user, 'read', entry, drive);
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit') ?? 50) || 50));
+          return Response.json({ activity: await activity(id, limit) });
         }
         case 'GET /entries/:id': {
           const drive = await load();
@@ -383,7 +404,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               const folderId = newId();
               const next = core.createFolder(drive, { id: folderId, name: String(asked.name ?? ''), parent: asked.parent ?? null }, context());
               return { drive: next, answer: { entry: core.getEntry(next, folderId) } };
-            }),
+            }, user.id),
           );
         }
 
@@ -477,7 +498,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               await allow(user, 'upload', folderOf(drive, file.parent), drive);
               const next = core.addFile(drive, { ...file, type: pending.type, version }, context());
               return { drive: next, answer: { entry: core.getEntry(next, file.id) } };
-            }),
+            }, user.id),
           );
         }
 
@@ -527,7 +548,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
                 next = core.rename(next, id, String(asked.name), context(), { ifTaken });
               }
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
+            }, user.id),
           );
         }
 
@@ -539,7 +560,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               await allow(user, action, core.getEntry(drive, id), drive);
               const next = action === 'trash' ? core.moveToTrash(drive, id, context()) : core.restore(drive, id, context());
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
+            }, user.id),
           );
         }
 
@@ -555,7 +576,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             for (const entry of core.trash(drive, user.id)) for (const inside of core.subtree(drive, entry.id)) await allow(user, 'delete', inside, drive);
             const removed = core.emptyTrash(drive, user.id);
             return { drive: removed.drive, answer: removed };
-          });
+          }, user.id);
           // The entries are gone first: bytes left behind by a failure here cost space, not a file that points nowhere.
           await options.storage.remove(gone.keys);
           return Response.json({ removed: gone.removed });
@@ -610,7 +631,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             first = !core.getEntry(drive, id).shares?.some((s) => s.with === who);
             const next = core.share(drive, id, who, asked.role, context());
             return { drive: next, answer: { entry: core.getEntry(next, id) } };
-          });
+          }, user.id);
           const before = answer.entry.shares?.find((s) => s.with === who);
           if (options.onShare && before)
             void Promise.resolve()
@@ -625,7 +646,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               if (shareWith !== user.id) await allow(user, 'share', core.getEntry(drive, id), drive);
               const next = core.unshare(drive, id, shareWith);
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
+            }, user.id),
           );
 
         case 'POST /entries/:id/links': {
@@ -642,7 +663,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               await allow(user, 'share', core.getEntry(drive, id), drive);
               const next = core.addLink(drive, id, made, context());
               return { drive: next, answer: { entry: core.getEntry(next, id), token: linkToken(made) } };
-            }),
+            }, user.id),
           );
         }
         case 'GET /entries/:id/links/:link': {
@@ -659,7 +680,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               await allow(user, 'share', core.getEntry(drive, id), drive);
               const next = core.removeLink(drive, id, linkId);
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
+            }, user.id),
           );
 
         case 'POST /entries/:id/versions/:v/restore':
@@ -668,7 +689,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               await allow(user, 'upload', core.getEntry(drive, id), drive);
               const next = core.restoreVersion(drive, id, versionId, newId(), context());
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
+            }, user.id),
           );
       }
       return Response.json({ error: 'no-route', message: `No ${request.method} ${path}.` }, { status: 404 });

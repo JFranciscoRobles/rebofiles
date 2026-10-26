@@ -68,6 +68,9 @@ export const CSS = `
 .rf-nav { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; border-radius: 999px; background: none; text-align: left; color: var(--rf-ink-soft); }
 .rf-nav:hover { background: var(--rf-hover); }
 .rf-nav[aria-current='true'] { background: var(--rf-brand-light); color: var(--rf-brand); font-weight: 600; }
+.rf-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.rf-activity li { display: flex; flex-direction: column; gap: 2px; }
+.rf-activity small { color: var(--rf-ink-soft); }
 .rf-badge { margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--rf-brand); color: var(--rf-on-brand); font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
 .rf-nav.rf-drop { box-shadow: inset 0 0 0 2px var(--rf-brand); }
 .rf-usage { display: flex; flex-direction: column; gap: 6px; margin: auto 12px 10px; font-size: 12px; color: var(--rf-muted); }

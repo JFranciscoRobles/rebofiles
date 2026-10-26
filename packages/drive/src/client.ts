@@ -5,7 +5,7 @@
 // server what arrived; and an upload left halfway is remembered, so the same
 // file uploaded again goes on from where it was.
 
-import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
+import type { Activity, DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
 import { type MadeRendition, renditionsOf } from './images';
 
 export interface ClientOptions {
@@ -203,6 +203,8 @@ export function createDriveClient(options: ClientOptions) {
     info: () => ask<{ storage: string; maxSize: number }>('GET', '/info'),
     /** What others shared with the one asking. */
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
+    /** What was done to an entry, and, of a folder, to what is right inside it: the newest first. */
+    activity: async (id: EntryId, limit = 50) => (await ask<{ activity: Activity[] }>('GET', `/entries/${encodeURIComponent(id)}/activity?limit=${limit}`)).activity,
     /** How many of what is shared with the one asking is new since they last looked; 0 from a server without the route. */
     sharedNew: async () => (await ask<{ count: number }>('GET', '/shared/new').catch(() => ({ count: 0 }))).count,
     /** They looked at what is shared with them. */

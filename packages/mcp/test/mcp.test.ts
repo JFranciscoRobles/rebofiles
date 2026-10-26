@@ -28,6 +28,7 @@ describe('the protocol', () => {
       'read_file',
       'list_recent',
       'list_shared',
+      'get_activity',
       'create_folder',
       'create_text_file',
       'update_text_file',
@@ -89,6 +90,10 @@ describe('the tools', () => {
     expect((await ana.call('move_to_trash', { id: file.id })).structuredContent.trashed).toBe(true);
     expect((await ana.call('search', { query: 'minutes', in_trash: true })).structuredContent.entries).toHaveLength(1);
     expect((await ana.call('restore', { id: file.id })).structuredContent.folder).toBe(archive.id);
+
+    const done = ((await ana.call('get_activity', { id: file.id, limit: 3 })).structuredContent as unknown as { activity: { action: string }[] }).activity;
+    expect(done.map((a) => a.action)).toEqual(['restored', 'trashed', 'moved']);
+    expect((await ana.call('get_activity', { id: file.id })).content[0].text).toMatch(/ ana renamed file "minutes.txt" \(id .*\) from "notes.txt"/);
   });
 
   it('read a Word document with Rebodocs, and say what they do not read', async () => {

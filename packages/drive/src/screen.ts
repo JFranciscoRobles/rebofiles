@@ -7,7 +7,7 @@
 //   const drive = mountDrive(document.getElementById('files')!, { base: '/api/files' });
 //   drive.destroy();
 
-import { type DriveSettings, EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type PersonalSettings, type Role, versionNumber } from '@rebofiles/core';
+import { type Activity, type DriveSettings, EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type PersonalSettings, type Role, versionNumber } from '@rebofiles/core';
 import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
 import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
@@ -187,7 +187,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let storage = '';
   let dropping = false;
   let menuOpen = false;
-  let tab: 'details' | 'versions' = 'details';
+  let tab: 'details' | 'versions' | 'activity' = 'details';
   let revision = 0;
   let alive = true;
 
@@ -233,6 +233,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     return asked.then((entries) => ({ folder: null, entries, path: [] as FolderEntry[] }));
   });
   const detail = resource((id) => client.entry(id));
+  // What was done to the entry shown: asked when its tab is, again after each change.
+  const happened = resource((id) => client.activity(id).catch(() => [] as Activity[]));
   // The space one keeps: asked again after each change, as uploads and the trash change it.
   const usage = resource(() => client.usage());
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
@@ -1147,7 +1149,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       link.download = entry.name;
       link.click();
     };
-    const shown = file ? tab : 'details';
+    const shown = !file && tab === 'versions' ? 'details' : tab;
     const row = (term: string, value: Child, title?: string) => [h('dt', null, term), h('dd', { title }, value)];
     return h(
       'aside',
@@ -1184,52 +1186,90 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 }),
               ],
         ),
-        file &&
-          h(
-            'div',
-            { class: 'rf-tabs', role: 'tablist' },
-            button(t('details'), () => ((tab = 'details'), render()), { role: 'tab', 'aria-selected': shown === 'details' }),
-            button(`${t('versions')} · ${file.versions.length}`, () => ((tab = 'versions'), render()), { role: 'tab', 'aria-selected': shown === 'versions' }),
-          ),
-        shown === 'versions' && file
-          ? h(
-              'ul',
-              { class: 'rf-versions' },
-              file.versions.map((version, i) =>
-                h(
-                  'li',
-                  { key: version.id, class: i === 0 ? 'rf-now' : undefined },
+        h(
+          'div',
+          { class: 'rf-tabs', role: 'tablist' },
+          button(t('details'), () => ((tab = 'details'), render()), { role: 'tab', 'aria-selected': shown === 'details' }),
+          file && button(`${t('versions')} · ${file.versions.length}`, () => ((tab = 'versions'), render()), { role: 'tab', 'aria-selected': shown === 'versions' }),
+          button(t('activity'), () => ((tab = 'activity'), render()), { role: 'tab', 'aria-selected': shown === 'activity' }),
+        ),
+        shown === 'activity'
+          ? activityList(entry)
+          : shown === 'versions' && file
+            ? h(
+                'ul',
+                { class: 'rf-versions' },
+                file.versions.map((version, i) =>
                   h(
-                    'span',
-                    { class: 'rf-v' },
-                    t('version', { n: versionNumber(file, version.id) }),
+                    'li',
+                    { key: version.id, class: i === 0 ? 'rf-now' : undefined },
                     h(
-                      'small',
-                      null,
-                      `${formatDate(version.at, locale)} · ${version.by} · ${formatSize(version.size, locale)}${version.restoredFrom ? ` · ${t('restoredFrom', { n: versionNumber(file, version.restoredFrom) })}` : ''}`,
+                      'span',
+                      { class: 'rf-v' },
+                      t('version', { n: versionNumber(file, version.id) }),
+                      h(
+                        'small',
+                        null,
+                        `${formatDate(version.at, locale)} · ${version.by} · ${formatSize(version.size, locale)}${version.restoredFrom ? ` · ${t('restoredFrom', { n: versionNumber(file, version.restoredFrom) })}` : ''}`,
+                      ),
                     ),
+                    i === 0
+                      ? h('span', { class: 'rf-chip' }, t('current'))
+                      : !inTrash &&
+                          button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), {
+                            class: 'rf-link',
+                          }),
                   ),
-                  i === 0
-                    ? h('span', { class: 'rf-chip' }, t('current'))
-                    : !inTrash &&
-                        button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), { class: 'rf-link' }),
                 ),
+              )
+            : h(
+                'dl',
+                { class: 'rf-props' },
+                row(t('type'), file ? typeName(file) : t('folder'), file?.type),
+                file && row(t('size'), formatSize(file.versions[0].size, locale)),
+                row(t('owner'), entry.owner),
+                entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${s.with === EVERYONE ? t('everyone') : s.with} · ${roleName(s.role)}`).join(', ')) : null,
+                row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
+                where && row(t('location'), where),
+                file && row(t('key'), h('code', null, file.versions[0].key)),
               ),
-            )
-          : h(
-              'dl',
-              { class: 'rf-props' },
-              row(t('type'), file ? typeName(file) : t('folder'), file?.type),
-              file && row(t('size'), formatSize(file.versions[0].size, locale)),
-              row(t('owner'), entry.owner),
-              entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${s.with === EVERYONE ? t('everyone') : s.with} · ${roleName(s.role)}`).join(', ')) : null,
-              row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
-              where && row(t('location'), where),
-              file && row(t('key'), h('code', null, file.versions[0].key)),
-            ),
       ),
     );
   }
+
+  /** What was done to an entry, and in it, the newest first: who, what, when. */
+  function activityList(entry: Entry) {
+    const found = happened(entry.id);
+    const lines = found.value ?? [];
+    if (!found.current || !found.value) return h('p', { class: 'rf-hint' }, t('loading'));
+    if (!lines.length) return h('p', { class: 'rf-hint' }, t('noActivity'));
+    return h(
+      'ol',
+      { class: 'rf-activity', 'aria-label': t('activity') },
+      lines.map((a, i) => h('li', { key: `${a.at}${a.action}${a.entry}${i}` }, h('span', null, activityText(a)), h('small', null, formatDate(a.at, locale)))),
+    );
+  }
+  const activityText = (a: Activity) => {
+    const by = a.by === 'trash' ? t('theTrash') : a.by;
+    const values = { by, name: a.name, was: a.was ?? '', with: a.with === EVERYONE ? t('everyone') : (a.with ?? ''), role: a.role ? roleName(a.role) : '' };
+    const key = (
+      {
+        created: 'didCreate',
+        uploaded: 'didUpload',
+        version: 'didVersion',
+        renamed: 'didRename',
+        moved: 'didMove',
+        trashed: 'didTrash',
+        restored: 'didRestore',
+        deleted: 'didDelete',
+        shared: 'didShare',
+        unshared: 'didUnshare',
+        linked: 'didLink',
+        unlinked: 'didUnlink',
+      } as const
+    )[a.action];
+    return t(key, values);
+  };
 
   // ---- Dialogs: the browser's own, which keep the focus inside and give it back when they close ----
 

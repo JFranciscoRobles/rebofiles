@@ -3,7 +3,7 @@
 // the bytes. The server loads the drive, changes it with core and writes back
 // only what changed.
 
-import { type Changes, type Drive, type Entry, driveOf, emptyDrive } from '@rebofiles/core';
+import { type Activity, type Changes, type Drive, type Entry, type EntryId, driveOf, emptyDrive } from '@rebofiles/core';
 
 export interface MetadataStore {
   load(): Promise<Drive>;
@@ -21,14 +21,35 @@ export interface MetadataStore {
   /** A setting kept by name (`drive`, `person:<id>`): what `setSetting` was given, or undefined. Without them, settings last as long as the process. */
   getSetting?(name: string): Promise<unknown>;
   setSetting?(name: string, value: unknown): Promise<void>;
+  /** What was done, kept as it is said, in order. Without it and `activity`, the activity lasts as long as the process. */
+  record?(lines: Activity[]): Promise<void>;
+  /** What was done to an entry, and, of a folder, to what is right inside it: the newest first, at most `limit`. */
+  activity?(id: EntryId, limit: number): Promise<Activity[]>;
 }
+
+/** The activity of an entry, from all of it, as a store without a query answers it. */
+export const activityIn = (all: readonly Activity[], id: EntryId, limit: number) => {
+  const found: Activity[] = [];
+  for (let i = all.length - 1; i >= 0 && found.length < limit; i--) {
+    const a = all[i];
+    if (a.entry === id || a.parent === id || a.from === id) found.push(a);
+  }
+  return found;
+};
 
 /** In memory: gone when the process ends. For tests and demos. */
 export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
   let drive = driveOf(entries);
   const settings = new Map<string, unknown>();
+  const lines: Activity[] = [];
   let saved = 0;
   return {
+    async record(more) {
+      lines.push(...more);
+    },
+    async activity(id, limit) {
+      return activityIn(lines, id, limit);
+    },
     async revision() {
       return String(saved);
     },
@@ -68,7 +89,25 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const bump = db.prepare('UPDATE rebofiles_revision SET n = n + 1 WHERE id = 1');
   const setting = db.prepare('SELECT value FROM rebofiles_settings WHERE name = ?');
   const keep = db.prepare('INSERT INTO rebofiles_settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value');
+  // A line of activity per row, with the entries it is about apart, to be found by any of them.
+  db.exec('CREATE TABLE IF NOT EXISTS rebofiles_activity (seq INTEGER PRIMARY KEY AUTOINCREMENT, entry TEXT NOT NULL, parent TEXT, origin TEXT, line TEXT NOT NULL)');
+  for (const column of ['entry', 'parent', 'origin']) db.exec(`CREATE INDEX IF NOT EXISTS rebofiles_activity_${column} ON rebofiles_activity (${column}, seq)`);
+  const note = db.prepare('INSERT INTO rebofiles_activity (entry, parent, origin, line) VALUES (?, ?, ?, ?)');
+  const about = db.prepare('SELECT line FROM rebofiles_activity WHERE entry = ? OR parent = ? OR origin = ? ORDER BY seq DESC LIMIT ?');
   return {
+    async record(more) {
+      db.exec('BEGIN');
+      try {
+        for (const a of more) note.run(a.entry, a.parent, a.from ?? null, JSON.stringify(a));
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+    async activity(id, limit) {
+      return (about.all(id, id, id, limit) as { line: string }[]).map((row) => JSON.parse(row.line) as Activity);
+    },
     async revision() {
       return String((revision.get() as { n: number }).n);
     },
@@ -148,6 +187,8 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     // One row, one number, one more at every save by any process: whether the drive another holds in memory is still the one here.
     await db.query(`CREATE TABLE IF NOT EXISTS ${table}_revision (id int PRIMARY KEY CHECK (id = 1), n bigint NOT NULL)`);
     await db.query(`INSERT INTO ${table}_revision (id, n) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`);
+    await db.query(`CREATE TABLE IF NOT EXISTS ${table}_activity (seq bigserial PRIMARY KEY, entry text NOT NULL, parent text, origin text, line jsonb NOT NULL)`);
+    for (const column of ['entry', 'parent', 'origin']) await db.query(`CREATE INDEX IF NOT EXISTS ${table}_activity_${column} ON ${table}_activity (${column}, seq)`);
   });
   // One statement: the rows removed and the rows put, together or not at all, without a transaction to hold open.
   // The revision goes up in the same statement: the change and the number that says it, together or not at all.
@@ -174,6 +215,17 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
       const { rows } = await db.query(`SELECT value FROM ${table}_settings WHERE name = $1`, [name]);
       const value = (rows[0] as { value: unknown } | undefined)?.value;
       return typeof value === 'string' ? JSON.parse(value) : value;
+    },
+    async record(more) {
+      if (more.length)
+        await db.query(
+          `INSERT INTO ${table}_activity (entry, parent, origin, line) SELECT a->>'entry', a->>'parent', a->>'from', a FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS t(a, n) ORDER BY n`,
+          [JSON.stringify(more)],
+        );
+    },
+    async activity(id, limit) {
+      const { rows } = await db.query(`SELECT line FROM ${table}_activity WHERE entry = $1 OR parent = $1 OR origin = $1 ORDER BY seq DESC LIMIT $2`, [id, limit]);
+      return (rows as { line: Activity | string }[]).map((row) => (typeof row.line === 'string' ? (JSON.parse(row.line) as Activity) : row.line));
     },
     async setSetting(name, value) {
       await db.query(`INSERT INTO ${table}_settings (name, value) VALUES ($1, $2::jsonb) ON CONFLICT (name) DO UPDATE SET value = excluded.value`, [name, JSON.stringify(value)]);

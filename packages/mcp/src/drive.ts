@@ -3,7 +3,7 @@
 // the assistant may do what they may and nothing more. Its own few lines
 // rather than the client of @rebofiles/react, which would bring React along.
 
-import type { Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
+import type { Activity, Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
 
 export interface DriveOptions {
   /** Where the routes are, as a whole address: `https://acme.com/api/files`. */
@@ -57,6 +57,7 @@ export function driveAt(options: DriveOptions) {
     },
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
+    activity: async (id: EntryId, limit: number) => (await ask<{ activity: Activity[] }>('GET', `${at(id)}/activity?limit=${limit}`)).activity,
     createFolder: (name: string, parent: EntryId | null) => one('POST', '/folders', { name, parent }) as Promise<FolderEntry>,
     rename: (id: EntryId, name: string) => one('PATCH', at(id), { name }),
     move: (id: EntryId, parent: EntryId | null) => one('PATCH', at(id), { parent }),

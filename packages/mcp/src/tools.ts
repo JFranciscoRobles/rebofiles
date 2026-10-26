@@ -191,6 +191,19 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'get_activity',
+    title: 'What was done',
+    description: 'Who did what to a file or a folder, and, of a folder, to what is right inside it: made, uploaded, renamed, moved, put in the trash, shared. The newest first.',
+    inputSchema: { type: 'object', properties: { id, limit: { type: 'integer', minimum: 1, maximum: 200, description: 'How many, 20 unless said.' } }, required: ['id'], additionalProperties: false },
+    annotations: READ,
+    async run(drive, args) {
+      const found = await drive.activity(str(args, 'id'), typeof args.limit === 'number' ? Math.min(200, Math.max(1, Math.floor(args.limit))) : 20);
+      const said = (a: (typeof found)[number]) =>
+        `${a.at} ${a.by} ${a.action} ${a.kind} "${a.name}" (id ${a.entry})${a.was ? ` from "${a.was}"` : ''}${a.with ? ` with ${a.with}${a.role ? ` as ${a.role}` : ''}` : ''}`;
+      return { text: found.length ? found.map(said).join('\n') : 'Nothing done there yet, or not since the activity is kept.', data: { activity: found } };
+    },
+  },
+  {
     name: 'create_folder',
     title: 'Make a folder',
     description: 'A new folder; with "(2)" after its name when the name is taken there.',

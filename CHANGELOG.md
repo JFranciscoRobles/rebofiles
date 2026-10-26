@@ -200,6 +200,15 @@ minor version (0.x.0) may change the API; such changes are listed under
   Beside Shared with me, the drive counts what was shared since one last
   looked there (`GET /shared/new`, `POST /shared/seen`, `sharedSince`),
   asked after each change, when the page is seen again and every minute.
+- **Activity.** What each person did, kept as each change is: made,
+  uploaded, a new version, renamed, moved, put in the trash and back,
+  deleted, shared and no longer, a link made and taken back. Told by core
+  from the drive before and after a change (`activityOf`), so whatever
+  changed it is in it, the trash emptying itself too. The details of a file
+  or a folder have an Activity tab, a folder's with what was done right
+  inside it (`GET /entries/:id/activity`, `client.activity`); an assistant
+  reads it with `get_activity`. Kept by the store (`record`, `activity`;
+  a table of its own on SQLite and Postgres), else in the process.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

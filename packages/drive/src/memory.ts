@@ -66,9 +66,11 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       throw error;
     }
   };
-  const change = <T>(work: (current: Drive) => { drive: Drive; answer: T }) =>
+  const lines: core.Activity[] = [];
+  const change = <T>(work: (current: Drive) => { drive: Drive; answer: T }, by = user) =>
     run(() => {
       const done = work(drive);
+      if (done.drive !== drive) lines.push(...core.activityOf(drive, done.drive, by, context().at));
       drive = done.drive;
       return done.answer;
     });
@@ -114,6 +116,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     recent: () => run(() => core.recent(drive)),
     trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
     shared: () => run(() => core.sharedWith(drive, user)),
+    activity: async (entryId, limit = 50) => core.activityFor(lines, entryId).reverse().slice(0, limit),
     sharedNew: async () => core.sharedSince(drive, user, seenShared).length,
     sawShared: async () => void (seenShared = context().at),
     search: (query, found = {}) => run(() => core.search(drive, query, { within: found.within, trashed: found.trashed, limit: 200 })),
@@ -224,7 +227,10 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
   Object.defineProperty(client, 'drive', { get: () => drive, enumerable: true });
   return Object.assign(client as DriveClient & { readonly drive: Drive }, {
     apply(work: (current: Drive, at: Context) => Drive, by: string) {
-      drive = work(drive, context(by));
+      const at = context(by);
+      const next = work(drive, at);
+      lines.push(...core.activityOf(drive, next, by, at.at));
+      drive = next;
     },
   });
 }
