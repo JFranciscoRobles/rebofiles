@@ -14,7 +14,7 @@ async function axe(page: Page) {
 
 test('picked with ⌘ and Shift, moved together into a folder, and put in the trash together', async ({ page }) => {
   await page.goto('/?as=picker');
-  await page.locator('input[type=file]').setInputFiles(['a', 'b', 'c', 'd'].map((n) => ({ name: `${n}.txt`, mimeType: 'text/plain', buffer: Buffer.from(n) })));
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles(['a', 'b', 'c', 'd'].map((n) => ({ name: `${n}.txt`, mimeType: 'text/plain', buffer: Buffer.from(n) })));
   for (const n of ['a', 'b', 'c', 'd']) await expect(item(page, `${n}.txt`)).toBeVisible();
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
@@ -54,7 +54,7 @@ test('picked with ⌘ and Shift, moved together into a folder, and put in the tr
 
 test('picked with the keyboard, restored together, and deleted for good together', async ({ page }) => {
   await page.goto('/?as=picker2');
-  await page.locator('input[type=file]').setInputFiles(['one', 'two', 'three'].map((n) => ({ name: `${n}.md`, mimeType: 'text/markdown', buffer: Buffer.from(`# ${n}`) })));
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles(['one', 'two', 'three'].map((n) => ({ name: `${n}.md`, mimeType: 'text/markdown', buffer: Buffer.from(`# ${n}`) })));
   for (const n of ['one', 'two', 'three']) await expect(item(page, `${n}.md`)).toBeVisible();
   await item(page, 'one.md').click();
   await page.keyboard.press('Shift+ArrowDown');

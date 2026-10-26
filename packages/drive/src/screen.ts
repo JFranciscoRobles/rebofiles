@@ -16,6 +16,7 @@ import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
+import { type Picked, readChosen, readDropped } from './folders';
 import { type UploadItem, createUploads, formatDuration } from './uploads';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
@@ -414,12 +415,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** What the last change undoes with, while its toast is up: ⌘Z or Ctrl+Z, or its button. */
   let undoing: (() => Promise<unknown>) | null = null;
-  const say = (text: string | null, undo?: () => Promise<unknown>) => {
+  /** Something else the toast offers to do, as downloading what was left out. */
+  let offered: { label: string; run: () => void } | null = null;
+  const say = (text: string | null, undo?: () => Promise<unknown>, offer?: { label: string; run: () => void }) => {
     toast = text;
     undoing = undo ?? null;
+    offered = offer ?? null;
     clearTimeout(toastTimer);
-    // Longer when it can be undone: time to see it and change one's mind.
-    if (text) toastTimer = setTimeout(() => ((toast = null), (undoing = null), render()), undo ? 7000 : 2800);
+    // Longer when there is something to do from it: time to see it and change one's mind.
+    if (text) toastTimer = setTimeout(() => ((toast = null), (undoing = null), (offered = null), render()), undo || offer ? 8000 : 2800);
     render();
   };
   const undo = async () => {
@@ -592,6 +596,36 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     for (const item of uploader.items.slice(first)) selectedWhen.set(item.id, selected);
     uploadsOpen = true;
   };
+  /** Folders of the computer made in `parent` as they were, top down, the empty ones too; then their files go up into them. */
+  const uploadTree = async (picked: Picked, parent: EntryId | null) => {
+    const made = new Map<string, EntryId | null>([['', parent]]);
+    const dirname = (path: string) => path.split('/').slice(0, -1).join('/');
+    try {
+      for (const path of picked.folders) {
+        // A name taken where it goes is told apart as "(2)", as the drive does for anything new.
+        const folderMade = await client.createFolder(path.split('/').pop()!, made.get(dirname(path)) ?? parent);
+        made.set(path, folderMade.id);
+      }
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error));
+    }
+    changed();
+    const byFolder = new Map<string, File[]>();
+    for (const { file, path } of picked.files) byFolder.set(dirname(path), [...(byFolder.get(dirname(path)) ?? []), file]);
+    for (const [path, files] of byFolder) if (made.has(path)) uploadInto(files, made.get(path) ?? parent);
+  };
+  /** What was dropped from the computer: its files, or its folders with all that is in them. */
+  const dropped = (transfer: DataTransfer, parent: EntryId | null) => {
+    const reading = readDropped(transfer);
+    void reading.then((picked) =>
+      picked.folders.length
+        ? uploadTree(picked, parent)
+        : uploadInto(
+            picked.files.map((one) => one.file),
+            parent,
+          ),
+    );
+  };
 
   /** What a folder, a crumb or a section does with what is dropped on it: files from the computer go up into it, entries of the drive move into it. */
   const dropTarget = (target: EntryId | null) => ({
@@ -609,7 +643,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       dropping = false;
       const moved = dragged(event).filter((entry) => entry.id !== target);
       if (moved.length) void each(moved, (entry) => client.move(entry.id, target), 'movedMany');
-      else if (event.dataTransfer?.files.length) uploadInto(event.dataTransfer.files, target);
+      else if (event.dataTransfer?.files.length) dropped(event.dataTransfer, target);
     },
   });
 
@@ -681,6 +715,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           button(
             withIcon('upload', t('uploadFiles'), 18),
             pick(() => element.querySelector<HTMLInputElement>('.rf-file')?.click()),
+            { role: 'menuitem', tabindex: '-1' },
+          ),
+          button(
+            withIcon('folder', t('uploadFolder'), 18),
+            pick(() => element.querySelector<HTMLInputElement>('.rf-folder-file')?.click()),
             { role: 'menuitem', tabindex: '-1' },
           ),
           button(
@@ -979,10 +1018,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   /** A .zip being made, of what was picked: how far it is, and what stops it. */
   let zipping: { name: string; read: number; size: number; stop: AbortController } | null = null;
-  const zipDownload = async (entries: Entry[]) => {
+  const zipDownload = async (entries: Pick<Entry, 'id' | 'name'>[], named?: string) => {
     if (zipping) return;
     // Named after the one, or after where they are.
-    const name = entries.length === 1 ? entries[0].name : `${t('filesZip')} ${new Date().toISOString().slice(0, 10)}`;
+    const name = named ?? (entries.length === 1 ? entries[0].name : `${t('filesZip')} ${new Date().toISOString().slice(0, 10)}`);
     const job = { name: `${name}.zip`, read: 0, size: 0, stop: new AbortController() };
     zipping = job;
     render();
@@ -1000,7 +1039,17 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           },
         },
       );
-      say(done.missed.length ? t('zipMissed', { name: job.name, n: done.missed.length }) : t('zipped', { name: job.name }));
+      // What could not be read, offered on its own: a cut while it was read, an address run out.
+      if (done.missed.length)
+        say(t('zipMissed', { name: job.name, n: done.missed.length }), undefined, {
+          label: t('zipTheRest'),
+          run: () =>
+            void zipDownload(
+              done.missed.map((file) => ({ id: file.id, name: file.path.split('/').pop() ?? file.path })),
+              `${name} (${t('zipRest')})`,
+            ),
+        });
+      else say(t('zipped', { name: job.name }));
     } catch (error) {
       say(job.stop.signal.aborted || (error as Error).name === 'AbortError' ? t('zipStopped') : error instanceof Error ? error.message : String(error));
     } finally {
@@ -2088,6 +2137,17 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               input.value = '';
             },
           }),
+          h('input', {
+            class: 'rf-folder-file',
+            type: 'file',
+            webkitdirectory: true,
+            hidden: true,
+            onChange: (event: Event) => {
+              const input = event.target as HTMLInputElement;
+              if (input.files?.length) void uploadTree(readChosen(input.files), folder);
+              input.value = '';
+            },
+          }),
           nav('drive', t('myFiles'), section === 'files' && from === 'files' && !query, () => go('files'), dropTarget(null)),
           nav('users', t('sharedWithMe'), (section === 'shared' || (section === 'files' && from === 'shared')) && !query, () => go('shared')),
           nav('clock', t('recent'), section === 'recent' && !query, () => go('recent')),
@@ -2116,7 +2176,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             onDrop: (event: DragEvent) => {
               event.preventDefault();
               dropping = false;
-              if (section === 'files' && !query && event.dataTransfer?.files.length) uploadInto(event.dataTransfer.files, folder);
+              if (section === 'files' && !query && event.dataTransfer?.files.length) dropped(event.dataTransfer, folder);
               render();
             },
           },
@@ -2245,7 +2305,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             ]
           : null,
       ),
-      toast && h('div', { class: 'rf-toast', role: 'status' }, h('span', null, toast), undoing && button(t('undo'), () => void undo(), { class: 'rf-toast-undo' })),
+      toast &&
+        h(
+          'div',
+          { class: 'rf-toast', role: 'status' },
+          h('span', null, toast),
+          undoing && button(t('undo'), () => void undo(), { class: 'rf-toast-undo' }),
+          offered && button(offered.label, () => (offered?.run(), say(null)), { class: 'rf-toast-undo' }),
+        ),
       uploader.items.length > 0 && uploadsPanel(),
       contextMenu && contextMenuView(contextMenu),
       dialogs(),

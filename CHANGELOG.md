@@ -175,6 +175,16 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **Folders of the computer, uploaded as they were.** Dropped on the drive,
+  or chosen with "Upload a folder", a folder goes up with all that is in it:
+  its folders made top down, the empty ones too, "(2)" for a name taken, and
+  each file into its own (`readDropped`, `readChosen`).
+- **A link's folder as a .zip.** Someone with a link to a folder downloads
+  it whole, or a folder in it, without signing in (`/links/:token/zip` and
+  `/links/:token/urls`, which keep to what the link reads).
+- **What a .zip left out, on its own.** A file that could not be read while
+  a .zip was made is said in its toast, with a button that downloads those
+  in a .zip of their own.
 - **The list in an order of one's choosing, and one kind of file.** A click
   on a column of the list (name, owner, modified, size) puts it in that
   order, a second the other way; in the grid, a choice of the order. Folders

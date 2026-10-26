@@ -23,7 +23,7 @@ test('the drive, empty and with files, in the list and the grid, with a file sel
   await expect(page.getByText('This folder is empty.')).toBeVisible();
   expect.soft(await axe(page)).toEqual([]);
 
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([
     { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Some notes.') },
     { name: 'budget.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\n1,2') },
   ]);
@@ -102,7 +102,7 @@ test('dark, as the system is', async ({ browser }) => {
 test('a link, opened signed out', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/?as=axe-link');
-  await page.locator('input[type=file]').setInputFiles([{ name: 'linked.txt', mimeType: 'text/plain', buffer: Buffer.from('Through a link.') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'linked.txt', mimeType: 'text/plain', buffer: Buffer.from('Through a link.') }]);
   await item(page, 'linked.txt').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
   await page

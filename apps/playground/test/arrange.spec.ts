@@ -9,7 +9,7 @@ const names = (page: Page) => page.getByRole('listbox').getByRole('option').eval
 
 async function some(page: Page, who: string) {
   await page.goto(`/?as=${who}`);
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([
     { name: 'b-medium.txt', mimeType: 'text/plain', buffer: Buffer.alloc(3000, 97) },
     { name: 'a-small.txt', mimeType: 'text/plain', buffer: Buffer.alloc(10, 97) },
     { name: 'c-large.png', mimeType: 'image/png', buffer: Buffer.alloc(9000, 1) },

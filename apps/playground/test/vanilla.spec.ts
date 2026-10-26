@@ -15,7 +15,7 @@ test('makes a folder, uploads into it, renames and trashes, with no React in the
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Plain');
   await page.getByRole('button', { name: 'Create' }).click();
   await item(page, 'Plain').dblclick();
-  await page.locator('input[type=file]').setInputFiles([{ name: 'plain.txt', mimeType: 'text/plain', buffer: Buffer.from('No framework.') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'plain.txt', mimeType: 'text/plain', buffer: Buffer.from('No framework.') }]);
   await item(page, 'plain.txt').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).getByText('No framework.')).toBeVisible();
 

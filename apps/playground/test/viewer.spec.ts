@@ -30,7 +30,7 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
       return Array.from(new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer()));
     }),
   );
-  await page.locator('input[type=file]').setInputFiles([
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([
     { name: 'a-agreement.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(sampleDocx()) },
     { name: 'b-house.png', mimeType: 'image/png', buffer: pixel },
     { name: 'c-notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# Visit\n\nThe **client** comes on *Friday*.\n\n- Kitchen\n- Garden\n\n[Map](javascript:alert(1))') },
@@ -114,7 +114,7 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
 test('a Word document’s thumbnail has its pictures in it', async ({ page }) => {
   await page.goto('/?as=pictures');
   await page
-    .locator('input[type=file]')
+    .locator('input[type=file]:not([webkitdirectory])')
     .setInputFiles({ name: 'house.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(sampleDocxWithPicture()) });
   await expect(item(page, 'house.docx')).toBeVisible();
   let id = '';
@@ -142,7 +142,7 @@ test('a Word document lying down is shown whole in its thumbnail', async ({ page
   const upright = importDocx(sampleDocx());
   const lying = exportDocx({ ...upright, page: { ...upright.page, width: upright.page.height, height: upright.page.width } });
   await page.goto('/?as=lying');
-  await page.locator('input[type=file]').setInputFiles({ name: 'plan.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(lying) });
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'plan.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(lying) });
   await item(page, 'plan.docx').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).locator('.rf-doc-thumb.rf-wide img.rf-doc-pic')).toBeVisible({ timeout: 15_000 });
 });

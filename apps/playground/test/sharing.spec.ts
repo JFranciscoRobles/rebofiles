@@ -32,7 +32,7 @@ test('Ana shares a folder with Bea as an editor, and Bea finds it and puts a fil
   await item(page, 'Team').dblclick();
   // The crumb leads back to where it was found.
   await expect(page.getByRole('button', { name: 'Shared with me' }).last()).toBeVisible();
-  await page.locator('input[type=file]').setInputFiles([{ name: 'from-bea.txt', mimeType: 'text/plain', buffer: Buffer.from('Hello, Ana.') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'from-bea.txt', mimeType: 'text/plain', buffer: Buffer.from('Hello, Ana.') }]);
   await expect(item(page, 'from-bea.txt')).toBeVisible();
 
   await page.goto('/?as=ana');

@@ -8,7 +8,7 @@ const PART = 8 * 1024 * 1024;
 // A row is read with its owner, date and size after its name: found by what it starts with.
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 const details = (page: Page) => page.getByRole('complementary', { name: 'Details' });
-const upload = (page: Page, files: { name: string; mimeType: string; buffer: Buffer }[]) => page.locator('input[type=file]').setInputFiles(files);
+const upload = (page: Page, files: { name: string; mimeType: string; buffer: Buffer }[]) => page.locator('input[type=file]:not([webkitdirectory])').setInputFiles(files);
 
 test.describe.configure({ mode: 'serial' });
 

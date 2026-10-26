@@ -370,6 +370,13 @@ export function createLinkClient(options: { base: string; token: string; fetch?:
   return {
     list: (folder?: EntryId) => ask<LinkListing>(folder ? `?folder=${encodeURIComponent(folder)}` : ''),
     url: async (id: EntryId, how: { inline?: boolean } = {}) => absolute((await ask<{ url: string }>(`/download?id=${encodeURIComponent(id)}${how.inline ? '&inline=1' : ''}`)).url),
+    /** What an archive of these holds, or of all the link reads. */
+    pack: (ids: EntryId[] = []) => ask<Packed>(`/zip${ids.length ? `?ids=${ids.map(encodeURIComponent).join(',')}` : ''}`),
+    urls: async (ids: EntryId[], how: { inline?: boolean } = {}): Promise<Record<EntryId, FileAddress>> => {
+      const { urls } = await ask<{ urls: Record<EntryId, FileAddress> }>(`/urls?ids=${ids.map(encodeURIComponent).join(',')}${how.inline ? '&inline=1' : ''}`);
+      for (const address of Object.values(urls)) address.url = absolute(address.url);
+      return urls;
+    },
   };
 }
 

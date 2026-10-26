@@ -13,7 +13,7 @@ test('a whole drive from the hooks: folders, uploads, details, renaming, version
   await page.getByRole('button', { name: '📁 Hooks' }).click();
   await expect(page.getByRole('list', { name: 'Where' })).toContainText('Hooks');
 
-  await page.locator('input[type=file]').setInputFiles([{ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('one') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('one') }]);
   await page.getByRole('button', { name: 'note.txt' }).click();
   const details = page.getByRole('complementary', { name: 'Details' });
   await expect(details.getByRole('heading', { name: 'note.txt' })).toBeVisible();
@@ -23,7 +23,7 @@ test('a whole drive from the hooks: folders, uploads, details, renaming, version
   await details.getByRole('button', { name: 'Rename' }).click();
   await expect(page.getByRole('button', { name: 'notes.txt' })).toBeVisible();
   // A name taken is refused, and said.
-  await page.locator('input[type=file]').setInputFiles([{ name: 'other.txt', mimeType: 'text/plain', buffer: Buffer.from('two') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'other.txt', mimeType: 'text/plain', buffer: Buffer.from('two') }]);
   await page.getByRole('button', { name: 'other.txt' }).click();
   await details.getByRole('textbox', { name: 'New name' }).fill('notes.txt');
   await details.getByRole('button', { name: 'Rename' }).click();

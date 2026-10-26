@@ -40,6 +40,8 @@
 //
 //   GET    /links/:token?folder=…         what the link reads, or a folder inside it
 //   GET    /links/:token/download?id=…&inline=1
+//   GET    /links/:token/zip?ids=…        what an archive of some of it (all, unless said) holds
+//   GET    /links/:token/urls?ids=…       the addresses of some of its files
 
 import { randomUUID } from 'node:crypto';
 import * as core from '@rebofiles/core';
@@ -622,6 +624,23 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
       const file = inside(url.searchParams.get('id'));
       if (file.kind !== 'file') throw new Refused(400, 'not-a-file', `${file.name} is a folder.`);
       return Response.json({ url: await options.storage.downloadUrl(file.versions[0].key, file.name, file.type, base, url.searchParams.get('inline') === '1') });
+    }
+    // An archive of some of what it reads, or of all of it, and the addresses of its files a few at a time.
+    const asked = () => (url.searchParams.get('ids') ?? '').split(',').filter(Boolean);
+    if (rest === 'zip') {
+      const ids = asked().length ? asked() : [root.id];
+      for (const id of ids) inside(id);
+      if (ids.reduce((sum, id) => sum + core.subtree(drive, id).length, 0) > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
+      return Response.json(core.packOf(drive, ids, (entry) => core.isWithin(drive, entry.id, root.id)));
+    }
+    if (rest === 'urls') {
+      const ids = asked().slice(0, URLS_AT_ONCE);
+      const urls: Record<string, Address> = {};
+      for (const id of ids) {
+        const entry = drive.entries.get(id);
+        if (entry?.kind === 'file' && core.isWithin(drive, id, root.id) && !core.isTrashed(drive, id)) urls[id] = await addressOf(entry, url.searchParams.get('inline') === '1');
+      }
+      return Response.json({ urls });
     }
     throw new Refused(404, 'no-route', 'No such route.');
   }

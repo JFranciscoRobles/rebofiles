@@ -23,7 +23,7 @@ test('files go up together, each saying how long it has left, and one is stopped
     writeFileSync(path, Buffer.alloc(60 * MiB, i + 1));
     return path;
   });
-  await page.locator('input[type=file]').setInputFiles(files);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles(files);
   const panel = page.getByRole('region', { name: 'Uploads' });
   await expect(panel).toBeVisible();
   // Both at once, not one after the other.
@@ -45,4 +45,21 @@ test('files go up together, each saying how long it has left, and one is stopped
   await expect(panel.locator('.rf-ups-title')).toHaveText('2 uploaded');
   await panel.getByRole('button', { name: 'Close' }).click();
   await expect(panel).toHaveCount(0);
+});
+
+test('a folder of the computer goes up as it was, its folders made and each file in its own', async ({ page }) => {
+  const { mkdirSync, mkdtempSync } = await import('node:fs');
+  const root = mkdtempSync(join(tmpdir(), 'rebofiles-folder-'));
+  mkdirSync(join(root, 'Obra', 'Planos'), { recursive: true });
+  writeFileSync(join(root, 'Obra', 'acta.txt'), 'Acta');
+  writeFileSync(join(root, 'Obra', 'Planos', 'planta.txt'), 'Planta');
+  await page.goto('/?as=folders');
+  await page.locator('.rf-folder-file').setInputFiles(join(root, 'Obra'));
+  const item = (name: string) => page.getByRole('listbox').getByRole('option', { name: new RegExp(`^${name}( |$)`) });
+  await expect(item('Obra')).toBeVisible();
+  await item('Obra').dblclick();
+  await expect(item('acta.txt')).toBeVisible();
+  await expect(item('Planos')).toBeVisible();
+  await item('Planos').dblclick();
+  await expect(item('planta.txt')).toBeVisible();
 });

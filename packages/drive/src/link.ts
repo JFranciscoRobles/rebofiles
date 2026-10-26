@@ -11,6 +11,7 @@ import { first, h, morph } from './dom';
 import { TEXTS, type Texts, formatDate, formatSize, translator } from './i18n';
 import { icon, logo as mark } from './icons';
 import { badgeOf, kindOf } from './kinds';
+import { downloadZip } from './download';
 import { CSS } from './styles';
 
 export interface SharedLinkOptions {
@@ -62,6 +63,33 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
     }
   };
 
+  // A .zip of the folder shown, or of one in it: made in the page, as in the drive.
+  let zipping: { id: EntryId; pct: number } | null = null;
+  const zip = async (folder: Entry) => {
+    if (zipping) return;
+    zipping = { id: folder.id, pct: 0 };
+    render();
+    try {
+      const done = await downloadZip(link, [folder.id], { name: folder.name, onProgress: ({ read, size }) => zipping && ((zipping.pct = Math.round((read / Math.max(1, size)) * 100)), render()) });
+      if (done.missed.length) error = t('zipMissed', { name: `${folder.name}.zip`, n: done.missed.length });
+    } catch (failed) {
+      error = (failed as Error).message;
+    } finally {
+      zipping = null;
+      render();
+    }
+  };
+  const zipButton = (folder: Entry, wide: boolean) => {
+    const going = zipping?.id === folder.id;
+    const label = going ? t('zipping', { name: `${folder.name}.zip`, pct: zipping!.pct }) : t('downloadZip');
+    return h(
+      'button',
+      { type: 'button', class: wide ? 'rf-btn rf-small' : 'rf-btn rf-text', disabled: Boolean(zipping), 'aria-label': wide ? label : `${label} · ${folder.name}`, onClick: () => void zip(folder) },
+      icon('download', 16),
+      wide && h('span', null, label),
+    );
+  };
+
   function screen() {
     // A link to one file shows that file as the only row.
     const rows = listing ? (listing.root.kind === 'file' ? [listing.root] : listing.entries) : [];
@@ -100,6 +128,7 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
                         ),
                       ),
                   ),
+                  listing?.folder.kind === 'folder' && zipButton(listing.folder, true),
                 ),
                 h(
                   'ul',
@@ -119,7 +148,7 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
                       h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
                       entry.kind === 'file'
                         ? h('button', { type: 'button', class: 'rf-btn rf-text', 'aria-label': `${t('download')} · ${entry.name}`, onClick: () => void open(entry, true) }, icon('download', 16))
-                        : h('span'),
+                        : zipButton(entry, false),
                     ),
                   ),
                 ),

@@ -19,6 +19,8 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
   await expect(page.getByRole('menu')).toBeVisible();
   expect(await focused(page)).toBe('Upload files');
   await page.keyboard.press('ArrowDown');
+  expect(await focused(page)).toBe('Upload a folder');
+  await page.keyboard.press('ArrowDown');
   expect(await focused(page)).toBe('New folder');
   await page.keyboard.press('ArrowDown');
   expect(await focused(page)).toBe('Upload files');
@@ -43,7 +45,7 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
   await page.keyboard.press('Enter');
   await expect(said(page)).toHaveText('Projects · 0 items');
 
-  await page.locator('input[type=file]').setInputFiles([{ name: 'plan.txt', mimeType: 'text/plain', buffer: Buffer.from('The plan.') }]);
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'plan.txt', mimeType: 'text/plain', buffer: Buffer.from('The plan.') }]);
   await expect(item(page, 'plan.txt')).toBeVisible();
   await page.getByRole('listbox').focus();
   await page.keyboard.press('Home');

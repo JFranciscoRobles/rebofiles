@@ -101,7 +101,7 @@ test('the drive’s colour, and pictures made in its sizes as the original’s t
   await page.keyboard.press('Escape');
 
   const bytes = await picture(page, 1500, 1000);
-  await page.locator('input[type=file]').setInputFiles({ name: 'plan.png', mimeType: 'image/png', buffer: Buffer.from(bytes) });
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'plan.png', mimeType: 'image/png', buffer: Buffer.from(bytes) });
   await expect(page.getByRole('option', { name: /^plan\.png/ })).toBeVisible();
   await expect
     .poll(async () => {

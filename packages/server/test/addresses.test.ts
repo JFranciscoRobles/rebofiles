@@ -109,3 +109,28 @@ describe('what an archive holds', () => {
     expect((await bea.ask('POST', '/api/files/zip', { ids: [contracts.id, deal.id] })).body).toEqual({ files: [], folders: [] });
   });
 });
+
+describe('an archive through a link', () => {
+  it('holds what the link reads, and nothing outside it, whoever asks', async () => {
+    const s3 = memoryS3();
+    const handle = createDriveHandler({
+      storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
+      metadata: memoryMetadata(),
+      identify,
+      authorize: byRoles,
+      secret: 'u',
+      base: '/api/files',
+    });
+    const ana = client(handle, 'ana');
+    const shared = (await ana.ask('POST', '/api/files/folders', { name: 'Shared', parent: null })).body.entry;
+    const inside = (await ana.upload(bytesOf(12), { name: 'in.txt', parent: shared.id, type: 'text/plain' }, s3.fetch)).body.entry;
+    const outside = (await ana.upload(bytesOf(12), { name: 'secret.txt', parent: null, type: 'text/plain' }, s3.fetch)).body.entry;
+    const { token } = (await ana.ask('POST', `/api/files/entries/${shared.id}/links`, { days: 7 })).body as unknown as { token: string };
+    // No one signed in.
+    const someone = (path: string) => handle(new Request(`http://drive.test/api/files/links/${encodeURIComponent(token)}${path}`)).then(async (r) => ({ status: r.status, body: await r.json() }));
+    expect((await someone('/zip')).body).toEqual({ folders: ['Shared/'], files: [expect.objectContaining({ id: inside.id, path: 'Shared/in.txt' })] });
+    expect((await someone(`/zip?ids=${outside.id}`)).status).toBe(404);
+    const { urls } = (await someone(`/urls?ids=${inside.id},${outside.id}`)).body as { urls: Record<string, unknown> };
+    expect(Object.keys(urls)).toEqual([inside.id]);
+  });
+});

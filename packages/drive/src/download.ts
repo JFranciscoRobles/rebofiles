@@ -6,7 +6,14 @@
 // the person chooses as it is made, nothing of it held in the page.
 
 import type { EntryId } from '@rebofiles/core';
-import type { DriveClient } from './client';
+import type { Packed } from '@rebofiles/core';
+import type { FileAddress } from './client';
+
+/** What makes an archive: what goes in it, and where each file is read from. A drive's client, or a link's. */
+export interface ZipSource {
+  pack(ids: EntryId[]): Promise<Packed>;
+  urls(ids: EntryId[], options: { inline?: boolean }): Promise<Record<EntryId, FileAddress>>;
+}
 import { type ZipItem, type ZipSink, blobSink, streamSink, worthDeflating, writeZip } from './zip';
 
 export interface ZipProgress {
@@ -28,8 +35,8 @@ export interface ZipDownloadOptions {
 export interface ZipDownload {
   files: number;
   size: number;
-  /** Files that could not be read, and are not in it. */
-  missed: string[];
+  /** Files that could not be read, and are not in it: to download again on their own. */
+  missed: { id: EntryId; path: string }[];
 }
 
 /** How many addresses are asked for at once, as the files come: they are good for a quarter of an hour. */
@@ -37,11 +44,11 @@ const AT_ONCE = 40;
 
 type Picker = (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{ createWritable(): Promise<WritableStream<Uint8Array>> }>;
 
-export async function downloadZip(client: DriveClient, ids: EntryId[], options: ZipDownloadOptions): Promise<ZipDownload> {
+export async function downloadZip(client: ZipSource, ids: EntryId[], options: ZipDownloadOptions): Promise<ZipDownload> {
   const name = /\.zip$/i.test(options.name) ? options.name : `${options.name}.zip`;
   const packed = await client.pack(ids);
   const size = packed.files.reduce((sum, file) => sum + file.size, 0);
-  const missed: string[] = [];
+  const missed: { id: EntryId; path: string }[] = [];
 
   // A large one straight to a file, where the browser lets the page write one; else in the page, saved at the end.
   const picker = (globalThis as { showSaveFilePicker?: Picker }).showSaveFilePicker;
@@ -81,7 +88,7 @@ export async function downloadZip(client: DriveClient, ids: EntryId[], options: 
         // One that cannot be read is left out, and said, rather than leaving the rest out with it.
         const answer = address ? await fetch(address.url, { signal: options.signal }).catch((error: Error) => (options.signal?.aborted ? Promise.reject(error) : undefined)) : undefined;
         if (!answer?.ok || !answer.body) {
-          missed.push(file.path);
+          missed.push({ id: file.id, path: file.path });
           continue;
         }
         const body = answer.body;

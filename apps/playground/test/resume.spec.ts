@@ -23,7 +23,7 @@ async function cutParts(page: Page, cut: (n: number) => boolean) {
 test('a part cut on the way is sent again by itself, and the file arrives whole', async ({ page }) => {
   await page.goto('/?as=resume1');
   const sent = await cutParts(page, (n) => n === 2);
-  await page.locator('input[type=file]').setInputFiles({ name: 'video.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(9 * MiB, 7) });
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'video.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(9 * MiB, 7) });
   await expect(item(page, 'video.bin')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('alert')).toHaveCount(0);
   // The first part, the second cut, then tried again.
@@ -34,7 +34,7 @@ test('an upload that cannot go on says so, and "Try again" sends only what had n
   await page.goto('/?as=resume2&retries=0');
   let down = true;
   const sent = await cutParts(page, (n) => n > 1 && down);
-  await page.locator('input[type=file]').setInputFiles({ name: 'film.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(17 * MiB, 3) });
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'film.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(17 * MiB, 3) });
   await expect(page.getByRole('alert')).toContainText('film.bin was cut at');
   await expect(page.getByRole('alert')).toContainText('What arrived is kept.');
   await expect(item(page, 'film.bin')).toHaveCount(0);
