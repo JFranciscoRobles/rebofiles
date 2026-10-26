@@ -3,6 +3,7 @@
 import * as app from './pages/app';
 import * as files from './pages/files';
 import * as reference from './pages/reference';
+import * as schema from './pages/schema';
 import * as server from './pages/server';
 import * as start from './pages/start';
 import * as together from './pages/together';
@@ -28,6 +29,7 @@ export const DOC_PAGES: Record<string, DocPage> = {
   authorize: server.authorize,
   storage: server.storage,
   metadata: server.metadata,
+  schema: schema.schema,
   sharing: server.sharing,
   activity: server.activity,
   desktop: server.desktop,

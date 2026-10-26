@@ -62,6 +62,7 @@ export const NAV: { title: string; color: Pastel; items: NavItem[] }[] = [
       { title: 'Who may do what', slug: 'authorize' },
       { title: 'Storage: S3 and disk', slug: 'storage' },
       { title: 'Metadata: SQLite and Postgres', slug: 'metadata' },
+      { title: 'Database schema', slug: 'schema' },
       { title: 'Sharing and links', slug: 'sharing' },
       { title: 'Activity and notifications', slug: 'activity' },
       { title: 'Desktop and other origins', slug: 'desktop' },

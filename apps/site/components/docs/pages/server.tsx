@@ -352,7 +352,7 @@ export const metadata: DocPage = {
       body: (
         <P>
           <C>MetadataStore</C> is <C>load()</C> and <C>save(changes)</C>; <C>revision</C>, <C>lock</C>, settings, <C>record</C>/<C>activity</C> and <C>keepText</C>/<C>findText</C> are optional, and
-          without them the server keeps those in the process.
+          without them the server keeps those in the process. <a href={hrefOf('schema')}>Database schema</a> has every table.
         </P>
       ),
     },
