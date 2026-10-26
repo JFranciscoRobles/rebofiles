@@ -3,20 +3,21 @@
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import type { SearchEntry } from '../searchIndex';
+import { useLocale } from '../../useLocale';
 
 type Kind = SearchEntry['kind'];
 
 /** Each kind: its name over a group of results, its colours, and the path of a 16 × 16 icon drawn with a stroke. */
-const KIND: Record<Kind, { group: string; tint: string; icon: string }> = {
-  Page: { group: 'Pages', tint: 'bg-brand-light text-brand', icon: 'M4 2h5.5L12 4.5V14H4zM9.5 2v2.5H12M6 8h4M6 11h3' },
-  Section: { group: 'Sections', tint: 'bg-hover text-muted', icon: 'M6.5 2.5l-1 11M10.5 2.5l-1 11M3 6h10.5M2.5 10H13' },
-  Component: { group: 'Components', tint: 'bg-pastel-purple text-pastel-purple-fg', icon: 'M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4' },
-  Hook: { group: 'Hooks', tint: 'bg-pastel-green text-pastel-green-fg', icon: 'M10.5 2v7.5a3 3 0 0 1-6 0V8' },
-  Prop: { group: 'Props and options', tint: 'bg-pastel-yellow text-pastel-yellow-fg', icon: 'M3 5h10M3 11h10M6 3v4M10 9v4' },
-  Function: { group: 'Client and functions', tint: 'bg-pastel-orange text-pastel-orange-fg', icon: 'M10.5 2.5C8.5 2.5 8 4 7.7 6l-1.2 7.5M5 7h5' },
-  Route: { group: 'HTTP routes', tint: 'bg-pastel-blue text-pastel-blue-fg', icon: 'M2 8h9M8 4.5L11.5 8 8 11.5M13.5 3v10' },
-  Package: { group: 'Packages', tint: 'bg-pastel-pink text-pastel-pink-fg', icon: 'M8 2l5.5 3v6L8 14l-5.5-3V5zM2.5 5L8 8l5.5-3M8 8v6' },
-  Tool: { group: 'Tools for an assistant', tint: 'bg-pastel-green text-pastel-green-fg', icon: 'M10.5 2.5a3 3 0 0 0-2.7 4.2L3 11.5 4.5 13l4.8-4.8a3 3 0 0 0 4-3.7l-1.8 1.8-1.7-.3-.3-1.7z' },
+const KIND: Record<Kind, { tint: string; icon: string }> = {
+  Page: { tint: 'bg-brand-light text-brand', icon: 'M4 2h5.5L12 4.5V14H4zM9.5 2v2.5H12M6 8h4M6 11h3' },
+  Section: { tint: 'bg-hover text-muted', icon: 'M6.5 2.5l-1 11M10.5 2.5l-1 11M3 6h10.5M2.5 10H13' },
+  Component: { tint: 'bg-pastel-purple text-pastel-purple-fg', icon: 'M5.5 4L2 8l3.5 4M10.5 4L14 8l-3.5 4' },
+  Hook: { tint: 'bg-pastel-green text-pastel-green-fg', icon: 'M10.5 2v7.5a3 3 0 0 1-6 0V8' },
+  Prop: { tint: 'bg-pastel-yellow text-pastel-yellow-fg', icon: 'M3 5h10M3 11h10M6 3v4M10 9v4' },
+  Function: { tint: 'bg-pastel-orange text-pastel-orange-fg', icon: 'M10.5 2.5C8.5 2.5 8 4 7.7 6l-1.2 7.5M5 7h5' },
+  Route: { tint: 'bg-pastel-blue text-pastel-blue-fg', icon: 'M2 8h9M8 4.5L11.5 8 8 11.5M13.5 3v10' },
+  Package: { tint: 'bg-pastel-pink text-pastel-pink-fg', icon: 'M8 2l5.5 3v6L8 14l-5.5-3V5zM2.5 5L8 8l5.5-3M8 8v6' },
+  Tool: { tint: 'bg-pastel-green text-pastel-green-fg', icon: 'M10.5 2.5a3 3 0 0 0-2.7 4.2L3 11.5 4.5 13l4.8-4.8a3 3 0 0 0 4-3.7l-1.8 1.8-1.7-.3-.3-1.7z' },
 };
 /** The order of the groups when something is typed: what is looked for most, first. */
 const ORDER: Kind[] = ['Page', 'Component', 'Hook', 'Prop', 'Function', 'Route', 'Package', 'Tool', 'Section'];
@@ -79,6 +80,7 @@ const Key = ({ children }: { children: ReactNode }) => (
  * was typed marked. ⌘K (Ctrl+K elsewhere) opens it from anywhere.
  */
 export function SearchCommand({ index }: { index: SearchEntry[] }) {
+  const { d } = useLocale();
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -101,13 +103,13 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
         .filter((hit) => hit.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, 50);
-      groups = ORDER.map((kind) => ({ title: KIND[kind].group, entries: hits.filter((hit) => hit.entry.kind === kind).map((hit) => hit.entry) })).filter((group) => group.entries.length);
+      groups = ORDER.map((kind) => ({ title: d.search.groups[kind], entries: hits.filter((hit) => hit.entry.kind === kind).map((hit) => hit.entry) })).filter((group) => group.entries.length);
       // The group with the best result goes first.
       const best = hits[0]?.entry.kind;
-      if (best) groups.sort((a, b) => Number(b.title === KIND[best].group) - Number(a.title === KIND[best].group));
+      if (best) groups.sort((a, b) => Number(b.title === d.search.groups[best]) - Number(a.title === d.search.groups[best]));
     }
     return { groups, flat: groups.flatMap((group) => group.entries) };
-  }, [index, words]);
+  }, [index, words, d]);
 
   const open = () => {
     setQuery('');
@@ -158,14 +160,14 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
           <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
           <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
-        <span className="min-w-0 flex-1 truncate">Search docs, props, routes…</span>
+        <span className="min-w-0 flex-1 truncate">{d.search.button}</span>
         <Key>{mac ? '⌘K' : 'Ctrl K'}</Key>
       </button>
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: a click on the backdrop closes it; the keyboard has Escape, as every dialog does */}
       <dialog
         ref={dialog}
-        aria-label="Search the documentation"
+        aria-label={d.search.dialog}
         className="palette m-auto mt-[10vh] w-[min(680px,calc(100vw-24px))]"
         onClick={(event) => event.target === dialog.current && dialog.current.close()}
       >
@@ -181,9 +183,9 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
               aria-expanded="true"
               aria-controls="search-results"
               aria-activedescendant={flat.length ? `search-${at}` : undefined}
-              aria-label="Search"
+              aria-label={d.search.label}
               value={query}
-              placeholder="Search pages, props, hooks, routes…"
+              placeholder={d.search.placeholder}
               spellCheck={false}
               autoComplete="off"
               onChange={(event) => {
@@ -211,7 +213,7 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
             )}
           </div>
 
-          <div id="search-results" role="listbox" aria-label="Results" className="max-h-[min(460px,62vh)] overflow-y-auto overscroll-contain px-2 pb-2">
+          <div id="search-results" role="listbox" aria-label={d.search.results} className="max-h-[min(460px,62vh)] overflow-y-auto overscroll-contain px-2 pb-2">
             {groups.map((group, g) => (
               // biome-ignore lint/a11y/useSemanticElements: a group of options inside a listbox, as ARIA has it; a fieldset is for a form
               <div key={group.title} role="group" aria-labelledby={`search-group-${g}`}>
@@ -256,8 +258,8 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
             ))}
             {!flat.length && (
               <div className="px-3 py-12 text-center">
-                <p className="m-0 text-[15px] text-ink">Nothing found for “{query}”.</p>
-                <p className="m-0 mt-1.5 text-[13px] text-muted">Try a hook, a prop, a route or a word of a page: useUploads, quota, /zip…</p>
+                <p className="m-0 text-[15px] text-ink">{d.search.nothing(query)}</p>
+                <p className="m-0 mt-1.5 text-[13px] text-muted">{d.search.tryThis}</p>
               </div>
             )}
           </div>
@@ -265,15 +267,15 @@ export function SearchCommand({ index }: { index: SearchEntry[] }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border bg-surface px-5 py-2.5 text-[12.5px] text-muted">
             <span className="flex items-center gap-1.5">
               <Key>↑</Key>
-              <Key>↓</Key> to move
+              <Key>↓</Key> {d.search.move}
             </span>
             <span className="flex items-center gap-1.5">
-              <Key>↵</Key> to open
+              <Key>↵</Key> {d.search.open}
             </span>
             <span className="flex items-center gap-1.5">
-              <Key>Esc</Key> to close
+              <Key>Esc</Key> {d.search.close}
             </span>
-            <span className="ml-auto">{words.length ? `${flat.length} ${flat.length === 1 ? 'result' : 'results'}` : `${flat.length} pages`}</span>
+            <span className="ml-auto">{d.search.count(flat.length, words.length > 0)}</span>
           </div>
         </div>
       </dialog>

@@ -18,7 +18,7 @@ export interface DemoDriveProps {
   defaultView?: 'list' | 'grid';
   /** Claude renames a contract three seconds in, and says so in a card. */
   claudeActivity?: boolean;
-  language?: 'en' | 'es';
+  language?: 'en' | 'es' | 'zh';
   /** `'compact'`: the places in a strip over the list, with no column on the left. */
   layout?: 'full' | 'compact';
 }
@@ -68,6 +68,7 @@ function Demo({ client, defaultView, claudeActivity, language, layout }: Require
 const SAID = {
   en: (to: string) => `Renamed to ${to}, after the client on page 1.`,
   es: (to: string) => `Le cambió el nombre a ${to}, por el cliente de la página 1.`,
+  zh: (to: string) => `已按第 1 页上的客户名称重命名为 ${to}。`,
 };
 
 type Step = { tool: string; said: string };
@@ -76,7 +77,7 @@ type Step = { tool: string; said: string };
  * An assistant at work, as the drive sees it: the messages Claude would send to the MCP server, each answered by the
  * real tools over the drive in the page, as Claude. Its thinking is scripted; what it asks and is told is not.
  */
-function Claude({ client, language }: { client: MemoryClient; language: 'en' | 'es' }) {
+function Claude({ client, language }: { client: MemoryClient; language: 'en' | 'es' | 'zh' }) {
   const { changed } = useDrive();
   const [steps, setSteps] = useState<Step[]>([]);
   const [said, setSaid] = useState('');
@@ -140,14 +141,14 @@ function Claude({ client, language }: { client: MemoryClient; language: 'en' | '
         <span style={{ flex: 1 }}>Claude · via MCP</span>
         <button
           type="button"
-          aria-label={language === 'es' ? 'Cerrar' : 'Close'}
+          aria-label={{ en: 'Close', es: 'Cerrar', zh: '关闭' }[language]}
           onClick={() => setClosed(true)}
           style={{ border: 0, background: 'none', cursor: 'pointer', color: '#9b9890', fontSize: 18, lineHeight: 1, padding: 4, borderRadius: 6 }}
         >
           ×
         </button>
       </div>
-      <ol aria-label={language === 'es' ? 'Herramientas usadas' : 'Tools used'} style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 3 }}>
+      <ol aria-label={{ en: 'Tools used', es: 'Herramientas usadas', zh: '使用的工具' }[language]} style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 3 }}>
         {steps.map((s) => (
           <li key={s.tool} style={{ display: 'flex', gap: 8, fontSize: 12, color: '#6b6963' }}>
             <code style={{ font: '500 11.5px ui-monospace, SFMono-Regular, Menlo, monospace', color: '#a4521c' }}>{s.tool}</code>

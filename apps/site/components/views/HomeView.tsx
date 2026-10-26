@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { CodeTabs } from '@/components/CodeTabs';
 import { FeatureGrid } from '@/components/home/FeatureGrid';
@@ -5,9 +6,18 @@ import { InstallPicker } from '@/components/home/InstallPicker';
 import { LiveDemo } from '@/components/home/LiveDemo';
 import { SiteFooter, SiteHeader, primary } from '@/components/home/SiteChrome';
 import { highlight } from '@/lib/highlight';
-import { PACKAGES, PASTEL_CLASS, PUBLISHED, type Pastel, TAGS, VERSION, npmOf, pastelAt } from '@/lib/home';
+import { PACKAGES, PASTEL_CLASS, PUBLISHED, type Pastel, VERSION, npmOf, pastelAt } from '@/lib/home';
+import { type Locale, dict, localePath } from '@/lib/i18n';
 import { DEMOS, DOCS, GET_STARTED, NPM_ORG, STATUS } from '@/lib/site';
 import { TESTS } from '@/components/docs/status/data';
+import { JsonLd, SOFTWARE_LD, pageMeta } from '@/lib/seo';
+
+/** The landing's metadata in a language: its title whole, not under the template of the other pages. */
+export function homeMeta(locale: Locale): Metadata {
+  const d = dict(locale);
+  const meta = pageMeta({ title: d.home.title, description: d.home.description, path: '/', locale });
+  return { ...meta, title: { absolute: d.home.title } };
+}
 
 const SAMPLES: [string, string, string][] = [
   [
@@ -102,7 +112,9 @@ const doodle = 'absolute hidden md:block';
 /** A stroke drawn by hand, that draws itself in after `delay`. */
 const drawn = (delay: string) => ({ className: 'draw animate-draw', style: { animationDelay: delay } });
 
-function Hero() {
+function Hero({ locale }: { locale: Locale }) {
+  const d = dict(locale);
+  const to = (path: string) => localePath(locale, path);
   return (
     <section id="top" className="relative mx-auto max-w-[1180px] px-6 pb-10 pt-18 text-center">
       <svg width="70" height="70" viewBox="0 0 70 70" aria-hidden="true" className={`${doodle} left-[6%] top-[90px] animate-float`}>
@@ -117,46 +129,47 @@ function Hero() {
       </svg>
 
       <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface py-1.5 pl-2 pr-3.5 text-sm text-muted">
-        <span className="rounded-full border border-border bg-white px-2 py-0.5 text-xs font-semibold text-ink">New</span>
-        Search inside files, activity, folder colours, and a desktop app
+        <span className="rounded-full border border-border bg-white px-2 py-0.5 text-xs font-semibold text-ink">{d.home.newBadge}</span>
+        {d.home.newLine}
       </p>
       <h1 className="mx-auto mt-7 max-w-[900px] text-balance font-display text-[clamp(44px,6.6vw,84px)] font-extrabold leading-[1.04] tracking-[-0.03em]">
-        The file drive you{' '}
+        {d.home.h1[0]}{' '}
         <span className="relative whitespace-nowrap text-brand">
-          build into
+          {d.home.h1[1]}
           <svg viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true" className="absolute -bottom-2.5 left-0 h-[18px] w-full">
             <path {...drawn('0s')} d="M4 14C70 4 160 4 296 10" fill="none" stroke="#F5C443" strokeWidth="7" strokeLinecap="round" />
           </svg>
         </span>{' '}
-        your app.
+        {d.home.h1[2]}
       </h1>
-      <p className="mx-auto mt-7 max-w-[640px] text-[19px] leading-[1.6] text-muted">
-        A file manager for the browser, on your own storage. Upload, organise and preview files, with folders, versions and a trash — in packages you take one at a time.
-      </p>
+      <p className="mx-auto mt-7 max-w-[640px] text-[19px] leading-[1.6] text-muted">{d.home.lead}</p>
       <p className="mt-8 flex flex-wrap justify-center gap-2.5 text-base">
-        <a href={GET_STARTED} className={`rounded-xl px-5.5 py-3.5 ${primary}`}>
-          Get started
+        <a href={to(GET_STARTED)} className={`rounded-xl px-5.5 py-3.5 ${primary}`}>
+          {d.nav.getStarted}
         </a>
         <a href="#demo" className={`px-5.5 py-3.5 ${secondary}`}>
-          Try it below
+          {d.home.tryBelow}
         </a>
       </p>
-      <InstallPicker />
+      <InstallPicker locale={locale} />
     </section>
   );
 }
 
-export default async function Home() {
-  const samples = await Promise.all(SAMPLES.map(async ([name, lang, code]) => ({ name, html: await highlight(code, lang) })));
+export async function HomeView({ locale }: { locale: Locale }) {
+  const d = dict(locale);
+  const to = (path: string) => localePath(locale, path);
+  const samples = await Promise.all(SAMPLES.map(async ([, lang, code], i) => ({ name: d.home.samples[i], html: await highlight(code, lang) })));
   const tests = TESTS.reduce((sum, row) => sum + row.count, 0);
   return (
     <div className="home overflow-x-clip text-ink">
-      <SiteHeader />
+      <SiteHeader locale={locale} />
+      <JsonLd data={SOFTWARE_LD} />
       <main>
-        <Hero />
+        <Hero locale={locale} />
 
-        <ul className="reveal mx-auto flex max-w-[1180px] flex-wrap justify-center gap-2.5 px-6 pb-6 pt-14" aria-label="What it does">
-          {TAGS.map((tag, i) => (
+        <ul className="reveal mx-auto flex max-w-[1180px] flex-wrap justify-center gap-2.5 px-6 pb-6 pt-14" aria-label={d.home.whatItDoes}>
+          {d.home.tags.map((tag, i) => (
             <li key={tag} className={`rounded-full px-3.5 py-[7px] text-sm font-medium transition duration-250 hover:-translate-y-1 hover:shadow-lift ${PASTEL_CLASS[pastelAt(i)]}`}>
               {tag}
             </li>
@@ -165,46 +178,41 @@ export default async function Home() {
 
         <section id="demo" className="mx-auto max-w-[1180px] px-6 pb-15 pt-20">
           <div className="reveal mx-auto max-w-[720px] text-center">
-            <Pill color="brand">Live demo</Pill>
-            <Title>This is the drive. Click around.</Title>
-            <p className="mt-4.5 text-lg leading-[1.6] text-muted">
-              Open folders, search, upload a few files and watch each go, preview them, open a .docx in Rebodocs, colour a folder, restore an old version, send it to the trash and bring it back.
-              Nothing leaves the browser.
-            </p>
+            <Pill color="brand">{d.home.demoPill}</Pill>
+            <Title>{d.home.demoTitle}</Title>
+            <p className="mt-4.5 text-lg leading-[1.6] text-muted">{d.home.demoLead}</p>
           </div>
           <div className="reveal relative mt-11 rounded-3xl border border-border bg-surface p-3.5">
-            <LiveDemo />
+            <LiveDemo locale={locale} />
           </div>
           <p className="mt-8 text-center text-[15px] text-muted">
-            Claude’s rename goes through the MCP tools of @rebofiles/mcp and Rebodocs, here in the page. Same drive, your own UI →{' '}
-            <a href={`${DEMOS}#headless`} className="font-medium text-brand hover:text-brand-hover">
-              see it in another look, built with the headless hooks
+            {d.home.demoNote}{' '}
+            <a href={`${to(DEMOS)}#headless`} className="font-medium text-brand hover:text-brand-hover">
+              {d.home.demoLink}
             </a>
           </p>
         </section>
 
         <section id="features" className="mx-auto max-w-[1180px] px-6 py-20">
           <div className="reveal mx-auto mb-12 max-w-[720px] text-center">
-            <Pill color="green">Features</Pill>
-            <Title>A drive you can trust with real files.</Title>
+            <Pill color="green">{d.home.featuresPill}</Pill>
+            <Title>{d.home.featuresTitle}</Title>
           </div>
-          <FeatureGrid />
+          <FeatureGrid locale={locale} />
         </section>
 
         <section id="docs" className="mx-auto max-w-[1180px] px-6 py-20">
           <div className="flex flex-wrap items-center gap-12 rounded-[28px] bg-surface p-[clamp(28px,5vw,64px)]">
             <div className="reveal min-w-0 flex-[1_1_360px]">
-              <Pill color="purple">For developers</Pill>
-              <Title small>It feels like part of your app — because it is.</Title>
-              <p className="mt-4.5 text-[17px] leading-[1.65] text-muted">
-                It mounts in your page, uses your fonts and your language, and sends bytes straight to your bucket. Where files live and who can open them stays your app’s business.
-              </p>
-              <a href={DOCS} className="mt-5 inline-flex items-center gap-1.5 font-semibold text-brand hover:text-brand-hover">
-                Read the guide <span aria-hidden="true">→</span>
+              <Pill color="purple">{d.home.devPill}</Pill>
+              <Title small>{d.home.devTitle}</Title>
+              <p className="mt-4.5 text-[17px] leading-[1.65] text-muted">{d.home.devLead}</p>
+              <a href={to(DOCS)} className="mt-5 inline-flex items-center gap-1.5 font-semibold text-brand hover:text-brand-hover">
+                {d.home.readGuide} <span aria-hidden="true">→</span>
               </a>
             </div>
             <div className="reveal min-w-0 flex-[1.2_1_480px]">
-              <CodeTabs samples={samples} />
+              <CodeTabs samples={samples} label={d.home.examples} />
             </div>
           </div>
         </section>
@@ -212,22 +220,22 @@ export default async function Home() {
         <section id="packages" className="mx-auto max-w-[1180px] px-6 py-20">
           <div className="reveal mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <Pill color="orange">Packages</Pill>
-              <Title small>Take what you need.</Title>
+              <Pill color="orange">{d.home.packagesPill}</Pill>
+              <Title small>{d.home.packagesTitle}</Title>
             </div>
             <p className="max-w-[380px] text-base leading-[1.6] text-muted">
-              The core has no DOM, so the same file model runs in your server, your browser and your desktop.{' '}
+              {d.home.packagesLead}{' '}
               {PUBLISHED ? (
                 <a href={NPM_ORG} className="font-medium text-brand hover:text-brand-hover">
-                  See them on npm →
+                  {d.home.seeOnNpm}
                 </a>
               ) : (
-                'All are written; none is on npm yet.'
+                d.home.notOnNpm
               )}
             </p>
           </div>
           {/* biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways on a phone, and a keyboard has to reach what is hidden (WCAG 2.1.1) */}
-          <section className="reveal overflow-x-auto rounded-2xl border border-border" aria-label="Packages" tabIndex={0}>
+          <section className="reveal overflow-x-auto rounded-2xl border border-border" aria-label={d.home.packagesPill} tabIndex={0}>
             <table className="w-full min-w-[680px] border-collapse text-left text-[15px]">
               <colgroup>
                 <col className="w-[27%]" />
@@ -236,9 +244,9 @@ export default async function Home() {
               </colgroup>
               <thead className="bg-surface text-[13px] font-medium text-muted">
                 <tr>
-                  <th className="px-4.5 py-[11px] font-medium">Package</th>
-                  <th className="border-l border-border px-4.5 py-[11px] font-medium">What it does</th>
-                  <th className="border-l border-border px-4.5 py-[11px] font-medium">Runs in</th>
+                  <th className="px-4.5 py-[11px] font-medium">{d.home.packageCols[0]}</th>
+                  <th className="border-l border-border px-4.5 py-[11px] font-medium">{d.home.packageCols[1]}</th>
+                  <th className="border-l border-border px-4.5 py-[11px] font-medium">{d.home.packageCols[2]}</th>
                 </tr>
               </thead>
               <tbody>
@@ -252,11 +260,11 @@ export default async function Home() {
                       ) : (
                         <span className={`font-code text-sm font-medium ${pkg.comes ? 'text-muted' : 'text-ink'}`}>{pkg.name}</span>
                       )}
-                      <div className="mt-1 text-xs text-muted">{pkg.comes ? `Coming in ${pkg.comes}` : `v${VERSION}`}</div>
+                      <div className="mt-1 text-xs text-muted">{pkg.comes ? d.home.comingIn(pkg.comes) : `v${VERSION}`}</div>
                     </td>
-                    <td className="border-l border-border px-4.5 py-3.5 text-ink-soft">{pkg.what}</td>
+                    <td className="border-l border-border px-4.5 py-3.5 text-ink-soft">{d.home.packages[pkg.name]?.what ?? pkg.what}</td>
                     <td className="border-l border-border px-4.5 py-3">
-                      <span className={`rounded-md px-[9px] py-[3px] text-[13px] font-medium ${PASTEL_CLASS[pkg.color]}`}>{pkg.tag}</span>
+                      <span className={`rounded-md px-[9px] py-[3px] text-[13px] font-medium ${PASTEL_CLASS[pkg.color]}`}>{d.home.packages[pkg.name]?.tag ?? pkg.tag}</span>
                     </td>
                   </tr>
                 ))}
@@ -268,33 +276,30 @@ export default async function Home() {
         <section id="status" className="mx-auto max-w-[1180px] px-6 pb-25 pt-15">
           <div className="reveal flex flex-wrap items-center gap-10 rounded-[28px] bg-pastel-yellow p-[clamp(28px,5vw,64px)]">
             <div className="min-w-0 flex-[1_1_340px]">
-              <span className="rounded-full bg-white px-3 py-[5px] text-[13px] font-semibold text-pastel-yellow-fg">Where it stands</span>
+              <span className="rounded-full bg-white px-3 py-[5px] text-[13px] font-semibold text-pastel-yellow-fg">{d.home.statusPill}</span>
               <p className="mt-4.5 font-display text-[clamp(48px,6vw,76px)] font-extrabold leading-[1.02] tracking-[-0.03em]">
-                Your files.
+                {d.home.statusBig[0]}
                 <br />
-                Your storage.
+                {d.home.statusBig[1]}
               </p>
-              <p className="mt-3 font-hand text-[26px] font-semibold text-pastel-yellow-fg">the bytes never pass through anyone else</p>
+              <p className="mt-3 font-hand text-[26px] font-semibold text-pastel-yellow-fg">{d.home.statusHand}</p>
             </div>
             <div className="min-w-0 flex-[1_1_380px]">
-              <p className="font-display text-[clamp(24px,2.6vw,32px)] font-bold leading-[1.3] tracking-[-0.03em]">Early, open, and built on Rebodocs.</p>
-              <p className="mt-4 text-[17px] leading-[1.6] text-[#5c4a1e]">
-                A file manager with its own file model that keeps your files where you put them, previews Word documents with the Rebodocs engine and opens every .docx in its editor. {tests} automated
-                tests pass; {PUBLISHED ? `the packages are on npm at ${VERSION}` : 'nothing is on npm yet'}. Open source under MIT.
-              </p>
+              <p className="font-display text-[clamp(24px,2.6vw,32px)] font-bold leading-[1.3] tracking-[-0.03em]">{d.home.statusTitle}</p>
+              <p className="mt-4 text-[17px] leading-[1.6] text-[#5c4a1e]">{d.home.statusText(tests, PUBLISHED ? VERSION : null)}</p>
               <p className="mt-6.5 flex flex-wrap gap-2.5">
-                <a href={GET_STARTED} className={`rounded-xl px-5 py-[13px] ${primary}`}>
-                  Get started
+                <a href={to(GET_STARTED)} className={`rounded-xl px-5 py-[13px] ${primary}`}>
+                  {d.nav.getStarted}
                 </a>
-                <a href={STATUS} className="rounded-xl bg-white px-5 py-[13px] font-semibold text-ink transition-colors hover:bg-hover">
-                  What’s checked, what’s missing →
+                <a href={to(STATUS)} className="rounded-xl bg-white px-5 py-[13px] font-semibold text-ink transition-colors hover:bg-hover">
+                  {d.home.statusLink}
                 </a>
               </p>
             </div>
           </div>
         </section>
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </div>
   );
 }

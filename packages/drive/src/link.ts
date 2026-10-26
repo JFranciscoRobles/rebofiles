@@ -19,7 +19,7 @@ export interface SharedLinkOptions {
   base?: string;
   /** The token of the link, as it came in its address. */
   token: string;
-  language?: 'en' | 'es';
+  language?: 'en' | 'es' | 'zh';
   texts?: Texts;
   logo?: Node;
   /** Light (the default), dark, or as the system is (`'auto'`). */

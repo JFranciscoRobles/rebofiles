@@ -57,7 +57,7 @@ export interface DriveOptions {
   /** Headers for every request to the server, such as a token of the session. */
   headers?: () => Record<string, string> | Promise<Record<string, string>>;
   /** Over the drive's settings, under each person's own; the drive's (English) unless given. */
-  language?: 'en' | 'es';
+  language?: 'en' | 'es' | 'zh';
   /** Texts of another language, with the keys of the English ones. */
   texts?: Texts;
   /** The name over the drive: the application's, or "Files". */
@@ -145,7 +145,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const prefix = `rf${++mounts}`;
   // The settings of the server, once they come: a person's own first, then what the application said, then the drive's.
   let settings: SettingsAnswer | null = null;
-  const languageNow = (): 'en' | 'es' => settings?.mine.language ?? options.language ?? settings?.drive.language ?? 'en';
+  const languageNow = (): 'en' | 'es' | 'zh' => settings?.mine.language ?? options.language ?? settings?.drive.language ?? 'en';
   const themeNow = () => settings?.mine.theme ?? options.theme ?? settings?.drive.theme ?? 'light';
   let t: Translate = translator(options.texts ?? TEXTS[languageNow()]);
   let locale = languageNow();
@@ -2026,9 +2026,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   function settingsScreen(part: SettingsPart) {
     const answer = settings!;
     const { mine, drive, canConfigure } = answer;
-    const languages: ['en' | 'es', string][] = [
+    const languages: ['en' | 'es' | 'zh', string][] = [
       ['en', 'English'],
       ['es', 'Español'],
+      ['zh', '中文'],
     ];
     const themes: ['light' | 'dark' | 'auto', string][] = [
       ['light', t('themeLight')],

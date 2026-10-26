@@ -17,7 +17,7 @@ import { createRoot } from 'react-dom/client';
 const Editor = lazy(() => import('./Editor'));
 
 const params = new URLSearchParams(location.search);
-const language = params.get('lang') === 'es' ? 'es' : params.get('lang') === 'en' ? 'en' : undefined;
+const language = (['en', 'es', 'zh'] as const).find((one) => one === params.get('lang'));
 const as = params.get('as');
 // Unless given, the drive's settings say it.
 const theme = (['light', 'dark', 'auto'].includes(params.get('theme') ?? '') ? params.get('theme') : undefined) as 'light' | 'dark' | 'auto' | undefined;

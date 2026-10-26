@@ -3,13 +3,14 @@
 // the browser only filters it.
 
 import { TOOLS } from '@rebofiles/mcp';
-import { PAGES, groupOf, hrefOf } from '@/lib/site';
+import type { Locale } from '@/lib/i18n';
+import { docHref, navOf } from '@/lib/site';
 import { hookId, propId } from './pages/app';
 import { clientId, packageId } from './pages/reference';
 import { optionId } from './pages/server';
 import { toolId } from './pages/together';
-import { CLIENT, HOOKS, PACKAGE_DOCS, PROPS, SERVER_OPTIONS } from './reference';
-import { DOC_PAGES } from './registry';
+import { referenceIn } from './referenceI18n';
+import { docPageOf } from './registry';
 import { routeId, routes } from './routes';
 
 export interface SearchEntry {
@@ -24,17 +25,29 @@ export interface SearchEntry {
 
 const plain = (text: string) => text.replace(/`/g, '');
 
-export function searchIndex(): SearchEntry[] {
+/** Everything there is to find, in a language: its pages and sections in its words, the reference as the code says it. */
+export function searchIndex(locale: Locale = 'en'): SearchEntry[] {
   const entries: SearchEntry[] = [];
-  for (const page of PAGES) {
-    const href = hrefOf(page.slug);
-    const doc = DOC_PAGES[page.slug];
-    entries.push({ kind: 'Page', title: page.title, detail: groupOf(page.slug)?.title ?? '', href, keywords: doc.description });
-    for (const section of doc.sections)
-      entries.push({ kind: 'Section', title: section.title, detail: page.title, href: `${href}#${section.id}`, keywords: `${section.badge} ${typeof section.lead === 'string' ? section.lead : ''}` });
-  }
-  entries.push({ kind: 'Component', title: '<FileDrive />', detail: 'The whole drive', href: hrefOf('react') });
-  entries.push({ kind: 'Component', title: '<SharedLink />', detail: 'What someone sent a link sees', href: `${hrefOf('react')}#the-link-page` });
+  const hrefOf = (slug: string) => docHref(locale, slug);
+  const { CLIENT, HOOKS, PACKAGE_DOCS, PROPS, SERVER_OPTIONS } = referenceIn(locale);
+  for (const group of navOf(locale))
+    for (const page of group.items) {
+      const href = hrefOf(page.slug);
+      const doc = docPageOf(locale, page.slug);
+      if (!doc) continue;
+      entries.push({ kind: 'Page', title: page.title, detail: group.title, href, keywords: doc.description });
+      for (const section of doc.sections)
+        entries.push({
+          kind: 'Section',
+          title: section.title,
+          detail: page.title,
+          href: `${href}#${section.id}`,
+          keywords: `${section.badge} ${typeof section.lead === 'string' ? section.lead : ''}`,
+        });
+    }
+  const COMPONENTS = { en: ['The whole drive', 'What someone sent a link sees'], es: ['El drive completo', 'Lo que ve quien recibió un enlace'], zh: ['完整的网盘', '收到链接的人看到的内容'] }[locale];
+  entries.push({ kind: 'Component', title: '<FileDrive />', detail: COMPONENTS[0], href: hrefOf('react') });
+  entries.push({ kind: 'Component', title: '<SharedLink />', detail: COMPONENTS[1], href: `${hrefOf('react')}#the-link-page` });
   for (const prop of PROPS) entries.push({ kind: 'Prop', title: prop.name, detail: `FileDrive · ${prop.type}`, href: `${hrefOf('react')}#${propId(prop.name)}`, keywords: plain(prop.does) });
   for (const option of SERVER_OPTIONS)
     entries.push({ kind: 'Prop', title: option.name, detail: `createDriveHandler · ${option.type}`, href: `${hrefOf('server')}#${optionId(option.name)}`, keywords: plain(option.does) });

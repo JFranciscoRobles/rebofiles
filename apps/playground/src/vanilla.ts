@@ -13,7 +13,7 @@ document.body.dataset.theme = theme;
 mountDrive(document.getElementById('root')!, {
   base: '/api/files',
   headers: (): Record<string, string> => (as ? { 'x-user': as } : {}),
-  language: params.get('lang') === 'es' ? 'es' : 'en',
+  language: params.get('lang') === 'es' ? 'es' : params.get('lang') === 'zh' ? 'zh' : 'en',
   title: as ? `Without a framework · ${as}` : 'Without a framework',
   theme,
   previewDocument: previewDocx,

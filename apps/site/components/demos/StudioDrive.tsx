@@ -10,8 +10,9 @@ import { FOLDER_COLORS, type Activity, type Entry, type EntryId, type FileEntry,
 import { downloadZip } from '@rebofiles/drive';
 import { DriveProvider, type Kind, type MemoryClient, type View, createMemoryClient, formatSize, kindOf, useActions, useDrive, useEntries, useEntry, useUploads } from '@rebofiles/react';
 import { pictureOfDocx, viewDocx } from '@rebofiles/react/rebodocs';
-import { type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { YOU, seed } from '../../../demo/src/seed';
+import { STUDIO_TEXTS, type StudioLanguage, type StudioTexts, agoIn } from './studioTexts';
 
 type Place = 'home' | 'files' | 'shared' | 'trash';
 type Filter = 'all' | 'folder' | 'image' | 'document' | 'pdf' | 'sheet' | 'media';
@@ -19,22 +20,14 @@ type Order = 'modified' | 'name' | 'size' | 'kind';
 type Tell = (text: string) => void;
 type PanelTab = 'info' | 'versions' | 'activity' | 'share';
 
-const PLACES: { id: Place; label: string; icon: ReactNode }[] = [
-  { id: 'home', label: 'Home', icon: <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1Z" /> },
-  { id: 'files', label: 'Your files', icon: <path d="M3 6a1.5 1.5 0 0 1 1.5-1.5h3.3l1.7 2h6A1.5 1.5 0 0 1 17 8v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15Z" /> },
-  { id: 'shared', label: 'Shared with you', icon: <path d="M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm-4.5 7c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5M13.5 9a2 2 0 1 0 0-4M14 11.6c1.9.4 3.5 2.1 3.5 4.4" /> },
-  { id: 'trash', label: 'Deleted', icon: <path d="M4 6h12M8 6V4.5h4V6m-6.5 0 .8 10a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10" /> },
+const PLACES: { id: Place; icon: ReactNode }[] = [
+  { id: 'home', icon: <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1Z" /> },
+  { id: 'files', icon: <path d="M3 6a1.5 1.5 0 0 1 1.5-1.5h3.3l1.7 2h6A1.5 1.5 0 0 1 17 8v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15Z" /> },
+  { id: 'shared', icon: <path d="M7 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm-4.5 7c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5M13.5 9a2 2 0 1 0 0-4M14 11.6c1.9.4 3.5 2.1 3.5 4.4" /> },
+  { id: 'trash', icon: <path d="M4 6h12M8 6V4.5h4V6m-6.5 0 .8 10a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l.8-10" /> },
 ];
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'folder', label: 'Folders' },
-  { id: 'image', label: 'Images' },
-  { id: 'document', label: 'Documents' },
-  { id: 'pdf', label: 'PDFs' },
-  { id: 'sheet', label: 'Spreadsheets' },
-  { id: 'media', label: 'Video & audio' },
-];
+const FILTERS: Filter[] = ['all', 'folder', 'image', 'document', 'pdf', 'sheet', 'media'];
 
 const matches = (filter: Filter, kind: Kind) =>
   filter === 'all' || (filter === 'document' ? kind === 'docx' || kind === 'text' : filter === 'media' ? kind === 'video' || kind === 'audio' : kind === filter);
@@ -66,31 +59,13 @@ const COLORS: Record<FolderColor, string> = {
 
 const PEOPLE = ['Ana', 'Luis', 'Bea'];
 
-const DONE: Record<Activity['action'], string> = {
-  created: 'created it',
-  uploaded: 'uploaded it',
-  version: 'uploaded a new version',
-  renamed: 'renamed it',
-  moved: 'moved it',
-  trashed: 'deleted it',
-  restored: 'restored it',
-  deleted: 'deleted it for good',
-  shared: 'shared it',
-  unshared: 'stopped sharing it',
-  linked: 'made a link to it',
-  unlinked: 'removed a link to it',
-  colored: 'changed its colour',
-};
-
-const ago = (iso: string) => {
-  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  const say = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-  if (minutes < 60) return say.format(-minutes, 'minute');
-  if (minutes < 60 * 24) return say.format(-Math.round(minutes / 60), 'hour');
-  return say.format(-Math.round(minutes / 60 / 24), 'day');
-};
+/** The words of the app in its language, and how it says a time and a size. */
+const Words = createContext<{ s: StudioTexts; lang: StudioLanguage }>({ s: STUDIO_TEXTS.en, lang: 'en' });
+function useWords() {
+  const { s, lang } = useContext(Words);
+  return { s, lang, ago: (iso: string) => agoIn(lang, iso), size: (bytes: number) => formatSize(bytes, lang) };
+}
 const sizeOf = (entry: Entry) => (entry.kind === 'file' ? entry.versions[0].size : 0);
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 const DRAGGED = 'application/x-studio-entries';
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([type=hidden]), select, textarea, iframe, [tabindex]:not([tabindex="-1"])';
 
@@ -129,26 +104,7 @@ function useDialog(box: { current: HTMLElement | null }, onClose: () => void, fi
   }, [box, first]);
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['Tab', 'Into the cards, and on to the panel'],
-  ['← → ↑ ↓', 'From card to card'],
-  ['Shift + arrows', 'Select as you go'],
-  ['Space', 'Select or unselect'],
-  ['⌘/Ctrl + click, Shift + click', 'Select more'],
-  ['⌘/Ctrl + A', 'Select all'],
-  ['Enter', 'Open'],
-  ['F2', 'Rename'],
-  ['Delete', 'Move to Deleted'],
-  ['Shift + F10, or the menu key', 'The menu of a card'],
-  ['Escape', 'Clear the selection, or close'],
-  ['/', 'Search'],
-  ['U', 'Upload'],
-  ['N', 'New folder'],
-  ['← →, in the viewer', 'The file before, the one after'],
-  ['?', 'These shortcuts'],
-];
-
-export function StudioDrive() {
+export function StudioDrive({ language = 'en' }: { language?: StudioLanguage }) {
   const [client, setClient] = useState<MemoryClient | null>(null);
   const [dark, setDark] = useState(false);
   useEffect(() => {
@@ -162,9 +118,11 @@ export function StudioDrive() {
     <div className="studio" data-theme={dark ? 'dark' : 'light'}>
       <style>{CSS}</style>
       {client ? (
-        <DriveProvider client={client} language="en">
-          <Studio dark={dark} setDark={setDark} />
-        </DriveProvider>
+        <Words.Provider value={{ s: STUDIO_TEXTS[language], lang: language }}>
+          <DriveProvider client={client} language={language}>
+            <Studio dark={dark} setDark={setDark} />
+          </DriveProvider>
+        </Words.Provider>
       ) : (
         <div className="st-app" />
       )}
@@ -174,6 +132,7 @@ export function StudioDrive() {
 
 function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => void }) {
   const { client } = useDrive();
+  const { s, ago, size } = useWords();
   const [place, setPlace] = useState<Place>('files');
   const [folder, setFolder] = useState<EntryId | null>(null);
   const [query, setQuery] = useState('');
@@ -262,17 +221,17 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
   };
   const newFolder = async () => {
     const names = new Set(entries.map((entry) => entry.name));
-    let name = 'Untitled folder';
-    for (let n = 2; names.has(name); n++) name = `Untitled folder ${n}`;
+    let name = s.untitled;
+    for (let n = 2; names.has(name); n++) name = `${s.untitled} ${n}`;
     const made = await actions.createFolder(name, folder);
     setSelected([made.id]);
-    tell(`Created “${made.name}”`);
+    tell(s.created(made.name));
     setTimeout(() => document.getElementById('st-name-field')?.focus(), 150);
   };
   const trash = async (ids: EntryId[]) => {
     for (const id of ids) await actions.moveToTrash(id);
     setSelected([]);
-    tell(`${plural(ids.length, 'item')} moved to Deleted`);
+    tell(s.movedToDeleted(s.items(ids.length)));
   };
   const move = async (ids: EntryId[], to: EntryId | null) => {
     let moved = 0;
@@ -285,14 +244,14 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
         tell((error as Error).message);
       }
     }
-    if (moved) tell(`${plural(moved, 'item')} moved`);
+    if (moved) tell(s.moved(s.items(moved)));
     setSelected([]);
   };
   const zip = async (ids: EntryId[]) => {
-    const name = ids.length === 1 ? (shown.find((e) => e.id === ids[0])?.name ?? 'files') : 'Acme files';
-    tell('Making the .zip…');
+    const name = ids.length === 1 ? (shown.find((e) => e.id === ids[0])?.name ?? s.zipName) : s.zipName;
+    tell(s.makingZip);
     const done = await downloadZip(client, ids, { name: name.replace(/\.[^.]+$/, '') });
-    tell(`Downloaded ${plural(done.files, 'file')} as a .zip`);
+    tell(s.downloadedZip(s.files(done.files)));
   };
   const download = async (entry: Entry) => {
     if (entry.kind === 'folder') return zip([entry.id]);
@@ -396,7 +355,7 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
     setMenu({ x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0), entry });
   };
 
-  const heading = searching ? `Results for “${query.trim()}”` : place === 'files' ? (path.at(-1)?.name ?? 'Your files') : place === 'home' ? 'Recent' : PLACES.find((p) => p.id === place)?.label;
+  const heading = searching ? s.resultsFor(query.trim()) : place === 'files' ? (path.at(-1)?.name ?? s.places.files) : place === 'home' ? s.recent : s.places[place];
   const one = picked.length === 1 ? picked[0] : null;
 
   return (
@@ -414,35 +373,35 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
             <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
             <path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          <span className="st-hidden">Search your files, by name and by what is written in them</span>
-          <input ref={search} type="search" placeholder="Search by name, or by what is written inside" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <span className="st-hidden">{s.searchLabel}</span>
+          <input ref={search} type="search" placeholder={s.searchPlaceholder} value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        <button type="button" className="st-icon" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-haspopup="dialog" onClick={() => setHelp(true)}>
+        <button type="button" className="st-icon" aria-label={s.keyboard} title={s.keyboardTitle} aria-haspopup="dialog" onClick={() => setHelp(true)}>
           <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
             <rect x="2" y="5" width="16" height="10" rx="2" />
             <path d="M5 8h1M8 8h1M11 8h1M14 8h1M6 12h8" strokeLinecap="round" />
           </svg>
         </button>
-        <button type="button" className="st-icon" aria-pressed={dark} aria-label="Dark theme" title="Dark theme" onClick={() => setDark(!dark)}>
+        <button type="button" className="st-icon" aria-pressed={dark} aria-label={s.dark} title={s.dark} onClick={() => setDark(!dark)}>
           <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M16 12.5A6.5 6.5 0 0 1 7.5 4a6.5 6.5 0 1 0 8.5 8.5Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
           </svg>
         </button>
-        <span className="st-avatar" title="You">
-          Y
+        <span className="st-avatar" title={s.you}>
+          {s.youInitial}
         </span>
       </header>
 
-      <nav className="st-rail" aria-label="Places">
+      <nav className="st-rail" aria-label={s.placesLabel}>
         <button type="button" className="st-create" onClick={() => picker.current?.click()}>
-          <span aria-hidden="true">+</span> Upload
+          <span aria-hidden="true">+</span> {s.upload}
         </button>
         {PLACES.map((p) => (
           <button key={p.id} type="button" className="st-place" aria-current={place === p.id && !searching ? 'page' : undefined} onClick={() => go(p.id)} {...(p.id === 'files' ? target(null) : {})}>
             <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
               {p.icon}
             </svg>
-            {p.label}
+            {s.places[p.id]}
           </button>
         ))}
         <Usage />
@@ -451,7 +410,7 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: a click on the empty space clears the selection; Escape does from the keyboard */}
       <section
         className={`st-main${dropping ? ' st-dropping' : ''}`}
-        aria-label="Files"
+        aria-label={s.filesLabel}
         onDragOver={(e) => {
           e.preventDefault();
           if (!e.dataTransfer.types.includes(DRAGGED)) setDropping(true);
@@ -463,9 +422,9 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
         <div className="st-head">
           <div>
             {place === 'files' && !searching && path.length > 0 && (
-              <nav aria-label="Path" className="st-path">
+              <nav aria-label={s.path} className="st-path">
                 <button type="button" onClick={() => into(null)} {...target(null)}>
-                  Your files
+                  {s.places.files}
                 </button>
                 {path.slice(0, -1).map((f) => (
                   <span key={f.id}>
@@ -481,29 +440,29 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
           </div>
           <div className="st-tools">
             {inTrash ? (
-              <button type="button" className="st-button" disabled={!entries.length} onClick={() => actions.emptyTrash().then(() => tell('Deleted for good'))}>
-                Empty
+              <button type="button" className="st-button" disabled={!entries.length} onClick={() => actions.emptyTrash().then(() => tell(s.deletedForGood))}>
+                {s.empty}
               </button>
             ) : (
               place === 'files' &&
               !searching && (
                 <button type="button" className="st-button" onClick={newFolder}>
-                  New folder
+                  {s.newFolder}
                 </button>
               )
             )}
             <label className="st-select">
-              <span className="st-hidden">Sort by</span>
+              <span className="st-hidden">{s.sortBy}</span>
               <select value={order} onChange={(e) => setOrder(e.target.value as Order)}>
-                <option value="modified">Last modified</option>
-                <option value="name">Name</option>
-                <option value="size">Size</option>
-                <option value="kind">Kind</option>
+                <option value="modified">{s.order.modified}</option>
+                <option value="name">{s.order.name}</option>
+                <option value="size">{s.order.size}</option>
+                <option value="kind">{s.order.kind}</option>
               </select>
             </label>
             <fieldset className="st-toggle">
-              <legend className="st-hidden">Layout</legend>
-              <button type="button" aria-pressed={layout === 'grid'} aria-label="Grid" onClick={() => setLayout('grid')}>
+              <legend className="st-hidden">{s.layout}</legend>
+              <button type="button" aria-pressed={layout === 'grid'} aria-label={s.grid} onClick={() => setLayout('grid')}>
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
                   <rect x="1" y="1" width="6" height="6" rx="1.5" />
                   <rect x="9" y="1" width="6" height="6" rx="1.5" />
@@ -511,7 +470,7 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
                   <rect x="9" y="9" width="6" height="6" rx="1.5" />
                 </svg>
               </button>
-              <button type="button" aria-pressed={layout === 'list'} aria-label="List" onClick={() => setLayout('list')}>
+              <button type="button" aria-pressed={layout === 'list'} aria-label={s.list} onClick={() => setLayout('list')}>
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
                   <rect x="1" y="2" width="14" height="2.4" rx="1.2" />
                   <rect x="1" y="6.8" width="14" height="2.4" rx="1.2" />
@@ -523,35 +482,35 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
         </div>
 
         {picked.length > 1 ? (
-          <div className="st-bulk" role="toolbar" aria-label="Selected items">
-            <strong>{plural(picked.length, 'item')} selected</strong>
+          <div className="st-bulk" role="toolbar" aria-label={s.selectedItems}>
+            <strong>{s.selected(s.items(picked.length))}</strong>
             {inTrash ? (
-              <button type="button" className="st-button" onClick={() => Promise.all(picked.map((id) => actions.restore(id))).then(() => (setSelected([]), tell('Restored')))}>
-                Restore
+              <button type="button" className="st-button" onClick={() => Promise.all(picked.map((id) => actions.restore(id))).then(() => (setSelected([]), tell(s.restored)))}>
+                {s.restore}
               </button>
             ) : (
               <>
                 <button type="button" className="st-button" onClick={() => zip(picked)}>
-                  Download .zip
+                  {s.downloadZip}
                 </button>
                 <button type="button" className="st-button" onClick={() => setMoving(picked)}>
-                  Move to…
+                  {s.moveTo}
                 </button>
                 <button type="button" className="st-button st-danger" onClick={() => trash(picked)}>
-                  Delete
+                  {s.delete}
                 </button>
               </>
             )}
             <button type="button" className="st-link" onClick={() => setSelected([])}>
-              Clear
+              {s.clear}
             </button>
           </div>
         ) : (
           <fieldset className="st-chips">
-            <legend className="st-hidden">Show</legend>
+            <legend className="st-hidden">{s.show}</legend>
             {FILTERS.map((f) => (
-              <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
-                {f.label}
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+                {s.filters[f]}
               </button>
             ))}
           </fieldset>
@@ -559,8 +518,8 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
 
         {!loading && !shown.length ? (
           <div className="st-empty">
-            <p>{inTrash ? 'Nothing deleted.' : searching ? 'No file of that name.' : 'Nothing here yet.'}</p>
-            {!inTrash && !searching && <p>Drop files here, or use Upload.</p>}
+            <p>{inTrash ? s.nothingDeleted : searching ? s.noFileOfName : s.nothingHere}</p>
+            {!inTrash && !searching && <p>{s.dropHere}</p>}
           </div>
         ) : (
           <ul className={layout === 'grid' ? 'st-grid' : 'st-list'} aria-label={heading} aria-busy={loading}>
@@ -589,11 +548,11 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
                     {entry.name}
                   </span>
                   <span className="st-meta">
-                    {entry.kind === 'folder' ? 'Folder' : formatSize(sizeOf(entry), 'en')} · {ago(entry.modified)}
+                    {entry.kind === 'folder' ? s.folder : size(sizeOf(entry))} · {ago(entry.modified)}
                     {(entry.shares?.length || entry.links?.length) && (
-                      <span className="st-shared" title="Shared">
+                      <span className="st-shared" title={s.shared}>
                         {' '}
-                        · Shared
+                        · {s.shared}
                       </span>
                     )}
                   </span>
@@ -604,19 +563,16 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
         )}
         {searching && <Inside query={query.trim()} onOpen={(file) => setViewing(file.id)} />}
         <p className="st-hint">
-          Click to select, ⌘ or Shift to select more, double-click to open; drag cards onto a folder to move them, right-click for more. Press <kbd>?</kbd> for the keyboard.
+          {s.hint[0]} <kbd>?</kbd> {s.hint[1]}
         </p>
       </section>
 
       {picked.length > 1 ? (
-        <aside className="st-props st-props-empty" aria-label="Properties">
+        <aside className="st-props st-props-empty" aria-label={s.properties}>
           <p>
-            {plural(picked.length, 'item')} selected
+            {s.selected(s.items(picked.length))}
             <br />
-            {formatSize(
-              picked.reduce((sum, id) => sum + sizeOf(shown.find((e) => e.id === id) as Entry), 0),
-              'en',
-            )}
+            {size(picked.reduce((sum, id) => sum + sizeOf(shown.find((e) => e.id === id) as Entry), 0))}
           </p>
         </aside>
       ) : (
@@ -652,6 +608,7 @@ function Studio({ dark, setDark }: { dark: boolean; setDark: (dark: boolean) => 
 /** What a search finds written inside the files, with the words around it. */
 function Inside({ query, onOpen }: { query: string; onOpen: (file: FileEntry) => void }) {
   const { client, revision } = useDrive();
+  const { s } = useWords();
   const [found, setFound] = useState<{ entry: FileEntry; snippet: string }[]>([]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: asked again after every change
   useEffect(() => {
@@ -671,8 +628,8 @@ function Inside({ query, onOpen }: { query: string; onOpen: (file: FileEntry) =>
   }, [client, query, revision]);
   if (!found.length) return null;
   return (
-    <section className="st-inside" aria-label="Found inside files">
-      <h3>Found inside files</h3>
+    <section className="st-inside" aria-label={s.foundInside}>
+      <h3>{s.foundInside}</h3>
       <ul>
         {found.map(({ entry, snippet }) => (
           <li key={entry.id}>
@@ -854,6 +811,7 @@ function Properties({
   const found = useEntry(id);
   const actions = useActions();
   const { client, changed } = useDrive();
+  const { s, ago, size, lang } = useWords();
   const [name, setName] = useState('');
   const [tab, setTab] = useState<PanelTab>('info');
   const entry = found?.entry;
@@ -861,8 +819,8 @@ function Properties({
 
   if (!entry) {
     return (
-      <aside className="st-props st-props-empty" aria-label="Properties">
-        <p>Select a file or a folder to see its properties.</p>
+      <aside className="st-props st-props-empty" aria-label={s.properties}>
+        <p>{s.selectToSee}</p>
       </aside>
     );
   }
@@ -872,7 +830,7 @@ function Properties({
     if (!wanted || wanted === entry.name) return setName(entry.name);
     try {
       await actions.rename(entry.id, wanted);
-      tell(`Renamed to “${wanted}”`);
+      tell(s.renamedTo(wanted));
     } catch (error) {
       setName(entry.name);
       tell((error as Error).message);
@@ -883,26 +841,26 @@ function Properties({
     changed();
   };
   const rows: [string, ReactNode][] = [
-    ['Kind', entry.kind === 'folder' ? 'Folder' : entry.type || 'File'],
-    ...(entry.kind === 'file' ? ([['Size', formatSize(entry.versions[0].size, 'en')]] as [string, ReactNode][]) : []),
-    ['Location', found.path.length ? found.path.map((f) => f.name).join(' / ') : 'Your files'],
-    ['Owner', entry.owner],
-    ['Modified', `${ago(entry.modified)} by ${entry.modifiedBy}`],
-    ['Created', new Date(entry.created).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })],
+    [s.kind, entry.kind === 'folder' ? s.folder : entry.type || s.file],
+    ...(entry.kind === 'file' ? ([[s.size, size(entry.versions[0].size)]] as [string, ReactNode][]) : []),
+    [s.location, found.path.length ? found.path.map((f) => f.name).join(' / ') : s.places.files],
+    [s.owner, entry.owner === YOU ? s.you : entry.owner],
+    [s.modified, s.modifiedBy(ago(entry.modified), entry.modifiedBy === YOU ? s.you : entry.modifiedBy)],
+    [s.createdAt, new Date(entry.created).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' })],
     ...(entry.kind === 'file' && entry.versions[0].sha256 ? ([['SHA-256', <code key="sha">{entry.versions[0].sha256.slice(0, 16)}…</code>]] as [string, ReactNode][]) : []),
   ];
   const tabs: { id: PanelTab; label: string }[] = [
-    { id: 'info', label: 'Info' },
-    ...(entry.kind === 'file' ? [{ id: 'versions' as const, label: `Versions (${entry.versions.length})` }] : []),
-    { id: 'activity', label: 'Activity' },
-    ...(gone ? [] : [{ id: 'share' as const, label: 'Share' }]),
+    { id: 'info', label: s.tabs.info },
+    ...(entry.kind === 'file' ? [{ id: 'versions' as const, label: s.tabs.versions(entry.versions.length) }] : []),
+    { id: 'activity', label: s.tabs.activity },
+    ...(gone ? [] : [{ id: 'share' as const, label: s.tabs.share }]),
   ];
   const shownTab = tabs.some((t) => t.id === tab) ? tab : 'info';
   return (
-    <aside className="st-props" aria-label="Properties">
+    <aside className="st-props" aria-label={s.properties}>
       <div className="st-props-head">
-        <h3>Properties</h3>
-        <button type="button" className="st-icon" aria-label="Close properties" onClick={onClose}>
+        <h3>{s.properties}</h3>
+        <button type="button" className="st-icon" aria-label={s.closeProperties} onClick={onClose}>
           ×
         </button>
       </div>
@@ -911,11 +869,11 @@ function Properties({
         <p className="st-title">{entry.name}</p>
       ) : (
         <label className="st-field">
-          <span>Name</span>
+          <span>{s.name}</span>
           <input id="st-name-field" value={name} onChange={(e) => setName(e.target.value)} onBlur={rename} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
         </label>
       )}
-      <div className="st-tabs" role="tablist" aria-label="About it">
+      <div className="st-tabs" role="tablist" aria-label={s.about}>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={shownTab === t.id} onClick={() => setTab(t.id)}>
             {t.label}
@@ -935,10 +893,10 @@ function Properties({
             </dl>
             {entry.kind === 'folder' && !gone && (
               <fieldset className="st-colors">
-                <legend>Colour</legend>
-                <button type="button" aria-label="No colour" aria-pressed={!entry.color} onClick={() => paint(null)} style={{ background: '#3b63fb' }} />
+                <legend>{s.colour}</legend>
+                <button type="button" aria-label={s.noColour} aria-pressed={!entry.color} onClick={() => paint(null)} style={{ background: '#3b63fb' }} />
                 {FOLDER_COLORS.map((color) => (
-                  <button key={color} type="button" aria-label={color} aria-pressed={entry.color === color} onClick={() => paint(color)} style={{ background: COLORS[color] }} />
+                  <button key={color} type="button" aria-label={s.colours[color]} aria-pressed={entry.color === color} onClick={() => paint(color)} style={{ background: COLORS[color] }} />
                 ))}
               </fieldset>
             )}
@@ -951,26 +909,26 @@ function Properties({
       <div className="st-actions">
         {gone ? (
           <>
-            <button type="button" className="st-button st-accent" onClick={() => actions.restore(entry.id).then(() => (onClose(), tell(`“${entry.name}” restored`)))}>
-              Restore
+            <button type="button" className="st-button st-accent" onClick={() => actions.restore(entry.id).then(() => (onClose(), tell(s.restoredName(entry.name))))}>
+              {s.restore}
             </button>
-            <button type="button" className="st-button st-danger" onClick={() => actions.deleteForever(entry.id).then(() => (onClose(), tell('Deleted for good')))}>
-              Delete forever
+            <button type="button" className="st-button st-danger" onClick={() => actions.deleteForever(entry.id).then(() => (onClose(), tell(s.deletedForGood)))}>
+              {s.deleteForever}
             </button>
           </>
         ) : (
           <>
             <button type="button" className="st-button st-accent" onClick={() => onOpen(entry)}>
-              Open
+              {s.open}
             </button>
             <button type="button" className="st-button" onClick={() => onDownload(entry)}>
-              {entry.kind === 'folder' ? 'Download .zip' : 'Download'}
+              {entry.kind === 'folder' ? s.downloadZip : s.download}
             </button>
             <button type="button" className="st-button" onClick={() => onMove(entry.id)}>
-              Move
+              {s.move}
             </button>
-            <button type="button" className="st-button st-danger" onClick={() => actions.moveToTrash(entry.id).then(() => (onClose(), tell(`“${entry.name}” moved to Deleted`)))}>
-              Delete
+            <button type="button" className="st-button st-danger" onClick={() => actions.moveToTrash(entry.id).then(() => (onClose(), tell(s.movedTo(entry.name))))}>
+              {s.delete}
             </button>
           </>
         )}
@@ -982,6 +940,7 @@ function Properties({
 /** Every version of a file, the newest first: each to download or to bring back, and a new one to upload. */
 function Versions({ file, gone, tell }: { file: FileEntry; gone: boolean; tell: Tell }) {
   const actions = useActions();
+  const { s, ago, size } = useWords();
   const input = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState<number | null>(null);
   const upload = async (picked: File | undefined) => {
@@ -989,7 +948,7 @@ function Versions({ file, gone, tell }: { file: FileEntry; gone: boolean; tell: 
     setSending(0);
     try {
       await actions.upload(picked, { file: file.id, onProgress: (p) => setSending(p.sent / Math.max(1, p.size)) });
-      tell('New version uploaded');
+      tell(s.newVersionUploaded);
     } catch (error) {
       tell((error as Error).message);
     } finally {
@@ -1002,15 +961,15 @@ function Versions({ file, gone, tell }: { file: FileEntry; gone: boolean; tell: 
         {file.versions.map((version, i) => (
           <li key={version.id}>
             <span>
-              <strong>{i === 0 ? 'Current' : `Version ${file.versions.length - i}`}</strong>
+              <strong>{i === 0 ? s.current : s.versionN(file.versions.length - i)}</strong>
               <span className="st-meta">
-                {ago(version.at)} by {version.by} · {formatSize(version.size, 'en')}
-                {version.restoredFrom && ' · restored'}
+                {s.modifiedBy(ago(version.at), version.by === YOU ? s.you : version.by)} · {size(version.size)}
+                {version.restoredFrom && ` · ${s.restoredTag}`}
               </span>
             </span>
             {i > 0 && !gone && (
-              <button type="button" className="st-link" onClick={() => actions.restoreVersion(file.id, version.id).then(() => tell('Version restored, as a new one'))}>
-                Restore
+              <button type="button" className="st-link" onClick={() => actions.restoreVersion(file.id, version.id).then(() => tell(s.versionRestored))}>
+                {s.restore}
               </button>
             )}
           </li>
@@ -1019,7 +978,7 @@ function Versions({ file, gone, tell }: { file: FileEntry; gone: boolean; tell: 
       {!gone && (
         <>
           <button type="button" className="st-button" disabled={sending !== null} onClick={() => input.current?.click()}>
-            {sending === null ? 'Upload a new version' : `Uploading… ${Math.round(sending * 100)}%`}
+            {sending === null ? s.uploadNewVersion : s.uploadingPct(Math.round(sending * 100))}
           </button>
           <input ref={input} type="file" hidden onChange={(e) => (upload(e.target.files?.[0]), (e.target.value = ''))} />
         </>
@@ -1031,6 +990,7 @@ function Versions({ file, gone, tell }: { file: FileEntry; gone: boolean; tell: 
 /** Who did what to it, and when. */
 function History({ id }: { id: EntryId }) {
   const { client, revision } = useDrive();
+  const { s, ago } = useWords();
   const [lines, setLines] = useState<Activity[] | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: asked again after every change
   useEffect(() => {
@@ -1044,7 +1004,7 @@ function History({ id }: { id: EntryId }) {
     };
   }, [client, id, revision]);
   if (!lines) return null;
-  if (!lines.length) return <p className="st-meta st-note">Nothing done to it in this page yet: what is done from now on shows here.</p>;
+  if (!lines.length) return <p className="st-meta st-note">{s.nothingDone}</p>;
   return (
     <ol className="st-activity">
       {lines.map((line) => (
@@ -1053,8 +1013,8 @@ function History({ id }: { id: EntryId }) {
             {line.by[0]}
           </span>
           <span>
-            <strong>{line.by === YOU ? 'You' : line.by}</strong> {DONE[line.action]}
-            {line.action === 'renamed' && line.was ? ` from “${line.was}”` : ''}
+            <strong>{line.by === YOU ? s.you : line.by}</strong> {s.done[line.action]}
+            {line.action === 'renamed' && line.was ? s.renamedFrom(line.was) : ''}
             {line.entry !== id ? ` (${line.name})` : ''}
             <span className="st-meta">{ago(line.at)}</span>
           </span>
@@ -1067,6 +1027,7 @@ function History({ id }: { id: EntryId }) {
 /** Who else it is shared with, and its links. */
 function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
   const actions = useActions();
+  const { s, lang } = useWords();
   const [person, setPerson] = useState(PEOPLE[0]);
   const [role, setRole] = useState<Role>('viewer');
   const [days, setDays] = useState(7);
@@ -1076,10 +1037,10 @@ function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
   return (
     <div className="st-share">
       <fieldset>
-        <legend>People</legend>
+        <legend>{s.people}</legend>
         <div className="st-row">
           <label>
-            <span className="st-hidden">Person</span>
+            <span className="st-hidden">{s.person}</span>
             <select value={person} onChange={(e) => setPerson(e.target.value)}>
               {PEOPLE.map((p) => (
                 <option key={p}>{p}</option>
@@ -1087,11 +1048,11 @@ function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
             </select>
           </label>
           <label>
-            <span className="st-hidden">May</span>
+            <span className="st-hidden">{s.may}</span>
             <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              <option value="viewer">Can view</option>
-              <option value="commenter">Can comment</option>
-              <option value="editor">Can edit</option>
+              <option value="viewer">{s.canView}</option>
+              <option value="commenter">{s.canComment}</option>
+              <option value="editor">{s.canEdit}</option>
             </select>
           </label>
           <button
@@ -1099,12 +1060,12 @@ function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
             className="st-button st-accent"
             onClick={() =>
               actions.share(entry.id, person, role).then(
-                () => tell(`Shared with ${person}`),
+                () => tell(s.sharedWith(person)),
                 (e: Error) => tell(e.message),
               )
             }
           >
-            Share
+            {s.shareButton}
           </button>
         </div>
         <ul>
@@ -1114,41 +1075,41 @@ function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
                 {share.with[0]}
               </span>
               <span>
-                {share.with === '*' ? 'Everyone' : share.with}
-                <span className="st-meta">{share.role === 'editor' ? 'Can edit' : share.role === 'commenter' ? 'Can comment' : 'Can view'}</span>
+                {share.with === '*' ? s.everyone : share.with}
+                <span className="st-meta">{share.role === 'editor' ? s.canEdit : share.role === 'commenter' ? s.canComment : s.canView}</span>
               </span>
-              <button type="button" className="st-link" onClick={() => actions.unshare(entry.id, share.with).then(() => tell(`No longer shared with ${share.with}`))}>
-                Remove
+              <button type="button" className="st-link" onClick={() => actions.unshare(entry.id, share.with).then(() => tell(s.noLonger(share.with)))}>
+                {s.remove}
               </button>
             </li>
           ))}
         </ul>
       </fieldset>
       <fieldset>
-        <legend>Links</legend>
+        <legend>{s.links}</legend>
         <div className="st-row">
           <label>
-            <span className="st-hidden">Good for</span>
+            <span className="st-hidden">{s.goodFor}</span>
             <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-              <option value={1}>1 day</option>
-              <option value={7}>7 days</option>
-              <option value={30}>30 days</option>
+              <option value={1}>{s.days(1)}</option>
+              <option value={7}>{s.days(7)}</option>
+              <option value={30}>{s.days(30)}</option>
             </select>
           </label>
           <label className="st-check">
-            <input type="checkbox" checked={once} onChange={(e) => setOnce(e.target.checked)} /> One download
+            <input type="checkbox" checked={once} onChange={(e) => setOnce(e.target.checked)} /> {s.oneDownload}
           </label>
           <button
             type="button"
             className="st-button"
             onClick={() =>
               actions.createLink(entry.id, days, { once }).then(
-                () => tell('Link made'),
+                () => tell(s.linkMade),
                 (e: Error) => tell(e.message),
               )
             }
           >
-            Make a link
+            {s.makeLink}
           </button>
         </div>
         <ul>
@@ -1158,11 +1119,11 @@ function Sharing({ entry, tell }: { entry: Entry; tell: Tell }) {
                 ⛓
               </span>
               <span>
-                {link.uses === 1 ? 'One download' : 'Anyone with the link'}
-                <span className="st-meta">Until {new Date(link.expires).toLocaleDateString('en', { day: 'numeric', month: 'short' })}</span>
+                {link.uses === 1 ? s.oneDownload : s.anyone}
+                <span className="st-meta">{s.until(new Date(link.expires).toLocaleDateString(lang, { day: 'numeric', month: 'short' }))}</span>
               </span>
-              <button type="button" className="st-link" onClick={() => actions.removeLink(entry.id, link.id).then(() => tell('Link removed'))}>
-                Remove
+              <button type="button" className="st-link" onClick={() => actions.removeLink(entry.id, link.id).then(() => tell(s.linkRemoved))}>
+                {s.remove}
               </button>
             </li>
           ))}
@@ -1202,6 +1163,7 @@ function Menu({
 }) {
   const actions = useActions();
   const { client, changed } = useDrive();
+  const { s } = useWords();
   const box = useRef<HTMLDivElement>(null);
   const ids = many ?? [entry.id];
   useDialog(box, onClose);
@@ -1226,22 +1188,22 @@ function Menu({
   );
   const items = inTrash
     ? [
-        item('Restore', () => Promise.all(ids.map((id) => actions.restore(id))).then(() => tell('Restored'))),
-        item('Delete forever', () => Promise.all(ids.map((id) => actions.deleteForever(id))).then(() => tell('Deleted for good')), true),
+        item(s.restore, () => Promise.all(ids.map((id) => actions.restore(id))).then(() => tell(s.restored))),
+        item(s.deleteForever, () => Promise.all(ids.map((id) => actions.deleteForever(id))).then(() => tell(s.deletedForGood)), true),
       ]
     : [
-        ...(many ? [] : [item('Open', () => onOpen(entry)), item('Rename', onRename)]),
-        item(many ? 'Download .zip' : entry.kind === 'folder' ? 'Download .zip' : 'Download', () => onDownload(ids)),
-        item('Move to…', () => onMove(ids)),
-        ...(!many && entry.kind === 'file' ? [item('Make a link (7 days)', () => actions.createLink(entry.id, 7).then(() => tell('Link made')))] : []),
-        item('Delete', () => onTrash(ids), true),
+        ...(many ? [] : [item(s.open, () => onOpen(entry)), item(s.rename, onRename)]),
+        item(many || entry.kind === 'folder' ? s.downloadZip : s.download, () => onDownload(ids)),
+        item(s.moveTo, () => onMove(ids)),
+        ...(!many && entry.kind === 'file' ? [item(s.makeLink7, () => actions.createLink(entry.id, 7).then(() => tell(s.linkMade)))] : []),
+        item(s.delete, () => onTrash(ids), true),
       ];
   return (
     <div
       ref={box}
       className="st-menu"
       role="menu"
-      aria-label={many ? `${ids.length} items` : entry.name}
+      aria-label={many ? s.items(ids.length) : entry.name}
       style={{ left: x, top: y }}
       tabIndex={-1}
       onKeyDown={(event) => {
@@ -1257,14 +1219,14 @@ function Menu({
       {items}
       {!many && !inTrash && entry.kind === 'folder' && (
         // biome-ignore lint/a11y/useSemanticElements: a group of a menu, which ARIA has as a group, not a fieldset
-        <div className="st-menu-colors" role="group" aria-label="Colour">
+        <div className="st-menu-colors" role="group" aria-label={s.colour}>
           {FOLDER_COLORS.map((color) => (
             <button
               key={color}
               type="button"
               role="menuitemradio"
               aria-checked={entry.color === color}
-              aria-label={color}
+              aria-label={s.colours[color]}
               style={{ background: COLORS[color] }}
               onClick={() => {
                 onClose();
@@ -1280,6 +1242,7 @@ function Menu({
 
 /** Where to move what is selected: the folders, gone into one at a time. */
 function MoveTo({ ids, from, onClose, onMove }: { ids: EntryId[]; from: EntryId | null; onClose: () => void; onMove: (to: EntryId | null) => void }) {
+  const { s } = useWords();
   const [at, setAt] = useState<EntryId | null>(from);
   const { entries, path } = useEntries({ section: 'files', folder: at });
   const box = useRef<HTMLDivElement>(null);
@@ -1288,10 +1251,10 @@ function MoveTo({ ids, from, onClose, onMove }: { ids: EntryId[]; from: EntryId 
   return (
     <div className="st-scrim">
       <div className="st-dialog" role="dialog" aria-modal="true" aria-labelledby="st-move-title" ref={box} tabIndex={-1}>
-        <h3 id="st-move-title">Move {plural(ids.length, 'item')}</h3>
-        <nav aria-label="Where" className="st-path">
+        <h3 id="st-move-title">{s.moveTitle(s.items(ids.length))}</h3>
+        <nav aria-label={s.where} className="st-path">
           <button type="button" onClick={() => setAt(null)}>
-            Your files
+            {s.places.files}
           </button>
           {path.map((f) => (
             <span key={f.id}>
@@ -1316,15 +1279,15 @@ function MoveTo({ ids, from, onClose, onMove }: { ids: EntryId[]; from: EntryId 
               </li>
             ))
           ) : (
-            <li className="st-meta st-note">No folders in here.</li>
+            <li className="st-meta st-note">{s.noFolders}</li>
           )}
         </ul>
         <div className="st-actions">
           <button type="button" className="st-button" onClick={onClose}>
-            Cancel
+            {s.cancel}
           </button>
           <button type="button" className="st-button st-accent" onClick={() => onMove(at)}>
-            Move here
+            {s.moveHere}
           </button>
         </div>
       </div>
@@ -1334,6 +1297,7 @@ function MoveTo({ ids, from, onClose, onMove }: { ids: EntryId[]; from: EntryId 
 
 /** The keys of the app, all of them. */
 function Shortcuts({ onClose }: { onClose: () => void }) {
+  const { s } = useWords();
   const box = useRef<HTMLDivElement>(null);
   useDialog(box, onClose);
   return (
@@ -1342,13 +1306,13 @@ function Shortcuts({ onClose }: { onClose: () => void }) {
     <div className="st-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="st-dialog" role="dialog" aria-modal="true" aria-labelledby="st-keys-title" ref={box} tabIndex={-1}>
         <div className="st-props-head">
-          <h3 id="st-keys-title">Keyboard shortcuts</h3>
-          <button type="button" className="st-icon" aria-label="Close" onClick={onClose}>
+          <h3 id="st-keys-title">{s.keyboard}</h3>
+          <button type="button" className="st-icon" aria-label={s.close} onClick={onClose}>
             ×
           </button>
         </div>
         <dl className="st-keys">
-          {SHORTCUTS.map(([keys, does]) => (
+          {s.shortcuts.map(([keys, does]) => (
             <div key={keys}>
               <dt>
                 <kbd>{keys}</kbd>
@@ -1365,6 +1329,7 @@ function Shortcuts({ onClose }: { onClose: () => void }) {
 /** How much of the drive is used, under the places. */
 function Usage() {
   const { client, revision } = useDrive();
+  const { s, size } = useWords();
   const [used, setUsed] = useState<{ used: number; quota: number | null } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: asked again after every change
   useEffect(() => {
@@ -1374,37 +1339,38 @@ function Usage() {
   const quota = used.quota ?? 2 * 1000 ** 3;
   return (
     <div className="st-usage">
-      <div className="st-bar" role="progressbar" aria-label="Storage used" aria-valuemin={0} aria-valuemax={quota} aria-valuenow={used.used}>
+      <div className="st-bar" role="progressbar" aria-label={s.storageUsed} aria-valuemin={0} aria-valuemax={quota} aria-valuenow={used.used}>
         <span style={{ width: `${Math.max(2, (used.used / quota) * 100)}%` }} />
       </div>
-      {formatSize(used.used, 'en')} of {formatSize(quota, 'en')} used
+      {s.usedOf(size(used.used), size(quota))}
     </div>
   );
 }
 
 /** The uploads, in a card in the corner, each with its bar and the time it has left. */
 function Uploads({ uploads, summary, clear, stop, retry, stopAll }: ReturnType<typeof useUploads>) {
+  const { s } = useWords();
   const [folded, setFolded] = useState(false);
   if (!uploads.length) return null;
   const going = summary.sending + summary.waiting;
   const left = summary.speed ? Math.ceil((summary.size - summary.sent) / summary.speed) : undefined;
   return (
-    <section className="st-uploads" aria-label="Uploads">
+    <section className="st-uploads" aria-label={s.uploadsLabel}>
       <div className="st-uploads-head">
         <strong>
-          {going ? `Uploading ${plural(going, 'item')}` : `${summary.done} uploaded`}
-          {going > 0 && left !== undefined && <span className="st-left"> · {left}s left</span>}
+          {going ? s.uploading(s.items(going)) : s.uploaded(summary.done)}
+          {going > 0 && left !== undefined && <span className="st-left"> · {s.left(left)}</span>}
         </strong>
         {going > 0 && (
           <button type="button" className="st-link st-light" onClick={stopAll}>
-            Stop all
+            {s.stopAll}
           </button>
         )}
-        <button type="button" className="st-icon" aria-expanded={!folded} aria-label={folded ? 'Show uploads' : 'Hide uploads'} onClick={() => setFolded(!folded)}>
+        <button type="button" className="st-icon" aria-expanded={!folded} aria-label={folded ? s.showUploads : s.hideUploads} onClick={() => setFolded(!folded)}>
           {folded ? '▴' : '▾'}
         </button>
         {!going && (
-          <button type="button" className="st-icon" aria-label="Close uploads" onClick={clear}>
+          <button type="button" className="st-icon" aria-label={s.closeUploads} onClick={clear}>
             ×
           </button>
         )}
@@ -1416,26 +1382,26 @@ function Uploads({ uploads, summary, clear, stop, retry, stopAll }: ReturnType<t
               <span className="st-name">{item.name}</span>
               <span className="st-meta">
                 {item.state === 'done'
-                  ? 'Done'
+                  ? s.doneState
                   : item.state === 'failed'
-                    ? (item.error ?? 'Failed')
+                    ? (item.error ?? s.failed)
                     : item.state === 'sending'
-                      ? `${Math.round((item.sent / Math.max(1, item.size)) * 100)}%${item.remaining !== undefined ? ` · ${Math.ceil(item.remaining)}s left` : ''}`
+                      ? `${Math.round((item.sent / Math.max(1, item.size)) * 100)}%${item.remaining !== undefined ? ` · ${s.left(Math.ceil(item.remaining))}` : ''}`
                       : item.state === 'stopped'
-                        ? 'Stopped'
-                        : 'Waiting'}
+                        ? s.stopped
+                        : s.waiting}
               </span>
               <span className="st-bar" aria-hidden="true">
                 <span style={{ width: `${(item.sent / Math.max(1, item.size)) * 100}%`, background: item.state === 'failed' ? '#d7373f' : undefined }} />
               </span>
               {item.state === 'sending' && (
                 <button type="button" className="st-link" onClick={() => stop(item.id)}>
-                  Stop
+                  {s.stop}
                 </button>
               )}
               {(item.state === 'failed' || item.state === 'stopped') && (
                 <button type="button" className="st-link" onClick={() => retry(item.id)}>
-                  Retry
+                  {s.retry}
                 </button>
               )}
             </li>
@@ -1479,6 +1445,7 @@ function rowsOf(text: string, separator: string, limit = 500): string[][] {
  */
 function Viewer({ files, id, onGo, onClose, onDownload }: { files: FileEntry[]; id: EntryId; onGo: (id: EntryId) => void; onClose: () => void; onDownload: (entry: Entry) => void }) {
   const { client } = useDrive();
+  const { s: w, ago, size } = useWords();
   const file = files.find((f) => f.id === id);
   const at = files.findIndex((f) => f.id === id);
   const [url, setUrl] = useState<string>();
@@ -1552,43 +1519,43 @@ function Viewer({ files, id, onGo, onClose, onDownload }: { files: FileEntry[]; 
       }}
     >
       <div className="st-viewer-head">
-        {tool('Back to the files', <path d="m15 18-6-6 6-6" />, onClose)}
+        {tool(w.back, <path d="m15 18-6-6 6-6" />, onClose)}
         <span className="st-kind" style={{ background: fg }} aria-hidden="true">
           {letters}
         </span>
         <span className="st-viewer-title">
           <strong>{file.name}</strong>
           <span>
-            {formatSize(file.versions[0].size, 'en')} · {ago(file.modified)} by {file.modifiedBy}
+            {size(file.versions[0].size)} · {w.modifiedBy(ago(file.modified), file.modifiedBy === YOU ? w.you : file.modifiedBy)}
           </span>
         </span>
         {files.length > 1 && (
           <span className="st-count" aria-live="polite">
-            {at + 1} of {files.length}
+            {w.nOfM(at + 1, files.length)}
           </span>
         )}
         {kind === 'docx' && document_?.print
-          ? tool('Print', <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />, () => document_.print?.())
-          : url && tool('Open in a new tab', <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />, () => window.open(url, '_blank', 'noopener'))}
+          ? tool(w.print, <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />, () => document_.print?.())
+          : url && tool(w.openTab, <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />, () => window.open(url, '_blank', 'noopener'))}
         <button type="button" className="st-button st-accent" onClick={() => onDownload(file)}>
-          Download
+          {w.download}
         </button>
-        {tool('Close', <path d="M18 6 6 18M6 6l12 12" />, onClose)}
+        {tool(w.close, <path d="M18 6 6 18M6 6l12 12" />, onClose)}
       </div>
       <div className="st-viewer-body">
         {files.length > 1 && (
-          <button type="button" className="st-nav st-prev" aria-label="Previous file" title="Previous file (←)" onClick={() => go(-1)}>
+          <button type="button" className="st-nav st-prev" aria-label={w.previousFile} title={`${w.previousFile} (←)`} onClick={() => go(-1)}>
             ‹
           </button>
         )}
         <div ref={page} className={kind === 'docx' ? 'st-docx' : 'st-hidden'} />
         {!url || kind === 'docx' ? (
-          kind !== 'docx' && <p className="st-wait">Opening…</p>
+          kind !== 'docx' && <p className="st-wait">{w.opening}</p>
         ) : kind === 'image' ? (
           <button
             type="button"
             className={`st-picture${zoomed ? ' st-zoomed' : ''}`}
-            aria-label={zoomed ? 'Fit to the screen' : 'Show at full size'}
+            aria-label={zoomed ? w.fitScreen : w.fullSize}
             aria-pressed={zoomed}
             onClick={() => setZoomed(!zoomed)}
             style={file.versions[0].placeholder ? { backgroundImage: `url(${file.versions[0].placeholder})` } : undefined}
@@ -1609,7 +1576,7 @@ function Viewer({ files, id, onGo, onClose, onDownload }: { files: FileEntry[]; 
           </div>
         ) : rows ? (
           // biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls, and a keyboard has to reach what is hidden (WCAG 2.1.1)
-          <section className="st-table" tabIndex={0} aria-label={`${file.name}, as a table`}>
+          <section className="st-table" tabIndex={0} aria-label={w.asTable(file.name)}>
             <table>
               <thead>
                 <tr>
@@ -1638,26 +1605,26 @@ function Viewer({ files, id, onGo, onClose, onDownload }: { files: FileEntry[]; 
             <pre>{text}</pre>
           </section>
         ) : kind === 'text' || table ? (
-          <p className="st-wait">Opening…</p>
+          <p className="st-wait">{w.opening}</p>
         ) : (
           <div className="st-sound">
             <Thumb entry={file} big />
             <p>
-              There is no preview of {file.name}.{' '}
+              {w.noPreview(file.name)}{' '}
               <button type="button" className="st-link" onClick={() => onDownload(file)}>
-                Download it
+                {w.downloadIt}
               </button>
             </p>
           </div>
         )}
         {files.length > 1 && (
-          <button type="button" className="st-nav st-next" aria-label="Next file" title="Next file (→)" onClick={() => go(1)}>
+          <button type="button" className="st-nav st-next" aria-label={w.nextFile} title={`${w.nextFile} (→)`} onClick={() => go(1)}>
             ›
           </button>
         )}
       </div>
       {files.length > 1 && (
-        <div className="st-strip" ref={strip} role="toolbar" aria-label="Files in this folder" aria-orientation="horizontal">
+        <div className="st-strip" ref={strip} role="toolbar" aria-label={w.strip} aria-orientation="horizontal">
           {files.map((f) => (
             <button
               key={f.id}

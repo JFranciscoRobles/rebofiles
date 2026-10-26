@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-export default function Editor({ file, url, language, onClose }: { file: FileEntry; url: string; language: 'en' | 'es'; onClose: () => void }) {
+export default function Editor({ file, url, language, onClose }: { file: FileEntry; url: string; language: 'en' | 'es' | 'zh'; onClose: () => void }) {
   const { upload } = useActions();
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [said, setSaid] = useState('');
@@ -30,9 +30,9 @@ export default function Editor({ file, url, language, onClose }: { file: FileEnt
   }, [onClose]);
 
   const save = async (docx: Uint8Array) => {
-    setSaid(language === 'es' ? 'Guardando…' : 'Saving…');
+    setSaid({ en: 'Saving…', es: 'Guardando…', zh: '正在保存…' }[language]);
     await upload(new File([docx as BlobPart], file.name, { type: DOCX }), { file: file.id });
-    setSaid(language === 'es' ? 'Guardado como versión nueva' : 'Saved as a new version');
+    setSaid({ en: 'Saved as a new version', es: 'Guardado como versión nueva', zh: '已保存为新版本' }[language]);
   };
 
   return (
@@ -41,7 +41,7 @@ export default function Editor({ file, url, language, onClose }: { file: FileEnt
         <strong style={{ flex: 1 }}>{file.name}</strong>
         <span style={{ color: '#6b6964' }}>{said}</span>
         <button type="button" onClick={onClose} style={{ font: 'inherit', padding: '8px 14px', borderRadius: 10, border: '1px solid #dddad3', background: '#fff', cursor: 'pointer' }}>
-          {language === 'es' ? 'Volver al drive' : 'Back to the drive'}
+          {{ en: 'Back to the drive', es: 'Volver al drive', zh: '返回网盘' }[language]}
         </button>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>{bytes && <DocsEditor docx={bytes} name={file.name} locale={language} onSave={save} />}</div>

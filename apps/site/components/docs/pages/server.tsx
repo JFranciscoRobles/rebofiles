@@ -7,7 +7,7 @@ import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, with
 
 export const optionId = (name: string) => `option-${name}`;
 
-const ROUTE = `import { byRoles, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
+export const ROUTE = `import { byRoles, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
 import { session } from '@/lib/auth'; // your own
 
 const handle = createDriveHandler({
@@ -24,7 +24,7 @@ const handle = createDriveHandler({
 
 export { handle as GET, handle as POST, handle as PATCH, handle as PUT, handle as DELETE };`;
 
-const NODE = `import { createServer } from 'node:http';
+export const NODE = `import { createServer } from 'node:http';
 import { createDriveHandler, diskStorage, everyone, memoryMetadata, nodeHandler } from '@rebofiles/server';
 
 const handle = createDriveHandler({
@@ -96,7 +96,7 @@ export const server: DocPage = {
   ],
 };
 
-const AUTHORIZE = `import { type Action, type User, byRoles } from '@rebofiles/server';
+export const AUTHORIZE = `import { type Action, type User, byRoles } from '@rebofiles/server';
 import type { Drive, Entry } from '@rebofiles/core';
 
 export function mayI(user: User, action: Action, entry: Entry | null, drive: Drive): boolean {
@@ -105,7 +105,7 @@ export function mayI(user: User, action: Action, entry: Entry | null, drive: Dri
   return byRoles(user, action, entry, drive);
 }`;
 
-const ACTIONS: [string, string][] = [
+export const ACTIONS: [string, string][] = [
   ['list', 'What is in a folder; null for the top. Each entry in it is then asked as read.'],
   ['read', 'One entry, a search, Recent, the trash, its activity: what a person may see at all.'],
   ['create', 'A folder, with the folder it goes into.'],
@@ -183,7 +183,7 @@ export const authorize: DocPage = {
   ],
 };
 
-const CORS = `[
+export const CORS = `[
   {
     "AllowedOrigins": ["https://your-app.com", "http://localhost:3000"],
     "AllowedMethods": ["GET", "PUT"],
@@ -193,7 +193,7 @@ const CORS = `[
   }
 ]`;
 
-const ENV = `# The S3 API of the account, not the public address of the bucket (r2.dev)
+export const ENV = `# The S3 API of the account, not the public address of the bucket (r2.dev)
 S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 S3_BUCKET=acme-files
 S3_REGION=auto
@@ -283,7 +283,7 @@ export const storage: DocPage = {
   ],
 };
 
-const POSTGRES = `import pg from 'pg';
+export const POSTGRES = `import pg from 'pg';
 import { postgresMetadata } from '@rebofiles/server';
 
 metadata: await postgresMetadata(new pg.Pool({ connectionString: process.env.DATABASE_URL })),`;
@@ -359,7 +359,7 @@ export const metadata: DocPage = {
   ],
 };
 
-const SHARE = `// The page a link goes to: app/shared/page.tsx
+export const SHARE = `// The page a link goes to: app/shared/page.tsx
 'use client';
 import { SharedLink } from '@rebofiles/react';
 import { useSearchParams } from 'next/navigation';
@@ -439,7 +439,7 @@ export const sharing: DocPage = {
   ],
 };
 
-const ON_SHARE = `createDriveHandler({
+export const ON_SHARE = `createDriveHandler({
   ...options,
   // Once the share is kept; a failure here is not the request's.
   onShare: async ({ entry, with: who, role, by, first }) => {
@@ -497,7 +497,7 @@ export const activity: DocPage = {
   ],
 };
 
-const ORIGINS = `createDriveHandler({
+export const ORIGINS = `createDriveHandler({
   ...options,
   // The desktop window on a Mac and on Windows, and a page of another domain.
   cors: { origins: ['tauri://localhost', 'http://tauri.localhost', 'https://app.example.com'] },

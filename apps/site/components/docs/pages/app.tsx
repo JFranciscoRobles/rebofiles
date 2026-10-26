@@ -7,11 +7,11 @@ import { REPO, hrefOf } from '@/lib/site';
 import { HOOKS, PROPS, type PropGroup } from '../reference';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../ui';
 
-const GROUPS: PropGroup[] = ['Server', 'Look', 'Files', 'Word documents', 'Events'];
+export const GROUPS: PropGroup[] = ['Server', 'Look', 'Files', 'Word documents', 'Events'];
 export const propId = (name: string) => `prop-${name}`;
 export const hookId = (name: string) => `hook-${name.toLowerCase()}`;
 
-const FILEDRIVE = `'use client';
+export const FILEDRIVE = `'use client';
 import { FileDrive } from '@rebofiles/react';
 import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 
@@ -35,7 +35,7 @@ export default function Files() {
   );
 }`;
 
-const SHARED = `'use client';
+export const SHARED = `'use client';
 import { SharedLink } from '@rebofiles/react';
 import { useSearchParams } from 'next/navigation';
 
@@ -115,19 +115,19 @@ export const react: DocPage = {
 };
 
 /** The screen of the playground that the tests in Chrome go through, shown as it is. */
-const WHOLE = readFileSync(join(process.cwd(), '../playground/src/HooksDrive.tsx'), 'utf8');
+export const WHOLE = readFileSync(join(process.cwd(), '../playground/src/HooksDrive.tsx'), 'utf8');
 
-const PROVIDER = `import { DriveProvider } from '@rebofiles/react';
+export const PROVIDER = `import { DriveProvider } from '@rebofiles/react';
 
 <DriveProvider base="/api/files" language="es" headers={async () => ({ authorization: \`Bearer \${await token()}\` })}>
   <YourDrive />
 </DriveProvider>`;
 
-const ENTRIES = `const { entries, path, loading, error, refresh } = useEntries({ section: 'files', folder: id });
+export const ENTRIES = `const { entries, path, loading, error, refresh } = useEntries({ section: 'files', folder: id });
 // or { section: 'recent' }, { section: 'shared' }, { section: 'trash' },
 //    { section: 'search', query: 'contract', trashed: false }`;
 
-const ACTIONS = `const actions = useActions();
+export const ACTIONS = `const actions = useActions();
 await actions.createFolder('Contracts', parent);   // FolderEntry
 await actions.rename(id, 'final.docx');            // refused as 409 "name-taken" when taken
 await actions.move(id, folder);
@@ -136,14 +136,14 @@ await actions.restoreVersion(id, versionId);
 await actions.upload(file, { parent, onProgress });  // or { file: id } for a new version
 const url = await actions.url(id, { inline: true });`;
 
-const UPLOADS = `const { uploads, summary, upload, retry, stop, decide } = useUploads({ check: true });
+export const UPLOADS = `const { uploads, summary, upload, retry, stop, decide } = useUploads({ check: true });
 upload(input.files, folder, (entry) => console.log('up', entry.name));
 // uploads: [{ id, name, size, sent, speed?, remaining?, state, conflict?, error? }]
 //   state: 'waiting' | 'checking' | 'asking' | 'sending' | 'done' | 'failed' | 'stopped' | 'skipped'
 formatDuration(summary.remaining ?? 0, 'en'); // "3 min"
 decide(id, 'replace' | 'keep' | 'skip', all?); // one 'asking': there already`;
 
-const TOGETHER = `<DriveProvider base="/api/files">
+export const TOGETHER = `<DriveProvider base="/api/files">
   <FileDrive />          {/* the whole drive */}
   <RecentSidebar />      {/* your own, with useEntries({ section: 'recent' }) */}
 </DriveProvider>`;
@@ -206,7 +206,7 @@ export const hooks: DocPage = {
   ],
 };
 
-const VANILLA = `import { mountDrive, mountSharedLink } from '@rebofiles/drive';
+export const VANILLA = `import { mountDrive, mountSharedLink } from '@rebofiles/drive';
 import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
 
 const drive = mountDrive(document.getElementById('files')!, {
@@ -227,7 +227,7 @@ drive.destroy();
 // What someone sent a link sees:
 mountSharedLink(document.getElementById('shared')!, { token: new URLSearchParams(location.search).get('link')! });`;
 
-const QUEUE = `import { createDriveClient, createUploads, formatDuration, lookInDrive } from '@rebofiles/drive';
+export const QUEUE = `import { createDriveClient, createUploads, formatDuration, lookInDrive } from '@rebofiles/drive';
 
 const client = createDriveClient({ base: '/api/files' });
 const uploads = createUploads(client, { check: lookInDrive(client), onChange: draw });
@@ -275,7 +275,7 @@ export const vanilla: DocPage = {
   ],
 };
 
-const VARS: [string, string][] = [
+export const VARS: [string, string][] = [
   ['--rf-brand', 'The colour of what is chosen and of the main buttons; from the brand colour of the settings.'],
   ['--rf-brand-hover, --rf-brand-light', 'Its darker and lighter pairs.'],
   ['--rf-ink, --rf-ink-soft, --rf-muted', 'The text, from the darkest.'],
@@ -288,7 +288,7 @@ const VARS: [string, string][] = [
   ['--rf-radius', 'The corners.'],
 ];
 
-const THEMED = `.acme-files {
+export const THEMED = `.acme-files {
   --rf-brand: #6d28d9;
   --rf-brand-hover: #5b21b6;
   --rf-brand-light: #ede9fe;
@@ -352,7 +352,7 @@ export const styling: DocPage = {
   ],
 };
 
-const KEYS: [string, string][] = [
+export const KEYS: [string, string][] = [
   ['↑ ↓, Home, End', 'Through the list or the grid.'],
   ['Enter', 'Open: a folder goes into it, a file opens in the viewer.'],
   ['Space, Shift + ↑ ↓, ⌘/Ctrl + A', 'Pick several.'],
@@ -403,16 +403,16 @@ export const accessibility: DocPage = {
   ],
 };
 
-const SPANISH = `import { FileDrive, TEXTS } from '@rebofiles/react';
+export const SPANISH = `import { FileDrive, TEXTS } from '@rebofiles/react';
 
-<FileDrive language="es" />                               // English and Spanish come with it
+<FileDrive language="zh" />                               // English, Spanish and Mandarin come with it
 <FileDrive texts={{ ...TEXTS.en, myFiles: 'Documents' }} /> // or words of your own`;
 
 export const languages: DocPage = {
   title: 'Languages',
-  description: 'The drive in English or Spanish, words of your own, and who chooses: the drive’s settings, the application, and each person.',
+  description: 'The drive in English, Spanish or Mandarin, words of your own, and who chooses: the drive’s settings, the application, and each person.',
   source: 'apps/site/components/docs/pages/app.tsx',
-  lead: <>Every word of the drive goes through one table of texts, in English and Spanish, with dates and sizes said as each language says them.</>,
+  lead: <>Every word of the drive goes through one table of texts, in English, Spanish and Mandarin Chinese, with dates and sizes said as each language says them.</>,
   sections: [
     { id: 'choose-one', title: 'Choose one', badge: 'Start', color: 'purple', body: <Code lang="tsx" code={SPANISH} /> },
     {
@@ -438,6 +438,9 @@ export const languages: DocPage = {
             are.
           </P>
           <Callout title="Errors from the server">are in English: the drive says them as they come. Their code (RequestError.code) is the same in every language, for words of your own.</Callout>
+          <Callout title="Rebodocs speaks English and Spanish.">
+            In Mandarin, the drive is in Chinese, and Rebodocs’ zoom bar and editor inside it are in English until Rebodocs has Chinese of its own.
+          </Callout>
         </>
       ),
     },

@@ -52,7 +52,7 @@ export const List = ({ items }: { items: ReactNode[] }) => (
 export async function Code({ code, lang = 'ts', file }: { code: string; lang?: string; file?: string }) {
   const html = await highlight(code, lang);
   return (
-    <div className="mt-5 max-w-[920px] overflow-hidden rounded-[12px] border border-border bg-surface">
+    <div className="mt-5 max-w-[920px] overflow-hidden rounded-[12px] border border-border bg-surface" data-lang={lang}>
       {file && <div className="border-b border-border px-5 py-2.5 font-code text-[12.5px] text-muted">{file}</div>}
       <div
         className="[&_pre]:m-0 [&_pre]:overflow-x-auto [&_pre]:bg-surface! [&_pre]:px-5 [&_pre]:py-4 [&_pre]:font-code [&_pre]:text-[13.5px] [&_pre]:leading-[1.7]"

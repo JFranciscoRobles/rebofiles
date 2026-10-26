@@ -4,10 +4,10 @@
 import { hrefOf } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../ui';
 
-const RESUME = `// A file cut halfway, or left when the page closed, is uploaded again:
+export const RESUME = `// A file cut halfway, or left when the page closed, is uploaded again:
 await client.upload(file, { parent });  // asks the server what arrived, sends the rest`;
 
-const QUEUE = `const { uploads, summary } = useUploads({ check: true });
+export const QUEUE = `const { uploads, summary } = useUploads({ check: true });
 // summary.remaining: seconds until all are up, at the speed all go at together
 // uploads[i].remaining: the same, of one`;
 
@@ -126,7 +126,7 @@ export const uploads: DocPage = {
   ],
 };
 
-const SIZES = `createDriveHandler({
+export const SIZES = `createDriveHandler({
   ...options,
   // Or from the settings of the drive, under Pictures.
   settings: { images: { enabled: true, sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.85 } },
@@ -250,7 +250,7 @@ export const search: DocPage = {
   ],
 };
 
-const SPACE = `createDriveHandler({
+export const SPACE = `createDriveHandler({
   ...options,
   // Or from the settings of the drive, under Storage, for whoever may configure it.
   settings: { quota: 5 * 1024 ** 3, trashDays: 30 },
@@ -353,7 +353,7 @@ export const zip: DocPage = {
   ],
 };
 
-const DOCX = `import { FileDrive } from '@rebofiles/react';
+export const DOCX = `import { FileDrive } from '@rebofiles/react';
 import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs'; // needs @rebodocs/editor
 
 <FileDrive
@@ -366,7 +366,7 @@ import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@re
   onOpenDocument={(file, url) => router.push(\`/documents/\${file.id}\`)}
 />`;
 
-const SAVE = `import { DocsEditor } from '@rebodocs/react';
+export const SAVE = `import { DocsEditor } from '@rebodocs/react';
 import { useActions } from '@rebofiles/react';
 
 const { upload } = useActions();

@@ -2,12 +2,12 @@
  * The sections of the page, at its start, under the title: what is on it and
  * a way straight to each. It shows on every screen, the narrow ones too.
  */
-export function PageIndex({ headings }: { headings: { id: string; text: string }[] }) {
+export function PageIndex({ headings, label }: { headings: { id: string; text: string }[]; label: string }) {
   if (headings.length < 2) return null;
   return (
     <nav aria-labelledby="page-index" className="mt-8 max-w-[920px] rounded-2xl border border-border bg-surface px-5 py-4">
       <p id="page-index" className="m-0 text-xs font-semibold uppercase tracking-[0.04em] text-muted">
-        On this page
+        {label}
       </p>
       <ol className="m-0 mt-2.5 grid list-none gap-x-6 gap-y-1 p-0 sm:grid-cols-2 lg:grid-cols-3">
         {headings.map((heading, i) => (

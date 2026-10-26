@@ -84,7 +84,7 @@ export const packages: DocPage = {
   ],
 };
 
-const EXPORTS: [string, string][] = [
+export const EXPORTS: [string, string][] = [
   ['FileDrive', 'The whole drive.'],
   ['SharedLink', 'What someone sent a link sees, without signing in.'],
   ['createMemoryClient', 'The drive kept in the page, with the client of the server’s routes.'],
@@ -125,7 +125,7 @@ export const components: DocPage = {
   ],
 };
 
-const CLIENT_CODE = `import { createDriveClient } from '@rebofiles/drive'; // or @rebofiles/react
+export const CLIENT_CODE = `import { createDriveClient } from '@rebofiles/drive'; // or @rebofiles/react
 
 const client = createDriveClient({
   base: '/api/files',
@@ -137,7 +137,7 @@ const client = createDriveClient({
 const { entries } = await client.list(null);
 const file = await client.upload(input.files[0], { parent: entries[0].id, onProgress: ({ sent, size }) => draw(sent / size) });`;
 
-const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings'] as const;
+export const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings'] as const;
 
 export const client: DocPage = {
   title: 'Client API',
@@ -167,7 +167,7 @@ export const client: DocPage = {
   ],
 };
 
-const METHOD: Record<Route['method'], string> = {
+export const METHOD: Record<Route['method'], string> = {
   GET: 'bg-pastel-green text-pastel-green-fg',
   POST: 'bg-pastel-blue text-pastel-blue-fg',
   PUT: 'bg-pastel-yellow text-pastel-yellow-fg',
@@ -175,15 +175,16 @@ const METHOD: Record<Route['method'], string> = {
   DELETE: 'bg-pastel-pink text-pastel-pink-fg',
 };
 
-function RouteTable({ through }: { through: Route['through'] }) {
+/** The routes of one kind, as api.ts says them; the column heads and the label in the page's language. */
+export function RouteTable({ through, words = ['Routes', 'Routes of a link', 'Route', 'What it does'] }: { through: Route['through']; words?: [string, string, string, string] }) {
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways on a phone, and a keyboard has to reach what is hidden (WCAG 2.1.1)
-    <section className="mt-5 max-w-[920px] overflow-x-auto rounded-[14px] border border-border" aria-label={through === 'link' ? 'Routes of a link' : 'Routes'} tabIndex={0}>
+    <section className="mt-5 max-w-[920px] overflow-x-auto rounded-[14px] border border-border" aria-label={through === 'link' ? words[1] : words[0]} tabIndex={0}>
       <table className="w-full min-w-[640px] border-collapse text-left text-[15px]">
         <thead className="bg-surface text-xs font-semibold uppercase tracking-[0.04em] text-muted">
           <tr>
-            <th className="px-4.5 py-3 font-semibold">Route</th>
-            <th className="px-4.5 py-3 font-semibold">What it does</th>
+            <th className="px-4.5 py-3 font-semibold">{words[2]}</th>
+            <th className="px-4.5 py-3 font-semibold">{words[3]}</th>
           </tr>
         </thead>
         <tbody>
@@ -235,7 +236,7 @@ export const routesPage: DocPage = {
 };
 
 /** `code` in the texts of data.ts, as code. */
-const Rows = ({ rows }: { rows: [string, string][] }) => (
+export const Rows = ({ rows }: { rows: [string, string][] }) => (
   <div className="mt-5 max-w-[920px] overflow-hidden rounded-[14px] border border-border">
     {rows.map(([what, how]) => (
       <div key={what} className="grid gap-1 border-t border-border px-4.5 py-3.5 first:border-t-0 sm:grid-cols-[180px_1fr] sm:gap-5">
@@ -246,7 +247,7 @@ const Rows = ({ rows }: { rows: [string, string][] }) => (
   </div>
 );
 
-const Milestones = (): ReactNode => (
+export const Milestones = ({ of = (done: number, all: number) => `${done} of ${all}`, notYet = '(not yet)' }: { of?: (done: number, all: number) => string; notYet?: string }): ReactNode => (
   <ol className="m-0 mt-5 max-w-[920px] list-none space-y-3 p-0">
     {ROADMAP.map((milestone) => {
       const done = milestone.items.filter((item) => item.done).length;
@@ -255,11 +256,7 @@ const Milestones = (): ReactNode => (
           <p className="m-0 flex flex-wrap items-baseline gap-x-3">
             <span className="font-code text-[14px] font-medium text-brand">{milestone.version}</span>
             <span className="font-semibold text-ink">{milestone.name}</span>
-            {done > 0 && (
-              <span className="ml-auto text-[13px] text-muted">
-                {done} of {milestone.items.length}
-              </span>
-            )}
+            {done > 0 && <span className="ml-auto text-[13px] text-muted">{of(done, milestone.items.length)}</span>}
           </p>
           <ul className="m-0 mt-2.5 list-none space-y-1.5 p-0 text-[15px]">
             {milestone.items.map((item) => (
@@ -269,7 +266,7 @@ const Milestones = (): ReactNode => (
                 </span>
                 <span>
                   {item.what}
-                  {item.done ? '' : <span className="sr-only"> (not yet)</span>}
+                  {item.done ? '' : <span className="sr-only"> {notYet}</span>}
                 </span>
               </li>
             ))}

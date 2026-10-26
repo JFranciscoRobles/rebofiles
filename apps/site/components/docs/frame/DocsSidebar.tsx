@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { Pastel } from '@/lib/home';
-import { NAV, hrefOf } from '@/lib/site';
+import { docHref, navOf } from '@/lib/site';
+import { useLocale } from '../../useLocale';
 
 /** Whole class names, so Tailwind finds them. */
 const DOT: Record<Pastel, string> = {
@@ -18,17 +19,18 @@ const DOT: Record<Pastel, string> = {
 /** The pages, by group: the column beside them, and what the sheet shows on a phone. */
 export function SidebarNav({ onGo }: { onGo?: () => void }) {
   const path = usePathname().replace(/\/?$/, '/');
+  const { locale, d } = useLocale();
   return (
-    <nav aria-label="Documentation" className="flex flex-col gap-5.5">
-      {NAV.map((group) => (
-        <div key={group.title}>
+    <nav aria-label={d.docs.documentation} className="flex flex-col gap-5.5">
+      {navOf(locale).map((group) => (
+        <div key={group.key}>
           <p className="m-0 flex items-center gap-2 px-2.5 pb-1.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted">
             <span className={`size-2 rounded-[3px] ${DOT[group.color]}`} aria-hidden="true" />
             {group.title}
           </p>
           <ul className="m-0 list-none p-0">
             {group.items.map((item) => {
-              const href = hrefOf(item.slug);
+              const href = docHref(locale, item.slug);
               const on = href === path;
               return (
                 <li key={item.slug}>

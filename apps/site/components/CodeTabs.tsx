@@ -3,11 +3,11 @@
 import { useState } from 'react';
 
 /** Samples of code, one shown at a time. Each comes already coloured, as HTML. */
-export function CodeTabs({ samples }: { samples: { name: string; html: string }[] }) {
+export function CodeTabs({ samples, label = 'Examples' }: { samples: { name: string; html: string }[]; label?: string }) {
   const [shown, setShown] = useState(0);
   return (
     <div className="min-w-0 overflow-hidden rounded-[18px] border border-border bg-white shadow-[0_20px_40px_-20px_rgba(47,46,43,0.18)]">
-      <div className="flex flex-wrap gap-1 border-b border-[#f0eee9] p-2.5" role="tablist" aria-label="Examples">
+      <div className="flex flex-wrap gap-1 border-b border-[#f0eee9] p-2.5" role="tablist" aria-label={label}>
         {samples.map((sample, i) => (
           <button
             key={sample.name}

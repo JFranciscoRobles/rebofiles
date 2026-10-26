@@ -21,7 +21,7 @@ export const PROPS: Prop[] = [
   { name: 'headers', type: '() => Record<string, string>', group: 'Server', does: 'Headers for every request to your server, such as a token of the session; never sent to the bucket. May be async.' },
   { name: 'linkAddress', type: '(token) => string', group: 'Server', does: 'Where a link of the drive points: your page with <SharedLink>. This page with `?link=` unless given.' },
   { name: 'settings', type: 'boolean', group: 'Server', does: '`false` leaves out the screen of settings and the button that opens it.' },
-  { name: 'language', type: "'en' | 'es'", group: 'Look', does: 'Under each person’s own choice, over the drive’s. English unless given.' },
+  { name: 'language', type: "'en' | 'es' | 'zh'", group: 'Look', does: 'Under each person’s own choice, over the drive’s. English unless given.' },
   { name: 'texts', type: 'Texts', group: 'Look', does: 'The words of another language, with the keys of `TEXTS.en`.' },
   { name: 'theme', type: "'light' | 'dark' | 'auto'", group: 'Look', does: 'Under each person’s own choice, over the drive’s. `auto` follows the system.' },
   { name: 'title', type: 'string', group: 'Look', does: 'The name over the drive: your application’s, or “Files”.' },

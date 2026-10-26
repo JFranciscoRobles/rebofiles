@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocale } from '../../useLocale';
 
 /** The sections of the page, the one being read in green. Hidden on a narrow screen. */
 export function OnThisPage({ headings }: { headings: { id: string; text: string }[] }) {
+  const { d } = useLocale();
   const [here, setHere] = useState(headings[0]?.id);
 
   useEffect(() => {
@@ -22,9 +24,9 @@ export function OnThisPage({ headings }: { headings: { id: string; text: string 
   }, [headings]);
 
   return (
-    <aside aria-label="On this page" className="hidden w-[200px] flex-none py-10 min-[1200px]:block">
+    <aside aria-label={d.docs.onThisPage} className="hidden w-[200px] flex-none py-10 min-[1200px]:block">
       <div className="sticky top-[90px]">
-        <p className="m-0 mb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted">On this page</p>
+        <p className="m-0 mb-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-muted">{d.docs.onThisPage}</p>
         {headings.length > 1 && (
           <ul className="m-0 list-none p-0">
             {headings.map((heading) => {
@@ -43,7 +45,7 @@ export function OnThisPage({ headings }: { headings: { id: string; text: string 
             })}
           </ul>
         )}
-        <p className="m-0 mt-5.5 font-hand text-[22px] leading-[1.1] text-pastel-pink-fg">tip: press ⌘K to jump to any prop or route</p>
+        <p className="m-0 mt-5.5 font-hand text-[22px] leading-[1.1] text-pastel-pink-fg">{d.docs.tip}</p>
       </div>
     </aside>
   );

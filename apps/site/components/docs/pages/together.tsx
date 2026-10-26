@@ -5,14 +5,14 @@ import { C, Callout, Code, type DocPage, List, P, RefTable } from '../ui';
 
 export const toolId = (name: string) => `tool-${name}`;
 
-const HTTP = `// app/api/mcp/route.ts, in Next.js
+export const HTTP = `// app/api/mcp/route.ts, in Next.js
 import { createMcpHandler } from '@rebofiles/mcp';
 
 export const POST = createMcpHandler({ base: 'https://acme.com/api/files' });`;
 
-const CLAUDE = `claude mcp add --transport http rebofiles https://acme.com/api/mcp --header "Authorization: Bearer …"`;
+export const CLAUDE = `claude mcp add --transport http rebofiles https://acme.com/api/mcp --header "Authorization: Bearer …"`;
 
-const STDIO = `{
+export const STDIO = `{
   "mcpServers": {
     "rebofiles": {
       "command": "npx",
@@ -23,10 +23,18 @@ const STDIO = `{
 }`;
 
 /** Rebodocs' tools on the drive's Word documents, when it is installed beside: read when the site is built. */
-async function DocumentTools() {
+export async function DocumentTools({
+  none = 'Rebodocs is not installed where this site was built.',
+  label = 'Rebodocs’ tools on the drive',
+  name = 'Tool',
+}: {
+  none?: string;
+  label?: string;
+  name?: string;
+}) {
   const tools = await documentTools().catch(() => []);
-  if (!tools.length) return <P>Rebodocs is not installed where this site was built.</P>;
-  return <RefTable label="Rebodocs’ tools on the drive" name="Tool" rows={tools.map((tool) => ({ id: toolId(tool.name), name: tool.name, does: tool.description }))} />;
+  if (!tools.length) return <P>{none}</P>;
+  return <RefTable label={label} name={name} rows={tools.map((tool) => ({ id: toolId(tool.name), name: tool.name, does: tool.description }))} />;
 }
 
 export const assistants: DocPage = {

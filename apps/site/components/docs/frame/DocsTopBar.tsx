@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { useRef } from 'react';
 import { Logo } from '@/components/home/SiteChrome';
 import { VERSION } from '@/lib/home';
+import { localePath } from '@/lib/i18n';
 import { REPO, hrefOf } from '@/lib/site';
+import { LanguageSwitcher } from '../../LanguageSwitcher';
+import { useLocale } from '../../useLocale';
 import type { SearchEntry } from '../searchIndex';
 import { SidebarNav } from './DocsSidebar';
 import { SearchCommand } from './SearchCommand';
@@ -13,6 +16,8 @@ const ghost = 'rounded-lg px-2.75 py-1.75 text-ink transition-colors hover:bg-ho
 
 /** The bar above every page of the documentation; on a phone, its menu button opens the pages as a sheet. */
 export function DocsTopBar({ index }: { index: SearchEntry[] }) {
+  const { locale, d } = useLocale();
+  const to = (path: string) => localePath(locale, path);
   const sheet = useRef<HTMLDialogElement>(null);
   const close = () => sheet.current?.close();
 
@@ -21,7 +26,7 @@ export function DocsTopBar({ index }: { index: SearchEntry[] }) {
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-5 gap-y-3 px-6 py-3">
         <button
           type="button"
-          aria-label="Pages of the documentation"
+          aria-label={d.docs.pages}
           onClick={() => sheet.current?.showModal()}
           className="-ml-2 flex size-9 cursor-pointer items-center justify-center rounded-lg text-ink transition-colors hover:bg-hover lg:hidden"
         >
@@ -29,33 +34,34 @@ export function DocsTopBar({ index }: { index: SearchEntry[] }) {
             <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
         </button>
-        <Link href="/" className="flex items-center gap-2.5 text-ink">
+        <Link href={to('/')} className="flex items-center gap-2.5 text-ink">
           <Logo size={28} />
           <span className="font-display text-lg font-extrabold tracking-[-0.03em]">ReboFiles</span>
-          <span className="rounded-md bg-hover px-2 py-0.75 text-[13px] font-semibold text-muted">Docs</span>
+          <span className="rounded-md bg-hover px-2 py-0.75 text-[13px] font-semibold text-muted">{d.docs.docs}</span>
         </Link>
         <SearchCommand index={index} />
         <nav aria-label="Top" className="ml-auto flex flex-wrap items-center gap-0.5 text-sm font-medium">
-          <Link href="/" className={ghost}>
-            Home
+          <Link href={to('/')} className={ghost}>
+            {d.nav.home}
           </Link>
-          <Link href={hrefOf('routes')} className={ghost}>
-            API
+          <Link href={to(hrefOf('routes'))} className={ghost}>
+            {d.docs.api}
           </Link>
           <a href={REPO} className={ghost}>
             GitHub
           </a>
+          <LanguageSwitcher className="ml-1" />
           <span className="ml-1 rounded-full bg-pastel-green px-2.5 py-1.25 text-xs font-medium text-pastel-green-fg">v{VERSION}</span>
         </nav>
       </div>
 
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: a click on the backdrop closes it; the keyboard has Escape, as every dialog does */}
-      <dialog ref={sheet} aria-label="Pages of the documentation" className="sheet m-0 h-dvh w-[min(320px,86vw)]" onClick={(event) => event.target === sheet.current && close()}>
+      <dialog ref={sheet} aria-label={d.docs.pages} className="sheet m-0 h-dvh w-[min(320px,86vw)]" onClick={(event) => event.target === sheet.current && close()}>
         <div className="flex h-full flex-col overflow-y-auto bg-white px-4 py-5 shadow-menu">
           <div className="mb-5 flex items-center justify-between px-2.5">
-            <span className="font-display text-lg font-extrabold tracking-[-0.03em]">Docs</span>
+            <span className="font-display text-lg font-extrabold tracking-[-0.03em]">{d.docs.docs}</span>
             <button type="button" onClick={close} className="cursor-pointer rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-hover">
-              Close
+              {d.docs.close}
             </button>
           </div>
           <SidebarNav onGo={close} />

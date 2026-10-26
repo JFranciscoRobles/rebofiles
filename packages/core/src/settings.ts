@@ -6,7 +6,7 @@
 
 import { DriveError } from './errors';
 
-export type Language = 'en' | 'es';
+export type Language = 'en' | 'es' | 'zh';
 export type Theme = 'light' | 'dark' | 'auto';
 
 export interface ImageSettings {
@@ -38,7 +38,7 @@ export interface PersonalSettings {
   theme?: Theme;
 }
 
-export const LANGUAGES: Language[] = ['en', 'es'];
+export const LANGUAGES: Language[] = ['en', 'es', 'zh'];
 export const THEMES: Theme[] = ['light', 'dark', 'auto'];
 /** How many sizes a picture is made in. */
 export const IMAGE_SIZES = 4;

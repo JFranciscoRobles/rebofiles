@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { INSTALL_ORDER, PACKAGES, PUBLISHED, VERSION } from '@/lib/home';
+import { type Locale, dict } from '@/lib/i18n';
 
 /** One package at a time: the command to install it, a button that copies it, and what it is. Until the packages are on npm, it says so instead of a command. */
-export function InstallPicker() {
+export function InstallPicker({ locale }: { locale: Locale }) {
+  const d = dict(locale);
   const [name, setName] = useState(INSTALL_ORDER[0]);
   const [copied, setCopied] = useState(false);
   const command = `npm install ${name}`;
@@ -23,7 +25,7 @@ export function InstallPicker() {
 
   return (
     <div className="mx-auto mt-7 max-w-[560px] rounded-2xl border border-border bg-surface p-2 text-left">
-      <div role="tablist" aria-label="Packages" className="flex flex-wrap gap-1">
+      <div role="tablist" aria-label={d.home.install.packages} className="flex flex-wrap gap-1">
         {INSTALL_ORDER.map((pkg) => {
           const on = pkg === name;
           return (
@@ -57,17 +59,17 @@ export function InstallPicker() {
             aria-live="polite"
             className={`flex-none rounded-md border border-border px-[9px] py-[3px] font-text text-xs font-semibold ${copied ? 'bg-pastel-green text-pastel-green-fg' : 'bg-white text-ink'}`}
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? d.home.install.copied : d.home.install.copy}
           </span>
         </button>
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[10px] border border-dashed border-border-strong bg-white py-3 pl-4 pr-3 font-code text-sm text-muted">
           <span className="flex-auto">{name}</span>
-          <span className="flex-none rounded-md bg-pastel-yellow px-[9px] py-[3px] font-text text-xs font-semibold text-pastel-yellow-fg">Not on npm yet · v{VERSION} soon</span>
+          <span className="flex-none rounded-md bg-pastel-yellow px-[9px] py-[3px] font-text text-xs font-semibold text-pastel-yellow-fg">{d.home.install.soon(VERSION)}</span>
         </div>
       )}
       <p key={name} className="m-0 animate-pop-in px-2 pb-1 pt-2.5 text-sm leading-normal text-muted opacity-0">
-        {PACKAGES.find((pkg) => pkg.name === name)?.what}
+        {d.home.packages[name]?.what ?? PACKAGES.find((pkg) => pkg.name === name)?.what}
       </p>
     </div>
   );

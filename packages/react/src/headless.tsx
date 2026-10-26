@@ -15,11 +15,11 @@ interface DriveContext {
   locale: string;
   /** The texts `t` says, for a drive mounted inside to say the same. */
   texts: Texts;
-  language: 'en' | 'es';
+  language: 'en' | 'es' | 'zh';
   /** The texts the application gave, if any: a drive mounted inside says these over its language. */
   ownTexts?: Texts;
   /** The language the application gave, if any: over the drive's settings, under a person's own. */
-  givenLanguage?: 'en' | 'es';
+  givenLanguage?: 'en' | 'es' | 'zh';
   /** The settings of the server, once they come; null before, or from a server without them. */
   settings: SettingsAnswer | null;
 }
@@ -33,7 +33,7 @@ export interface DriveProviderProps {
   client?: DriveClient;
   /** Headers for every request to the server. */
   headers?: () => Record<string, string> | Promise<Record<string, string>>;
-  language?: 'en' | 'es';
+  language?: 'en' | 'es' | 'zh';
   /** Texts of another language, with the keys of the English ones. */
   texts?: Texts;
   children: ReactNode;

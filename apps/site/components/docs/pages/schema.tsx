@@ -5,7 +5,7 @@
 import { hrefOf } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../ui';
 
-const POSTGRES = `-- The entries: one row each, the whole entry as JSON.
+export const POSTGRES = `-- The entries: one row each, the whole entry as JSON.
 CREATE TABLE rebofiles_entries (
   id     text PRIMARY KEY,
   parent text,                 -- the folder it is in; null at the top
@@ -47,7 +47,7 @@ CREATE TABLE rebofiles_entries_text (
 );
 CREATE INDEX rebofiles_entries_text_words ON rebofiles_entries_text USING gin (words);`;
 
-const PRISMA = `// What \`prisma db pull\` reads from the tables ReboFiles made, named as an application names its models.
+export const PRISMA = `// What \`prisma db pull\` reads from the tables ReboFiles made, named as an application names its models.
 // \`prisma migrate diff\` between it and the database: an empty migration.
 
 /// A folder or a file of the drive: the whole entry, as @rebofiles/core has it, in \`entry\`.
@@ -101,7 +101,7 @@ model DriveText {
   @@map("rebofiles_entries_text")
 }`;
 
-const ONE_POOL = `// lib/db.ts: one pool, for your Prisma and for the drive.
+export const ONE_POOL = `// lib/db.ts: one pool, for your Prisma and for the drive.
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { PrismaClient } from '@/lib/generated/prisma/client';
@@ -119,7 +119,7 @@ const handle = createDriveHandler({
   identify, authorize: byRoles, secret: process.env.REBOFILES_SECRET!, base: '/api/files',
 });`;
 
-const BASELINE = `# The tables are there already, made by ReboFiles: add the models, then tell Prisma they exist.
+export const BASELINE = `# The tables are there already, made by ReboFiles: add the models, then tell Prisma they exist.
 npx prisma db pull                      # or paste the models above into schema.prisma
 mkdir -p prisma/migrations/0_rebofiles
 npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > prisma/migrations/0_rebofiles/migration.sql
@@ -128,10 +128,10 @@ npx prisma migrate resolve --applied 0_rebofiles
 # From then on, migrate dev leaves them as they are: its next migration about them is empty.
 npx prisma migrate dev`;
 
-const FRESH = `# A new database: your migrations make the tables first, ReboFiles finds them when it starts.
+export const FRESH = `# A new database: your migrations make the tables first, ReboFiles finds them when it starts.
 npx prisma migrate deploy`;
 
-const PRISMA_QUERIES = `import { Prisma } from '@/lib/generated/prisma/client';
+export const PRISMA_QUERIES = `import { Prisma } from '@/lib/generated/prisma/client';
 import type { Entry } from '@rebofiles/core';
 import { prisma } from '@/lib/db';
 
@@ -164,7 +164,7 @@ const found = await prisma.$queryRaw<{ id: string; body: string }[]>(Prisma.sql\
   SELECT id, body FROM rebofiles_entries_text WHERE words @@ to_tsquery('simple', \${'payment & 30'})\`);`;
 
 /** Every field of an entry, as packages/core/src/model.ts has it: [field, type, what it is]. */
-const ENTRY_FIELDS: [string, string, string][] = [
+export const ENTRY_FIELDS: [string, string, string][] = [
   ['kind', "'file' | 'folder'", 'What it is.'],
   ['id', 'string', 'Its id, a UUID unless newId says otherwise; also the column id.'],
   ['name', 'string', 'As the person reads it, extension included; never twice in a folder, whatever the case or the accents.'],
@@ -180,7 +180,7 @@ const ENTRY_FIELDS: [string, string, string][] = [
   ['links', 'Link[]', 'Its links: { id, role, expires, locked?, uses?, used?, spent?, by, at }.'],
 ];
 
-const VERSION_FIELDS: [string, string, string][] = [
+export const VERSION_FIELDS: [string, string, string][] = [
   ['id', 'string', 'Its id.'],
   ['key', 'string', 'Where its bytes are in the bucket: the file’s id and its own, "<file>/<version>". Never a path.'],
   ['size', 'number', 'In bytes, as the server checked them when the upload finished.'],
@@ -192,7 +192,7 @@ const VERSION_FIELDS: [string, string, string][] = [
   ['note', 'string', 'A word on it, when one was given.'],
 ];
 
-const FILE = `{
+export const FILE = `{
   "kind": "file",
   "id": "5b0c…",
   "name": "contract.docx",
@@ -220,13 +220,13 @@ const FILE = `{
   ]
 }`;
 
-const FOLDER = `{
+export const FOLDER = `{
   "kind": "folder", "id": "a1f3…", "name": "Clients", "parent": null, "color": "teal",
   "owner": "ana", "created": "…", "modified": "…", "modifiedBy": "ana",
   "trashed": { "at": "2026-10-26T18:00:00.000Z", "by": "ana" }   // only on what was put in the trash itself
 }`;
 
-const LINE = `{
+export const LINE = `{
   "at": "2026-10-26T16:41:00.000Z", "by": "bea",
   "action": "renamed",                  // created, uploaded, version, renamed, moved, trashed, restored,
                                         // deleted, shared, unshared, linked, unlinked, colored
@@ -235,7 +235,7 @@ const LINE = `{
   "was": "contract.docx"                // for one renamed; "from" for one moved; "with", "role" for one shared
 }`;
 
-const QUERIES = `-- Each person's files, and the bytes they keep (every version counts, as the quota counts them).
+export const QUERIES = `-- Each person's files, and the bytes they keep (every version counts, as the quota counts them).
 SELECT entry->>'owner' AS owner,
        count(*) AS files,
        sum((SELECT sum((v->>'size')::bigint) FROM jsonb_array_elements(entry->'versions') v)) AS bytes
@@ -257,7 +257,7 @@ SELECT line FROM rebofiles_entries_activity WHERE line->>'by' = 'bea' AND line->
 -- An index for a query you make often, as for the owner:
 CREATE INDEX rebofiles_entries_owner ON rebofiles_entries ((entry->>'owner'));`;
 
-const STORE = `import type { MetadataStore } from '@rebofiles/server';
+export const STORE = `import type { MetadataStore } from '@rebofiles/server';
 
 export const myStore: MetadataStore = {
   async load() { /* every entry, as driveOf(entries) */ },
@@ -272,7 +272,7 @@ export const myStore: MetadataStore = {
 
 export const schema: DocPage = {
   title: 'Database schema',
-  description: 'The tables @rebofiles/server makes in Postgres and SQLite, every field of a file, the settings it keeps, the models and migrations for Prisma ORM, and queries of your own.',
+  description: 'The tables @rebofiles/server makes in Postgres and SQLite, every field of a file, its settings, Prisma ORM models and migrations, and queries of your own.',
   source: 'apps/site/components/docs/pages/schema.tsx',
   lead: (
     <>

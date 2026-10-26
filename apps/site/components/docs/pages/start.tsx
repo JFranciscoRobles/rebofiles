@@ -29,7 +29,7 @@ export const index: DocPage = {
           {/* Wider than the column beside the menu: it scrolls sideways there, as it does on a phone. */}
           {/* biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways, and a keyboard has to reach what is hidden (WCAG 2.1.1) */}
           <section className="overflow-x-auto" aria-label="The demo" tabIndex={0}>
-            <LiveDemo />
+            <LiveDemo locale="en" />
           </section>
         </DemoBox>
       ),
@@ -70,7 +70,7 @@ export const index: DocPage = {
               <strong>AI assistants.</strong> Tools for Claude over MCP, with the user’s own rights; Word documents edited through Rebodocs, each change a version.
             </>,
             <>
-              <strong>Keyboard and screen readers</strong>, light and dark, English and Spanish, a screen of settings, and a desktop application.
+              <strong>Keyboard and screen readers</strong>, light and dark, English, Spanish and Mandarin, a screen of settings, and a desktop application.
             </>,
           ]}
         />
@@ -147,7 +147,7 @@ export const index: DocPage = {
   ],
 };
 
-const PAGE = `'use client';
+export const PAGE = `'use client';
 import { FileDrive } from '@rebofiles/react';
 
 export default function Files() {
@@ -158,7 +158,7 @@ export default function Files() {
   );
 }`;
 
-const ROUTE = `import { byRoles, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
+export const ROUTE = `import { byRoles, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
 import { session } from '@/lib/auth'; // your own
 
 const handle = createDriveHandler({
@@ -175,16 +175,16 @@ const handle = createDriveHandler({
 
 export { handle as GET, handle as POST, handle as PATCH, handle as PUT, handle as DELETE };`;
 
-const MEMORY = `import { FileDrive, createMemoryClient } from '@rebofiles/react';
+export const MEMORY = `import { FileDrive, createMemoryClient } from '@rebofiles/react';
 
 // No server: the drive kept in the page, with the same client and the same refusals.
 <FileDrive client={createMemoryClient({ user: 'You' })} />`;
 
-const REPOSITORY = `git clone ${REPO}
+export const REPOSITORY = `git clone ${REPO}
 cd rebofiles && npm install
 npm run dev        # the playground: the drive on this computer, at http://localhost:5180`;
 
-const COMMANDS: [string, string][] = [
+export const COMMANDS: [string, string][] = [
   ['npm run dev', 'The playground: the whole drive against a server in the same process, the bytes in a folder, the entries in SQLite. `?as=bea` is someone else.'],
   ['npm run demo', 'The demo of the landing: the drive kept in the page, with Claude’s calls to the MCP tools.'],
   ['npm run storage', 'The drive against a real bucket (R2, S3, MinIO), from `apps/storage/.env`.'],
@@ -322,7 +322,7 @@ export const demos: DocPage = {
               <C>http://localhost:5180</C> is the drive in React; <C>/vanilla.html</C> without a framework; <C>/headless.html</C> built from the hooks alone.
             </>,
             <>
-              <C>?as=bea</C> is someone else, to share with; <C>?lang=es</C> and <C>?theme=dark</C> as they say.
+              <C>?as=bea</C> is someone else, to share with; <C>?lang=es</C>, <C>?lang=zh</C> and <C>?theme=dark</C> as they say.
             </>,
             <>
               The tools for an assistant at <C>/api/mcp</C>: <C>claude mcp add --transport http rebofiles http://localhost:5180/api/mcp</C>.
@@ -376,8 +376,8 @@ export const demos: DocPage = {
       color: 'pink',
       body: (
         <P>
-          The landing, with the demo in it, and these pages: Next.js and Tailwind, built as plain files. <a href="/demo/">/demo/</a> has the drive twice, in a tab each: <C>&lt;FileDrive&gt;</C> as it
-          comes, and an interface of a creative suite’s look built on the headless hooks alone.
+          The landing, with the demo in it, and these pages: Next.js and Tailwind, built as plain files, in English, Spanish and Mandarin. <a href="/demo/">/demo/</a> has the drive three ways, a tab
+          each: <C>&lt;FileDrive&gt;</C> as it comes, its compact layout, and an interface of a creative suite’s look built on the headless hooks alone.
         </P>
       ),
     },

@@ -14,6 +14,7 @@ export const DEMOS = '/demo/';
 export const GET_STARTED = '/docs/getting-started/';
 
 import type { Pastel } from './home';
+import { type Locale, dict, localePath } from './i18n';
 
 export interface NavItem {
   title: string;
@@ -92,3 +93,13 @@ export const PAGES = NAV.flatMap((group) => group.items);
 /** The group a page is in, for the line above its title. */
 export const groupOf = (slug: string) => NAV.find((group) => group.items.some((item) => item.slug === slug));
 export const hrefOf = (slug: string) => (slug === 'index' ? '/docs/' : `/docs/${slug}/`);
+/** A page of the documentation in a language. */
+export const docHref = (locale: Locale, slug: string) => localePath(locale, hrefOf(slug));
+/** The menu of the documentation in a language: the groups and pages by the names the language gives them. */
+export function navOf(locale: Locale) {
+  const d = dict(locale);
+  return NAV.map((group) => ({ ...group, key: group.title, title: d.groups[group.title] ?? group.title, items: group.items.map((item) => ({ ...item, title: d.pages[item.slug] ?? item.title })) }));
+}
+export const pagesOf = (locale: Locale) => navOf(locale).flatMap((group) => group.items);
+/** The page as Markdown, beside it, for a language model: made after the build by `scripts/llms.ts`. */
+export const markdownOf = (slug: string) => `/docs/${slug}.md`;

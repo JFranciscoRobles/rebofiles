@@ -57,7 +57,8 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 npm install
 npm run dev         # the playground, at http://localhost:5180: the drive on this computer, in storage/
 npm run demo        # the demo of the landing, at http://localhost:5181: entirely in the browser
-npm run site        # the landing page, at http://localhost:5182 (Next.js; npm run build:site makes it static, in apps/site/out)
+npm run site        # the landing page, at http://localhost:5182 (Next.js; npm run build:site makes it static, in apps/site/out,
+                    # with the sitemap, llms.txt and a .md of each page, and fails on a page without its SEO)
 npm test            # Vitest
 npm run typecheck   # tsc, over every package
 npm run lint        # Biome
