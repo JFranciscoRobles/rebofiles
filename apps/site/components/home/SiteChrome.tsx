@@ -31,7 +31,7 @@ export function SiteHeader() {
       </Link>
       <span className="rounded-full bg-pastel-green px-2.5 py-1 text-xs font-medium text-pastel-green-fg">Open source · MIT · v{VERSION}</span>
       <nav aria-label="Main" className="ml-auto flex flex-wrap items-center gap-0.5 text-[15px] font-medium">
-        <a href="#demo" className={ghost}>
+        <a href="/#demo" className={ghost}>
           Demo
         </a>
         <a href={DOCS} className={ghost}>

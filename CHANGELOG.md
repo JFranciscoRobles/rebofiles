@@ -75,6 +75,11 @@ minor version (0.x.0) may change the API; such changes are listed under
   file goes from Node, a small file, one in parts, a version, a download shown
   in the page and the deletion, and says what the bucket answered when it
   refuses; `npm run storage:seed` puts a few files there.
+- **Getting started and the status page** on the site (`/docs/`, `/status/`):
+  a drive in a Next.js application on R2, from the bucket and its rule of
+  origins to the route, `authorize()`, the page and what to do when something
+  fails; and what is tested, checked by hand, not yet, its limits and the
+  roadmap, from `components/docs/status/data.ts`.
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes

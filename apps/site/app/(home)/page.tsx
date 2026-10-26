@@ -7,7 +7,7 @@ import { SiteFooter, SiteHeader, primary } from '@/components/home/SiteChrome';
 import { highlight } from '@/lib/highlight';
 import { PACKAGES, PASTEL_CLASS, PUBLISHED, type Pastel, TAGS, VERSION, npmOf, pastelAt } from '@/lib/home';
 import { DOCS, NPM_ORG, STATUS } from '@/lib/site';
-import { TESTS } from '@/lib/status';
+import { TESTS } from '@/components/docs/status/data';
 
 const SAMPLES: [string, string, string][] = [
   [

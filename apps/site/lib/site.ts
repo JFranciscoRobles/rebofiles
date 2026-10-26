@@ -5,6 +5,6 @@ export const SITE = 'https://rebofiles.com';
 export const NPM_ORG = 'https://www.npmjs.com/org/rebofiles';
 /** The other product of the suite. */
 export const REBODOCS = 'https://www.rebodocs.com';
-/** Until there are pages of documentation, the README and the roadmap of the repository are them. */
-export const DOCS = `${REPO}#readme`;
-export const STATUS = `${REPO}/blob/main/ROADMAP.md`;
+/** The pages of documentation: Getting started, and what is checked. */
+export const DOCS = '/docs/';
+export const STATUS = '/status/';

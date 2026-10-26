@@ -121,9 +121,8 @@ install command.
    `@rebodocs/core` when it is installed. "Open in Rebodocs".
 5. ✅ **`apps/demo`, `apps/playground`, `apps/storage`**, and the storage one
    run by hand against Cloudflare R2 (`npm run storage:check`, then the page).
-6. **`apps/site`:** the landing of the handoff ✅, Getting started, and the
-   status page. Until those two are written, the landing links to the README
-   and to this file.
+6. ✅ **`apps/site`:** the landing of the handoff, Getting started (`/docs/`),
+   and the status page (`/status/`, from `components/docs/status/data.ts`).
 
 Builds to publish are made (`npm run build:packages`) and were installed
 from their tarballs in an empty project: a server on `node:http`, the client
