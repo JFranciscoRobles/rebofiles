@@ -67,8 +67,8 @@ The same rules:
 Taken on October 25, 2026, by running `npm test`, every one passing:
 
 - `packages/core` · 31 · Names, the tree, renaming and moving, the trash, versions, search, changes.
-- `packages/server` · 19 · The routes on the disk and on an S3 kept in memory, uploads in parts, who may do what, SQLite across two processes, and the signature against AWS's example.
-- `packages/react` · 15 · The client against the routes: folders, uploads in parts with progress, the headers a bucket signed, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
+- `packages/server` · 23 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, and the signature against AWS's example.
+- `packages/react` · 16 · The client against the routes: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
 
 ### The interface
 
@@ -76,7 +76,7 @@ Driven in Chrome without a window, with real clicks and keys, on the playground:
 
 ## What is not
 
-- `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, the deletion), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
+- `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
 - `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone.
 - `Tests in a browser.` The walk through the interface was a script run by hand, not a test the repository keeps.
 - `Two processes on one database.` SQLite was opened by two handlers one after the other, not at once.
@@ -85,8 +85,7 @@ Driven in Chrome without a window, with real clicks and keys, on the playground:
 
 Storage
 
-- A part left halfway by an upload never finished stays in the bucket until a lifecycle rule of the bucket takes it.
-- Deleting is one request per key.
+- An upload that fails or is stopped is given up, and what of it arrived taken away; one left when the page is closed halfway stays in the bucket until a lifecycle rule of the bucket takes it.
 
 Metadata
 

@@ -144,6 +144,43 @@ describe('who may do what', () => {
   });
 });
 
+describe('an upload given up, on the disk', () => {
+  const parts = async (at: string): Promise<string[]> => (await readdir(at, { recursive: true }).catch(() => [])).filter((name) => /\.part\d+$|\.uploading$/.test(name));
+
+  it('takes away the parts that arrived, when asked and when the upload cannot be finished', async () => {
+    const at = join(folder, 'given-up');
+    const handle = createDriveHandler({ storage: diskStorage({ folder: at, secret: 's' }), metadata: memoryMetadata(), identify, authorize: () => true, secret: 'u', base: '/api/files' });
+    const { ask } = client(handle);
+    const send = (url: string, bytes: Uint8Array) => handle(new Request(`http://drive.test${url}`, { method: 'PUT', body: bytes as Uint8Array<ArrayBuffer> }));
+
+    const asked = await ask('POST', '/api/files/uploads', { name: 'video.mp4', parent: null, size: 2 * PART_SIZE });
+    const [first] = asked.body.parts as { url: string }[];
+    await send(first.url, bytesOf(PART_SIZE));
+    expect(await parts(at)).toHaveLength(1);
+    expect((await ask('POST', '/api/files/uploads/abort', { token: asked.body.token })).body).toEqual({ aborted: true });
+    expect(await parts(at)).toEqual([]);
+
+    // Finished with a part that never came: refused, and the one that came is gone too.
+    const again = await ask('POST', '/api/files/uploads', { name: 'video.mp4', parent: null, size: 2 * PART_SIZE });
+    await send((again.body.parts as { url: string }[])[0].url, bytesOf(PART_SIZE));
+    const finished = await ask('POST', '/api/files/uploads/finish', {
+      token: again.body.token,
+      parts: [
+        { number: 1, etag: '"1"' },
+        { number: 2, etag: '"2"' },
+      ],
+    });
+    expect(finished.status).toBe(500);
+    expect(await parts(at)).toEqual([]);
+  });
+
+  it('is refused to someone else', async () => {
+    const handle = onDisk();
+    const asked = await client(handle, 'ana').ask('POST', '/api/files/uploads', { name: 'a.txt', parent: null, size: 1 });
+    expect((await client(handle, 'bea').ask('POST', '/api/files/uploads/abort', { token: asked.body.token })).status).toBe(403);
+  });
+});
+
 describe('the routes, on S3', () => {
   const s3 = memoryS3();
   const handle = createDriveHandler({
@@ -189,6 +226,38 @@ describe('the routes, on S3', () => {
     const { url } = (await ask('GET', `/api/files/entries/${entry.id}/download`)).body;
     expect(new URL(url).searchParams.get('response-content-disposition')).toContain('receipt.docx');
     expect(new URL(url).searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('gives up an upload in parts in the bucket, and not the bytes of one already finished', async () => {
+    const open = s3.uploads.size;
+    const start = await ask('POST', '/api/files/uploads', { name: 'left.bin', parent: null, size: 2 * PART_SIZE });
+    const [part] = start.body.parts as { url: string }[];
+    await s3.fetch(part.url, { method: 'PUT', body: bytesOf(PART_SIZE) });
+    expect(s3.uploads.size).toBe(open + 1);
+    await ask('POST', '/api/files/uploads/abort', { token: start.body.token });
+    expect(s3.uploads.size).toBe(open);
+
+    const kept = await ask('POST', '/api/files/uploads', { name: 'kept.txt', parent: null, type: 'text/plain', size: 3 });
+    const [one] = kept.body.parts as { url: string }[];
+    await s3.fetch(one.url, { method: 'PUT', headers: { 'content-type': 'text/plain' }, body: bytesOf(3) });
+    const entry = (await ask('POST', '/api/files/uploads/finish', { token: kept.body.token, parts: [{ number: 1, etag: '"one"' }] })).body.entry;
+    if (entry.kind !== 'file') throw new Error('not a file');
+    expect((await ask('POST', '/api/files/uploads/abort', { token: kept.body.token })).body).toEqual({ aborted: false });
+    expect(s3.objects.has(entry.versions[0].key)).toBe(true);
+  });
+
+  it('deletes a folder of files from the bucket in one request', async () => {
+    const box = (await ask('POST', '/api/files/folders', { name: 'Box', parent: null })).body.entry;
+    const keys: string[] = [];
+    for (const name of ['a.txt', 'b.txt', 'c.txt']) {
+      const entry = (await upload(bytesOf(10), { name, parent: box.id, type: 'text/plain' }, s3.fetch)).body.entry;
+      if (entry.kind === 'file') keys.push(entry.versions[0].key);
+    }
+    await ask('POST', `/api/files/entries/${box.id}/trash`);
+    const before = s3.seen.length;
+    await ask('DELETE', `/api/files/entries/${box.id}`);
+    expect(s3.seen.slice(before).map((r) => `${r.method} ${r.url.pathname}${r.url.searchParams.has('delete') ? '?delete' : ''}`)).toEqual(['POST /bucket/?delete']);
+    expect(keys.filter((key) => s3.objects.has(key))).toEqual([]);
   });
 
   it('deletes from the bucket what is deleted for good', async () => {

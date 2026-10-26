@@ -1,7 +1,8 @@
 // `npm run storage:check`: the whole way a file goes, against the bucket of
 // `.env`, from Node, so a bucket that refuses something says so here and not
 // in a page. A small file in one PUT, a large one in parts, each read back
-// and compared byte for byte, a new version, and everything deleted again.
+// and compared byte for byte, a new version, an upload given up, and
+// everything deleted again, in one request.
 //
 // A page asks more of the bucket than this: its rule of origins (`cors.json`).
 // Node sends no origin, so that is tried in the page, with `npm run storage`.
@@ -62,6 +63,21 @@ await step('shown in the page, not saved', async () => {
   const disposition = answer.headers.get('content-disposition') ?? '';
   if (!disposition.startsWith('inline')) throw new Error(`The bucket answered with content-disposition "${disposition}".`);
   await answer.body?.cancel();
+});
+
+await step('an upload in parts given up, and gone from the bucket', async () => {
+  const route = (path: string, body: unknown) =>
+    handle(new Request(`${origin}/api/files${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).then((r) => r.json());
+  const started = (await route('/uploads', { name: 'given up.bin', parent: folder.id, type: 'application/octet-stream', size: 2 * PART_SIZE })) as { token: string; parts: { url: string }[] };
+  const [first, second] = started.parts;
+  const sent = await fetch(first.url, { method: 'PUT', body: bytesOf(PART_SIZE, 4) });
+  if (!sent.ok) throw new Error(`The bucket answered ${sent.status} to the first part.`);
+  const { aborted } = (await route('/uploads/abort', { token: started.token })) as { aborted: boolean };
+  if (!aborted) throw new Error('The server did not give it up.');
+  // The bucket no longer knows the upload: a part sent to it now is refused.
+  const late = await fetch(second.url, { method: 'PUT', body: bytesOf(PART_SIZE, 5) });
+  await late.body?.cancel();
+  if (late.ok) throw new Error('The bucket still took a part of the upload given up.');
 });
 
 const urls = await Promise.all([drive.url(one.id), drive.url(one.id, { version: versioned.versions[1].id }), drive.url(parts.id)]);

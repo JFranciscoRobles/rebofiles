@@ -69,6 +69,11 @@ export function diskStorage(options: DiskOptions): Storage {
       await rename(whole, target);
     },
 
+    async abortUpload(key, _state, size) {
+      for (const part of partsOf(size)) await rm(partPath(key, part.number), { force: true });
+      await rm(`${pathOf(key)}.uploading`, { force: true });
+    },
+
     async downloadUrl(key, name, type, base, inline) {
       return address(base, { key, may: 'read', name, type, inline });
     },

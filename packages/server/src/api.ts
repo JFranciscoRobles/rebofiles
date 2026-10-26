@@ -12,6 +12,7 @@
 //   POST   /folders                       { name, parent }
 //   POST   /uploads                       { name, parent, type, size }, or { file, type, size } for a new version: where to send the parts
 //   POST   /uploads/finish                { token, parts: [{ number, etag }] }: the file, once its bytes are there
+//   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
 //   PATCH  /entries/:id                   { name } or { parent }, with { ifTaken: 'keep-both' } to add "(2)"
 //   POST   /entries/:id/trash             into the trash
 //   POST   /entries/:id/restore           out of it
@@ -209,7 +210,13 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const pending = openToken<Pending>(options.secret, String(asked.token ?? ''));
           if (!pending || pending.user !== user.id) throw new Refused(403, 'bad-token', 'That upload is not yours, or it is out of date.');
           const parts = Array.isArray(asked.parts) ? asked.parts.map((part) => ({ number: Number(part.number), etag: String(part.etag) })) : [];
-          await options.storage.finishUpload(pending.key, pending.state, parts, pending.size);
+          try {
+            await options.storage.finishUpload(pending.key, pending.state, parts, pending.size);
+          } catch (error) {
+            // An upload that cannot be finished is given up, so its parts do not wait in the bucket for a lifecycle rule.
+            await options.storage.abortUpload(pending.key, pending.state, pending.size).catch(() => undefined);
+            throw error;
+          }
           const version = { id: pending.versionId, key: pending.key, size: pending.size };
           return Response.json(
             await change(async (drive) => {
@@ -225,6 +232,17 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               return { drive: next, answer: { entry: core.getEntry(next, file.id) } };
             }),
           );
+        }
+
+        case 'POST /uploads/abort': {
+          const asked = await body<{ token: string }>();
+          const pending = openToken<Pending>(options.secret, String(asked.token ?? ''));
+          if (!pending || pending.user !== user.id) throw new Refused(403, 'bad-token', 'That upload is not yours, or it is out of date.');
+          // A token stays good after its upload is finished: the bytes of a version that is kept are not taken away.
+          const drive = await options.metadata.load();
+          const kept = [...drive.entries.values()].some((entry) => entry.kind === 'file' && entry.versions.some((v) => v.key === pending.key));
+          if (!kept) await options.storage.abortUpload(pending.key, pending.state, pending.size);
+          return Response.json({ aborted: !kept });
         }
 
         case 'PATCH /entries/:id': {

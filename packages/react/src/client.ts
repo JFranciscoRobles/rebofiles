@@ -155,7 +155,14 @@ export function createDriveClient(options: ClientOptions) {
           finished.push({ number, etag });
         }
       };
-      await Promise.all(Array.from({ length: Math.min(parallel, start.parts.length) }, worker));
+      try {
+        await Promise.all(Array.from({ length: Math.min(parallel, start.parts.length) }, worker));
+      } catch (error) {
+        // Given up: no more parts go, and what arrived is taken away rather than left in the bucket. Not with the signal, which may be what stopped it.
+        waiting.length = 0;
+        await ask('POST', '/uploads/abort', { token: start.token }).catch(() => undefined);
+        throw error;
+      }
       return (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token: start.token, parts: finished }, options.signal)).entry;
     },
   };

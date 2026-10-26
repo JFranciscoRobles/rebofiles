@@ -34,6 +34,8 @@ export interface Storage {
   startUpload(key: string, type: string, size: number, base: string): Promise<UploadPlan>;
   /** The upload made whole; refused when what arrived is not the size it said. */
   finishUpload(key: string, state: string, parts: FinishedPart[], size: number): Promise<void>;
+  /** An upload given up: whatever of it arrived taken away. Only for a key no version points to. */
+  abortUpload(key: string, state: string, size: number): Promise<void>;
   /** An address to read the bytes from, as an attachment named `name`, or shown in the page when `inline`. */
   downloadUrl(key: string, name: string, type: string, base: string, inline?: boolean): Promise<string>;
   remove(keys: string[]): Promise<void>;

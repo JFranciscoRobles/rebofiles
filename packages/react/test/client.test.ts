@@ -100,6 +100,34 @@ describe('the client against a bucket', () => {
     const large = await drive.upload(new File([new Uint8Array(PART_SIZE + 10)], 'big.bin'));
     expect([small, untyped, large].map((file) => s3.objects.get(file.versions[0].key)?.length)).toEqual([6, 1, PART_SIZE + 10]);
   });
+
+  it('gives up an upload when the bucket refuses a part, and leaves nothing of it there', async () => {
+    const s3 = memoryS3();
+    const handle = createDriveHandler({
+      storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
+      metadata: memoryMetadata(),
+      ...everyone('ana'),
+      secret: 'u',
+      base: '/api/files',
+    });
+    const origin = 'http://drive.test';
+    const drive = createDriveClient({
+      base: `${origin}/api/files`,
+      parallel: 1,
+      fetch: (input, init) => {
+        if (String(input).startsWith(origin)) return handle(new Request(String(input), init));
+        // The second part refused, as a bucket does when its address is out of date.
+        if (new URL(String(input)).searchParams.get('partNumber') === '2') return Promise.resolve(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
+        return s3.fetch(input, init);
+      },
+    });
+    const error = await drive.upload(new File([new Uint8Array(3 * PART_SIZE)], 'big.bin')).catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 403, code: 'upload' });
+    expect(s3.uploads.size).toBe(0);
+    // The third part was not sent after the second was refused.
+    expect(s3.seen.filter((r) => r.url.searchParams.get('partNumber') === '3')).toEqual([]);
+    expect(await drive.search('big')).toEqual([]);
+  });
 });
 
 describe('what the drive shows', () => {

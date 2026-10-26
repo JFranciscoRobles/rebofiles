@@ -80,6 +80,13 @@ minor version (0.x.0) may change the API; such changes are listed under
   origins to the route, `authorize()`, the page and what to do when something
   fails; and what is tested, checked by hand, not yet, its limits and the
   roadmap, from `components/docs/status/data.ts`.
+- **An upload given up.** `POST /uploads/abort` takes away what of an upload
+  arrived, and the client asks it when a part fails or the upload is
+  stopped, sending no more parts; the server gives up one it cannot finish.
+  The bytes of a version already kept are never taken. A storage of your own
+  needs `abortUpload(key, state, size)`.
+- **Deleting in one request.** `s3Storage` deletes up to a thousand keys at
+  once, with DeleteObjects, instead of one request for each.
 ### Fixed
 
 - **The client outside a browser.** An address a storage on the disk makes

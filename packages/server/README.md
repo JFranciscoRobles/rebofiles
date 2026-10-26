@@ -56,14 +56,14 @@ against AWS or MinIO yet. Not on npm yet.
 
 ## Where it can improve
 
-- **A real bucket.** R2 and MinIO by hand, with the rule of origins
-  (`ETag` among the headers exposed, for parts).
+- **Other buckets.** R2 is checked; AWS and MinIO not yet.
 - **One process.** Changes are put in order inside a process; two processes
   on one database need a lock of the database.
 - **The whole drive loaded on each request.** Fine for a team, not for a
   drive of millions of entries.
-- **Uploads left halfway** stay in the bucket as parts until a lifecycle
-  rule takes them.
+- **Uploads left when the page is closed halfway** stay in the bucket as
+  parts until a lifecycle rule takes them; one that fails or is stopped is
+  given up.
 - **Postgres**, in 0.2.
 
 ## License

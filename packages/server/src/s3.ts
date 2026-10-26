@@ -3,11 +3,14 @@
 // parts, each signed for its exact length, so a browser cannot send more
 // than it said.
 
+import { createHash } from 'node:crypto';
 import { type Credentials, presign } from './sigv4';
 import { type FinishedPart, type Storage, type UploadPlan, attachment, partsOf } from './storage';
 
 /** How long an address handed to the browser is good for, in seconds. */
 const URL_LIFE = 15 * 60;
+/** The most keys S3 deletes in one request. */
+const DELETE_BATCH = 1000;
 
 export interface S3Options {
   /** `https://<account-id>.r2.cloudflarestorage.com`, `http://localhost:9000`; AWS's of the region when left out. */
@@ -49,9 +52,9 @@ export function s3Storage(options: S3Options): Storage {
     for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
     return url.toString();
   };
-  const ask = async (method: string, url: string, body?: string): Promise<Response> => {
+  const ask = async (method: string, url: string, body?: string, signed: Record<string, string> = {}): Promise<Response> => {
     // Not compressed: Cloudflare gzips the answer to a HEAD of a text, and drops its content-length, which says what arrived.
-    const answer = await send(presign(credentials, { method, url, expires: 60 }), { method, body, headers: { 'accept-encoding': 'identity' } });
+    const answer = await send(presign(credentials, { method, url, expires: 60, headers: signed }), { method, body, headers: { ...signed, 'accept-encoding': 'identity' } });
     if (!answer.ok && answer.status !== 404) throw new Error(`The bucket answered ${answer.status} to ${method}: ${(await answer.text()).slice(0, 300)}`);
     return answer;
   };
@@ -98,12 +101,31 @@ export function s3Storage(options: S3Options): Storage {
       }
     },
 
+    async abortUpload(key, uploadId) {
+      // The parts kept for an upload in parts; a file of one part may have arrived whole, under a key nothing points to.
+      if (uploadId) await ask('DELETE', at(key, { uploadId }));
+      else await ask('DELETE', at(key));
+    },
+
     async downloadUrl(key, name, type, _base, inline) {
       return presign(credentials, { method: 'GET', url: at(key, { 'response-content-disposition': attachment(name, inline), 'response-content-type': type }), expires: URL_LIFE });
     },
 
     async remove(keys) {
-      for (const key of keys) await ask('DELETE', at(key));
+      const xmlText = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      for (let from = 0; from < keys.length; from += DELETE_BATCH) {
+        const objects = keys
+          .slice(from, from + DELETE_BATCH)
+          .map((key) => `<Object><Key>${xmlText((options.prefix ?? '') + key)}</Key></Object>`)
+          .join('');
+        const xml = `<Delete><Quiet>true</Quiet>${objects}</Delete>`;
+        // S3 takes a list to delete only with the MD5 of it.
+        // To the bucket itself, not under the prefix: the keys in the list have it.
+        const answer = await ask('POST', `${root}?delete=`, xml, { 'content-md5': createHash('md5').update(xml).digest('base64') });
+        // Quiet: only what could not be deleted is said, each as an <Error>.
+        const text = await answer.text();
+        if (answer.status === 404 || /<Error>/.test(text)) throw new Error(`The bucket did not delete everything: ${text.slice(0, 300)}`);
+      }
     },
   };
 }

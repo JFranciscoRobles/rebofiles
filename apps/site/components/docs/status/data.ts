@@ -9,13 +9,13 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   { where: 'packages/core', count: 31, what: 'Names, the tree, renaming and moving, the trash, versions, search, changes.' },
   {
     where: 'packages/server',
-    count: 19,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, who may do what, SQLite across two processes, and the signature against AWS’s example.',
+    count: 23,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, SQLite across two processes, and the signature against AWS’s example.',
   },
   {
     where: 'packages/react',
-    count: 15,
-    what: 'The client against the routes and against a bucket: folders, uploads in parts with progress, the headers a bucket signed, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
+    count: 16,
+    what: 'The client against the routes and against a bucket: folders, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
 ];
 
@@ -23,7 +23,7 @@ export const TESTS: { where: string; count: number; what: string }[] = [
 export const CHECKED: [string, string][] = [
   [
     'Cloudflare R2',
-    '`npm run storage:check` from Node: a file in one PUT, one of 16 MiB in parts, each read back byte for byte, a second version, a download shown in the page, the deletion seen in the bucket. Then the page against the same bucket, with its rule of origins.',
+    '`npm run storage:check` from Node: a file in one PUT, one of 16 MiB in parts, each read back byte for byte, a second version, a download shown in the page, an upload given up, the deletion in one request, seen in the bucket. Then the page against the same bucket, with its rule of origins.',
   ],
   [
     'The interface',
@@ -47,7 +47,9 @@ export const NOT_CHECKED: [string, string][] = [
 export const LIMITS: { area: string; items: string[] }[] = [
   {
     area: 'Storage',
-    items: ['A part left halfway by an upload never finished stays in the bucket until a lifecycle rule of the bucket takes it.', 'Deleting is one request per key.'],
+    items: [
+      'An upload that fails or is stopped is given up, and what of it arrived taken away; one left when the page is closed halfway stays in the bucket until a lifecycle rule of the bucket takes it.',
+    ],
   },
   {
     area: 'Metadata',

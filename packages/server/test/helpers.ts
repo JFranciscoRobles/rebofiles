@@ -58,6 +58,17 @@ export function memoryS3() {
       uploads.get(q.get('uploadId')!)!.set(Number(q.get('partNumber')), body);
       return new Response(null, { headers: { etag: `"p${q.get('partNumber')}"` } });
     }
+    if (method === 'DELETE' && q.has('uploadId')) {
+      uploads.delete(q.get('uploadId')!);
+      return new Response(null, { status: 204 });
+    }
+    if (method === 'POST' && q.has('delete')) {
+      const xml = new TextDecoder().decode(body);
+      const { createHash } = await import('node:crypto');
+      if (sent.get('content-md5') !== createHash('md5').update(xml).digest('base64')) return new Response('<Error><Code>InvalidDigest</Code></Error>', { status: 400 });
+      for (const match of xml.matchAll(/<Key>([^<]+)<\/Key>/g)) objects.delete(match[1]);
+      return new Response('<DeleteResult/>');
+    }
     if (method === 'POST' && q.has('uploadId')) {
       const parts = uploads.get(q.get('uploadId')!)!;
       const order = [...new TextDecoder().decode(body).matchAll(/<PartNumber>(\d+)<\/PartNumber>/g)].map((m) => Number(m[1]));
