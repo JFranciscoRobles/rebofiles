@@ -55,12 +55,21 @@ export function pageWidthToFit(pages: number, ratio: number, width: number, heig
 /**
  * A Word document's pages, by Rebodocs' editor, read only, for the viewer of the drive:
  * `mountDrive(element, { viewDocument: viewDocx })`. All of its pages at first, as large as lets them all fit on the
- * screen, or at the editor's least zoom (a quarter) for one too long to; `layout('pages')` shows them one under another, each whole on the screen. Its engine is loaded the first time.
+ * screen, or at the editor's least zoom (a quarter) for one too long to; with Rebodocs' bar of the zoom over them; `layout('pages')` shows them one under another, each whole on the screen. Its engine is loaded the first time.
  */
-export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise<DocumentView> {
-  const { Editor } = await import('@rebodocs/editor');
+export async function viewDocx(element: HTMLElement, bytes: Uint8Array, context: { language?: string } = {}): Promise<DocumentView> {
+  const { Editor, createStatusBar, setLocale } = await import('@rebodocs/editor');
+  // In the drive's language: Rebodocs' words are its own, for all its editors in the page.
+  if (context.language) setLocale(context.language);
   const editor = new Editor(element, importDocx(bytes));
   editor.readOnly = true;
+  // Rebodocs' own bar, floating over the pages: the page one is on, how the page fits, and the zoom.
+  const bar = document.createElement('div');
+  bar.className = 'rf-doc-zoom';
+  element.appendChild(bar);
+  const status = createStatusBar(bar, editor, { layout: 'floating' });
+  // One page under another, or all of them at once; a document only read has no notes to open nor language to set.
+  for (const away of bar.querySelectorAll('[data-name="spread"], [data-name="flow"], [data-name="notes"], [data-name="language"]')) away.remove();
   let current: DocumentLayout = 'all';
   const layout = (mode: DocumentLayout) => {
     current = mode;
@@ -94,8 +103,25 @@ export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise
     element.scrollTop = 0;
     for (const inside of element.querySelectorAll<HTMLElement>('*')) if (inside.scrollTop) inside.scrollTop = 0;
   };
-  layout('all');
-  return { pages: editor.pageCount, layout, destroy: () => editor.destroy() };
+  layout('pages');
+  // The bar's buttons of the views set them out as Rebodocs does; here, all the pages fit on the screen, or each one does.
+  let shownView = editor.view;
+  const offChange = editor.onChange(() => {
+    if (editor.view === shownView) return;
+    shownView = editor.view;
+    // After the bar has done its own, which sets a zoom of its choosing once the view is set.
+    const mode: DocumentLayout | undefined = editor.view === 'grid' ? 'all' : editor.view === 'column' ? 'pages' : undefined;
+    if (mode) setTimeout(() => editor.view === shownView && layout(mode));
+  });
+  return {
+    pages: editor.pageCount,
+    layout,
+    destroy: () => {
+      offChange();
+      status.destroy();
+      editor.destroy();
+    },
+  };
 }
 
 /** Thumbnails made one at a time: each needs an editor laid out for a moment. */

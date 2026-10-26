@@ -142,9 +142,11 @@ minor version (0.x.0) may change the API; such changes are listed under
   elements, never of HTML, its links only to http, https and mail), a CSV as
   a table, JSON laid out, code and text; a Word document in its pages, by
   Rebodocs' editor read only, with `viewDocument: viewDocx` of
-  `@rebofiles/drive/rebodocs`: all of its pages at once, as large as lets
-  them all fit on the screen (at the editor's least zoom, a quarter, for a
-  long one), or one by one, each whole. Its thumbnail, in the grid and the
+  `@rebofiles/drive/rebodocs`: one page under another, each whole on the
+  screen, with Rebodocs' bar floating over them (the page one is on, the
+  fit, the zoom), whose grid of pages sets all of them out at once, as large
+  as lets them all fit (at the editor's least zoom, a quarter, for a long
+  one). A first page lying down is shown whole in its thumbnail. Its thumbnail, in the grid and the
   details, is the top of its first page as Rebodocs draws it, large, its
   side margins left out. It is a picture made when the document is uploaded
   (`pictureDocument: pictureOfDocx`): its first page drawn by Rebodocs'

@@ -4,6 +4,7 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
+import { exportDocx, importDocx } from '@rebodocs/core';
 import { sampleDocx, sampleDocxWithPicture } from '../../../tools/sample-docx';
 
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
@@ -80,11 +81,17 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   // Its pages, by Rebodocs' engine.
   await expect(docx.locator('.rf-view-pages .dx-page').first()).toBeVisible({ timeout: 15_000 });
   await expect(docx.getByRole('button', { name: 'Open in Rebodocs' })).toBeVisible();
-  await expect(docx.getByText('1 page')).toBeVisible();
-  await expect(docx.getByRole('button', { name: 'All pages' })).toHaveAttribute('aria-pressed', 'true');
-  await docx.getByRole('button', { name: 'One by one' }).click();
-  await expect(docx.getByRole('button', { name: 'One by one' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(docx.locator('.rf-view-pages .dx-page').first()).toBeVisible();
+  // One page under another at first; Rebodocs' bar floating over them sets all of them out, and zooms.
+  const bar = docx.locator('.rf-doc-zoom');
+  await expect(bar.locator('[data-name="column"]')).toHaveClass(/dx-on/);
+  await expect(bar.getByText('Page 1 of 1')).toBeVisible();
+  await expect(bar.locator('[data-name="notes"], [data-name="flow"]')).toHaveCount(0);
+  await bar.locator('[data-name="grid"]').click();
+  await expect(bar.locator('[data-name="grid"]')).toHaveClass(/dx-on/);
+  const zoom = bar.locator('.dx-sb-percent');
+  const before = await zoom.textContent();
+  await bar.locator('[data-name="zoom-in"]').click();
+  await expect(zoom).not.toHaveText(before ?? '');
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: /agreement/ })).toHaveCount(0);
@@ -118,4 +125,13 @@ test('a Word document’s thumbnail has its pictures in it', async ({ page }) =>
     return [r, g, b];
   }, id);
   expect(Math.abs(colour[0] - 14) + Math.abs(colour[1] - 124) + Math.abs(colour[2] - 82)).toBeLessThan(40);
+});
+
+test('a Word document lying down is shown whole in its thumbnail', async ({ page }) => {
+  const upright = importDocx(sampleDocx());
+  const lying = exportDocx({ ...upright, page: { ...upright.page, width: upright.page.height, height: upright.page.width } });
+  await page.goto('/?as=lying');
+  await page.locator('input[type=file]').setInputFiles({ name: 'plan.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(lying) });
+  await item(page, 'plan.docx').click();
+  await expect(page.getByRole('complementary', { name: 'Details' }).locator('.rf-doc-thumb.rf-wide img.rf-doc-pic')).toBeVisible({ timeout: 15_000 });
 });

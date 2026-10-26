@@ -42,7 +42,7 @@ export interface DriveOptions {
    * Shows a Word document's pages in the viewer, in `element`, and gives what takes them down: `viewDocx` of
    * `@rebofiles/drive/rebodocs`, by Rebodocs' engine. Without it, the viewer shows what `previewDocument` reads.
    */
-  viewDocument?: (element: HTMLElement, bytes: Uint8Array) => ShownDocument | Promise<ShownDocument>;
+  viewDocument?: (element: HTMLElement, bytes: Uint8Array, context: { language: string }) => ShownDocument | Promise<ShownDocument>;
   /** The first page of a Word document, drawn, for its thumbnail in the grid and the details: `thumbDocx` of `@rebofiles/drive/rebodocs`. */
   thumbDocument?: (bytes: Uint8Array) => Promise<HTMLElement>;
   /**
@@ -261,9 +261,16 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const docThumb = (file: FileEntry, fit: 'page' | 'width', wanted = 640): Child | undefined => {
     if (kindOf(file) !== 'docx') return undefined;
     // The picture made of its first page when it was uploaded, when there is one: nothing to draw.
-    if (file.versions[0].renditions?.length) {
+    const renditions = file.versions[0].renditions;
+    if (renditions?.length) {
       const src = urlOf(file, wanted);
-      return h('div', { key: `pic:${file.id}:${fit}`, class: `rf-doc-thumb rf-fit-${fit}`, 'aria-hidden': 'true' }, src && h('img', { class: 'rf-doc-pic', src, alt: '' }));
+      // A page lying down is shown whole: its top would be a strip.
+      const wide = renditions[0].width > renditions[0].height;
+      return h(
+        'div',
+        { key: `pic:${file.id}:${fit}`, class: `rf-doc-thumb rf-fit-${wide ? 'page' : fit}${wide ? ' rf-wide' : ''}`, 'aria-hidden': 'true' },
+        src && h('img', { class: 'rf-doc-pic', src, alt: '' }),
+      );
     }
     const make = options.thumbDocument;
     if (!make || file.versions[0].size > PREVIEW_LIMIT) return undefined;
@@ -296,11 +303,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         const copy = page.cloneNode(true) as HTMLElement;
         const width = Number(page.dataset.width) || 816;
         const height = Number(page.dataset.height) || 1056;
+        // A page lying down is shown whole: its top would be a strip.
+        const shown = width > height ? 'page' : fit;
+        if (shown !== fit) box.classList.add('rf-wide');
         // Its top, the side margins left out so the text is as large as it can be; or the whole page.
-        const SHOWN = 0.8;
-        const scale = fit === 'width' ? box.clientWidth / (width * SHOWN) : Math.min(box.clientWidth / width, box.clientHeight / height);
-        const left = fit === 'width' ? -(width * scale - box.clientWidth) / 2 : Math.max(0, (box.clientWidth - width * scale) / 2);
-        const top = fit === 'width' ? -height * scale * 0.04 : Math.max(0, (box.clientHeight - height * scale) / 2);
+        const SHOWN = 1 / 1.22;
+        const scale = shown === 'width' ? box.clientWidth / (width * SHOWN) : Math.min(box.clientWidth / width, box.clientHeight / height);
+        const left = shown === 'width' ? -(width * scale - box.clientWidth) / 2 : Math.max(0, (box.clientWidth - width * scale) / 2);
+        const top = shown === 'width' ? -height * scale * 0.02 : Math.max(0, (box.clientHeight - height * scale) / 2);
         copy.style.cssText = `width:${width}px;height:${height}px;transform:scale(${scale});transform-origin:top left;position:absolute;left:${left}px;top:${top}px`;
         box.appendChild(copy);
       },
@@ -1160,9 +1170,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let zoomed = false;
   /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
   const fullTexts = new Map<string, string | null | Error>();
-  /** The document shown in pages, to take down before the next, and to set out. */
+  /** The document shown in pages, to take down before the next. */
   let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void } | undefined;
-  let documentLayout: 'all' | 'pages' = 'all';
   const undoDocument = () => {
     shownDocument?.destroy();
     shownDocument = undefined;
@@ -1299,13 +1308,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             undoDocument();
             fetch(url)
               .then((answer) => answer.arrayBuffer())
-              .then((bytes) => show(node, new Uint8Array(bytes)))
+              .then((bytes) => show(node, new Uint8Array(bytes), { language: locale }))
               .then(
                 (shown) => {
                   const handle = typeof shown === 'function' ? { destroy: shown } : shown;
                   if (viewing !== file.id) return handle?.destroy();
                   shownDocument = handle;
-                  if (documentLayout !== 'all') handle?.layout?.(documentLayout);
                   render();
                 },
                 () => node.replaceChildren(h('p', { class: 'rf-view-cut' }, t('couldNotRead'))),
@@ -1372,30 +1380,6 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         h('span', { class: `rf-tile rf-k-${kind}`, 'aria-hidden': 'true' }, badgeOf(file)),
         h('div', { class: 'rf-view-title' }, h('strong', null, file.name), h('span', null, `${formatSize(file.versions[0].size, locale)} · ${formatDate(file.modified, locale)} · ${file.modifiedBy}`)),
         files.length > 1 && h('span', { class: 'rf-view-count', 'aria-live': 'polite' }, t('nOfM', { n: at + 1, m: files.length })),
-        kind === 'docx' &&
-          shownDocument?.layout && [
-            shownDocument.pages !== undefined && h('span', { class: 'rf-view-count' }, shownDocument.pages === 1 ? t('onePage') : t('pagesN', { n: shownDocument.pages })),
-            h(
-              'div',
-              { class: 'rf-view-seg', role: 'group', 'aria-label': t('pagesShown') },
-              (
-                [
-                  ['all', t('allPages')],
-                  ['pages', t('oneByOne')],
-                ] as const
-              ).map(([mode, label]) =>
-                button(
-                  label,
-                  () => {
-                    documentLayout = mode;
-                    shownDocument?.layout?.(mode);
-                    render();
-                  },
-                  { key: mode, 'aria-pressed': documentLayout === mode },
-                ),
-              ),
-            ),
-          ],
         options.onOpenDocument &&
           kind === 'docx' &&
           button(withIcon('doc', t('openInRebodocs')), () => void attempt(async () => options.onOpenDocument?.(file, await client.url(file.id, { inline: true }))), {

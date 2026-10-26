@@ -152,8 +152,12 @@ export const CSS = `
 .rf-details h2 { margin: 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
 .rf-none { padding: 24px 16px; color: var(--rf-muted); }
 .rf-doc-thumb { position: absolute; inset: 0; overflow: hidden; background: #fff; }
-.rf-doc-pic { position: absolute; left: -12.5%; top: -4%; width: 125%; height: auto; }
-.rf-fit-page .rf-doc-pic { left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; }
+/* The top of the page, centred, most of its side margins left out (a tenth of it each side, as most documents have more): about half of it shows. */
+/* Over the rules of pictures in a preview and in a card, which fill their box. */
+.rf-doc-thumb img.rf-doc-pic { position: absolute; left: 50%; top: -1%; width: 122%; max-width: none; height: auto; max-height: none; object-fit: initial; transform: translateX(-50%); border-radius: 0; }
+.rf-doc-thumb.rf-fit-page img.rf-doc-pic { left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; transform: none; }
+.rf-doc-thumb.rf-wide { background: none; }
+.rf-doc-thumb.rf-wide img.rf-doc-pic { left: 4%; top: 4%; width: 92%; height: 92%; filter: drop-shadow(0 1px 3px rgba(var(--rf-shade),.22)); }
 .rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
 .rf-thumb .rf-doc-thumb { inset: 8px 10px 0; border-radius: 6px 6px 0 0; }
 .rf-preview.rf-preview-doc { position: relative; height: 240px; }
@@ -230,9 +234,6 @@ export const CSS = `
 .rf-view-title strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-view-title span { font-size: 12px; color: #a9a69f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-view-count { font-size: 13px; color: #a9a69f; white-space: nowrap; }
-.rf-view-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.08); }
-.rf-view-seg button { border: 0; border-radius: 8px; background: none; color: #d2d0ca; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
-.rf-view-seg button[aria-pressed='true'] { background: #ecebe7; color: #161514; font-weight: 600; }
 .rf-view-stage { position: relative; flex: 1; min-height: 0; display: flex; }
 .rf-view-content { flex: 1; min-width: 0; display: flex; }
 .rf-view-content > * { flex: 1; min-width: 0; }
@@ -269,6 +270,11 @@ export const CSS = `
 .rf-view-table th { position: sticky; top: 0; background: #f1f0ec; font-weight: 600; }
 .rf-view-cut { text-align: center; color: #a9a69f; font-size: 13px; margin: 14px 0 0; }
 .rf-view-pages { position: relative; padding: 0; background: #2a2926; }
+/* Rebodocs' bar of the zoom, floating at the foot of the pages. */
+.rf-doc-zoom { position: sticky; bottom: 14px; z-index: 3; display: flex; justify-content: center; pointer-events: none; margin-top: -52px; height: 52px; align-items: center; }
+.rf-doc-zoom .dx-sb { background: none; border: 0; box-shadow: none; }
+/* Only read: no caret, though the bar gives the editor the keyboard back. */
+.rf-view-pages .dx-caret { display: none !important; }
 @media (max-width: 700px) {
   .rf-view-doc, .rf-view-code, .rf-view-table { padding: 12px; }
   .rf-view-image img { inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
