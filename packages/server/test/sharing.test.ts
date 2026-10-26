@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Entry } from '@rebofiles/core';
+import type { Entry, FileEntry } from '@rebofiles/core';
 import { type DriveServerOptions, byRoles, createDriveHandler, diskStorage, memoryMetadata } from '../src';
 import { bytesOf, client } from './helpers';
 
@@ -263,6 +263,25 @@ describe('links, through the routes', () => {
     const d = drive();
     const asked = await d.ana.ask('POST', '/api/files/uploads', { name: 'a.txt', parent: null, size: 1 });
     expect((await anonymous(d, `/links/${encodeURIComponent(asked.body.token as string)}`)).status).toBe(404);
+  });
+});
+
+describe('the same file again', () => {
+  const hash = 'a'.repeat(64);
+  it('is found by the SHA-256 kept with its version, among what one may read, outside the trash', async () => {
+    const d = drive();
+    const { clients } = await anasClients(d);
+    const file = (await d.ana.upload(bytesOf(10), { name: 'x.txt', parent: clients.id, type: 'text/plain', sha256: hash }, d.send)).body.entry;
+    expect((file as FileEntry).versions[0].sha256).toBe(hash);
+    // A hash that is not one is not kept.
+    expect(((await d.ana.upload(bytesOf(10), { name: 'y.txt', parent: null, sha256: 'nope' }, d.send)).body.entry as FileEntry).versions[0]).not.toHaveProperty('sha256');
+
+    const found = (await d.ana.ask('POST', '/api/files/duplicates', { hashes: [hash, 'b'.repeat(64), 'bad'] })).body.found as Record<string, Entry[]>;
+    expect(Object.keys(found)).toEqual([hash]);
+    expect(found[hash].map((e) => e.name)).toEqual(['x.txt']);
+    expect((await d.bea.ask('POST', '/api/files/duplicates', { hashes: [hash] })).body.found).toEqual({});
+    await d.ana.ask('POST', `/api/files/entries/${file.id}/trash`);
+    expect((await d.ana.ask('POST', '/api/files/duplicates', { hashes: [hash] })).body.found).toEqual({});
   });
 });
 

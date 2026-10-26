@@ -209,6 +209,16 @@ minor version (0.x.0) may change the API; such changes are listed under
   inside it (`GET /entries/:id/activity`, `client.activity`); an assistant
   reads it with `get_activity`. Kept by the store (`record`, `activity`;
   a table of its own on SQLite and Postgres), else in the process.
+- **The same file, or the same name, asked about before it goes.** Each
+  file is looked for in the drive before it is uploaded: its SHA-256, made
+  in the page for one of up to 64 MiB (`hashOf`) and kept with its version
+  (`sha256`), finds the same bytes anywhere one may read (`POST
+  /duplicates`, `filesByHash`); else a file of its name where it goes. The
+  panel of uploads asks: for the same bytes, upload anyway or skip; for a
+  name, replace (a new version of it), keep both, or skip; and "do the
+  same for all the others". `createUploads({ check })`, `lookInDrive`,
+  `decide`; `useUploads({ check: true })` in React; `checkUploads: false`
+  to upload without asking, as before.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

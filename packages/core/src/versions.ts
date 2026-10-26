@@ -14,7 +14,7 @@ function live(drive: Drive, id: EntryId): FileEntry {
 const withFile = (drive: Drive, file: FileEntry): Drive => ({ entries: new Map(drive.entries).set(file.id, file) });
 
 /** The file saved again: its new bytes become the version it is now. */
-export function addVersion(drive: Drive, id: EntryId, version: { id: string; key: string; size: number; note?: string }, context: Context): Drive {
+export function addVersion(drive: Drive, id: EntryId, version: { id: string; key: string; size: number; note?: string; sha256?: string }, context: Context): Drive {
   const file = live(drive, id);
   if (file.versions.some((v) => v.id === version.id)) throw new DriveError('duplicate-id', `There is already a version ${version.id}`);
   const next: Version = { ...version, at: context.at, by: context.by };
@@ -28,7 +28,16 @@ export function restoreVersion(drive: Drive, id: EntryId, versionId: string, new
   if (!old) throw new DriveError('no-version', `${file.name} has no version ${versionId}`);
   if (old === file.versions[0]) return drive;
   if (file.versions.some((v) => v.id === newId)) throw new DriveError('duplicate-id', `There is already a version ${newId}`);
-  const next: Version = { id: newId, key: old.key, size: old.size, at: context.at, by: context.by, restoredFrom: old.id, ...(old.renditions ? { renditions: old.renditions } : {}) };
+  const next: Version = {
+    id: newId,
+    key: old.key,
+    size: old.size,
+    at: context.at,
+    by: context.by,
+    restoredFrom: old.id,
+    ...(old.sha256 ? { sha256: old.sha256 } : {}),
+    ...(old.renditions ? { renditions: old.renditions } : {}),
+  };
   return withFile(drive, { ...file, versions: [next, ...file.versions], modified: context.at, modifiedBy: context.by });
 }
 
@@ -52,3 +61,15 @@ export function addRendition(drive: Drive, id: EntryId, versionId: string, rendi
 
 /** The smallest rendition of a version that shows it at `size` pixels, or none when only the original does. */
 export const renditionFor = (version: Version, size: number): Rendition | undefined => version.renditions?.find((r) => r.size >= size);
+
+/** The files outside the trash whose bytes, as they are now, have one of these SHA-256s: by each. */
+export function filesByHash(drive: Drive, hashes: readonly string[]): Map<string, FileEntry[]> {
+  const wanted = new Set(hashes);
+  const found = new Map<string, FileEntry[]>();
+  for (const entry of drive.entries.values()) {
+    const hash = entry.kind === 'file' ? entry.versions[0].sha256 : undefined;
+    if (!hash || !wanted.has(hash) || isTrashed(drive, entry.id)) continue;
+    found.set(hash, [...(found.get(hash) ?? []), entry as FileEntry]);
+  }
+  return found;
+}

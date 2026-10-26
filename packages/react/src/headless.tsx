@@ -4,7 +4,7 @@
 
 import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, translator } from '@rebofiles/drive';
+import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, lookInDrive, translator } from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;
@@ -209,8 +209,9 @@ export type Upload = UploadItem;
  * Files going up, a few at once, each in parts: how far each is, how fast and how long it has left, and the same for
  * all of them (`summary`). One that failed is tried again with `retry`, from what arrived; one going is stopped with `stop`.
  */
-export function useUploads() {
+export function useUploads(how: { /** Each file looked for in the drive before it goes, and asked about (`decide`) when it is there. */ check?: boolean } = {}) {
   const { client, changed, settings } = useDrive();
+  const look = useMemo(() => (how.check ? lookInDrive(client) : undefined), [client, how.check]);
   const [, redraw] = useState(0);
   // The sizes pictures are made in, as the drive's settings say when an upload starts.
   const images = useRef<ImageSettings | undefined>(undefined);
@@ -220,15 +221,17 @@ export function useUploads() {
     () =>
       createUploads(client, {
         extra: () => ({ images: images.current }),
+        check: look,
         onChange: () => redraw((n) => n + 1),
         onDone: (entry, item) => {
           done.current.get(item.id)?.(entry);
           done.current.delete(item.id);
+          look?.forget();
           changed();
         },
         onFail: () => changed(),
       }),
-    [client, changed],
+    [client, changed, look],
   );
   const upload = useCallback(
     (files: Iterable<File>, parent: EntryId | null, onDone?: (entry: FileEntry) => void) => {
@@ -243,6 +246,7 @@ export function useUploads() {
     summary: uploads.summary(),
     upload,
     retry: uploads.retry,
+    decide: uploads.decide,
     stop: uploads.stop,
     stopAll: uploads.stopAll,
     dismiss: uploads.dismiss,

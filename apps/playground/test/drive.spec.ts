@@ -34,10 +34,12 @@ test('makes a folder and uploads into it, a large file in parts among them', asy
   await expect(details(page).getByText('Call Acme on Monday.')).toBeVisible();
 });
 
-test('keeps both files when one comes with a name already taken', async ({ page }) => {
+test('keeps both files, when asked, when one comes with a name already taken', async ({ page }) => {
   await page.goto('/');
   await item(page, 'Clients').dblclick();
   await upload(page, [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('A second one.') }]);
+  // Asked first, as there is one of that name here.
+  await page.getByRole('region', { name: 'Uploads' }).getByRole('button', { name: 'Keep both' }).click();
   await expect(item(page, 'notes (2).txt')).toBeVisible();
 });
 

@@ -15,6 +15,8 @@ export interface Version {
   at: string;
   by: string;
   note?: string;
+  /** The SHA-256 of its bytes, in hex, as the one who uploaded it said: to tell the same file uploaded again. */
+  sha256?: string;
   /** The version this one brought back, when it was made by `restoreVersion`. */
   restoredFrom?: string;
   /** Of a picture: smaller ones made of it when it was uploaded, to show it; the bytes under `key` stay as they came. */

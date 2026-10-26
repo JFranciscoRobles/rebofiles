@@ -17,6 +17,8 @@ export {
   RequestError,
   createDriveClient,
   createLinkClient,
+  hashOf,
+  HASH_UP_TO,
 } from './client';
 export { type MemoryOptions, type MemoryClient, createMemoryClient } from './memory';
 export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate } from './i18n';
@@ -24,7 +26,7 @@ export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
 export { type MadeRendition, renditionsOf, makesRenditions } from './images';
 export { type ZipItem, type ZipSink, type ZipOptions, writeZip, blobSink, streamSink, crc32 } from './zip';
-export { type UploadItem, type Uploads, type UploadsOptions, type UploadsSummary, createUploads, formatDuration } from './uploads';
+export { type Choice, type Conflict, type UploadItem, type Uploads, type UploadsOptions, type UploadsSummary, createUploads, formatDuration, lookInDrive } from './uploads';
 export { type Picked, readDropped, readChosen } from './folders';
 export { type ZipProgress, type ZipDownload, type ZipDownloadOptions, downloadZip } from './download';
 export { type DriveOptions, type MountedDrive, mountDrive } from './screen';

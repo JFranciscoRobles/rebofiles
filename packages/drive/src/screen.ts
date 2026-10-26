@@ -17,7 +17,7 @@ import { type DocumentPreview, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
 import { type Picked, readChosen, readDropped } from './folders';
-import { type UploadItem, createUploads, formatDuration } from './uploads';
+import { type UploadItem, createUploads, formatDuration, lookInDrive } from './uploads';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
@@ -62,6 +62,8 @@ export interface DriveOptions {
   theme?: 'light' | 'dark' | 'auto';
   /** False to leave out the settings of the server, and the button that changes them. */
   settings?: boolean;
+  /** Each file looked for in the drive before it goes, and asked about when its bytes or its name are there already: true unless said. */
+  checkUploads?: boolean;
   className?: string;
   /** Called after every change made from the drive, for what else in the page shows it to ask again. */
   onChange?: () => void;
@@ -444,6 +446,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   };
   const changed = () => {
     revision++;
+    lookIn.forget();
     options.onChange?.();
     askShared();
     render();
@@ -597,8 +600,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // Files going up, a few at once; what was selected when each was chosen, to show it once it is up unless that changed.
   const selectedWhen = new Map<number, EntryId | null>();
+  // The same bytes anywhere in the drive, and else a file of the same name where it goes: asked about before it goes.
+  const lookIn = lookInDrive(client);
   const uploader = createUploads(client, {
     extra: () => ({ images: settings?.settings.images, renditions: picturesOf }),
+    check: (file, parent) => (options.checkUploads === false ? Promise.resolve({}) : lookIn(file, parent)),
     onChange: render,
     onDone: (entry, item) => {
       if (selectedWhen.get(item.id) === selected && picked.size <= 1 && !viewing && !dialog) select(entry.id);
@@ -609,6 +615,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     onFail: () => changed(),
   });
   let uploadsOpen = true;
+  /** What is chosen for one asked about goes for all the others of its kind. */
+  let forAll = false;
   const uploadInto = (files: Iterable<File>, parent: EntryId | null) => {
     const chosen = [...files];
     const first = uploader.items.length;
@@ -2105,7 +2113,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   function uploadsPanel() {
     const all = uploader.items;
     const sum = uploader.summary();
-    const going = sum.sending + sum.waiting;
+    const going = sum.sending + sum.waiting + sum.asking;
     const pct = (sent: number, size: number) => Math.round((sent / Math.max(1, size)) * 100);
     const title = going
       ? `${t('upGoing', { done: sum.done, n: all.length })}${sum.remaining !== undefined ? ` · ${t('upLeft', { time: formatDuration(sum.remaining, locale) })}` : ''}`
@@ -2114,21 +2122,29 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         : t('upDone', { n: sum.done });
     const row = (item: UploadItem) => {
       const stateText =
-        item.state === 'waiting'
-          ? t('upWaiting')
-          : item.state === 'sending'
-            ? [
-                t('upOf', { sent: formatSize(item.sent, locale), size: formatSize(item.size, locale) }),
-                item.speed !== undefined && ` · ${t('upSpeed', { speed: formatSize(item.speed, locale) })}`,
-                item.remaining !== undefined && ` · ${t('upLeft', { time: formatDuration(item.remaining, locale) })}`,
-              ]
-            : item.state === 'done'
-              ? t('upUploaded')
-              : item.state === 'stopped'
-                ? t('upStopped')
-                : item.sent > 0
-                  ? t('uploadCut', { name: item.name, pct: pct(item.sent, item.size) })
-                  : `${item.name}: ${item.error}`;
+        item.state === 'asking' && item.conflict
+          ? item.conflict.kind === 'same'
+            ? t('upSame', { name: item.conflict.entry.name })
+            : t('upNamed', { name: item.conflict.entry.name })
+          : item.state === 'checking'
+            ? t('upChecking')
+            : item.state === 'skipped'
+              ? t('upSkipped')
+              : item.state === 'waiting'
+                ? t('upWaiting')
+                : item.state === 'sending'
+                  ? [
+                      t('upOf', { sent: formatSize(item.sent, locale), size: formatSize(item.size, locale) }),
+                      item.speed !== undefined && ` · ${t('upSpeed', { speed: formatSize(item.speed, locale) })}`,
+                      item.remaining !== undefined && ` · ${t('upLeft', { time: formatDuration(item.remaining, locale) })}`,
+                    ]
+                  : item.state === 'done'
+                    ? t('upUploaded')
+                    : item.state === 'stopped'
+                      ? t('upStopped')
+                      : item.sent > 0
+                        ? t('uploadCut', { name: item.name, pct: pct(item.sent, item.size) })
+                        : `${item.name}: ${item.error}`;
       return h(
         'li',
         { key: `up${item.id}`, class: `rf-up rf-up-${item.state}` },
@@ -2145,9 +2161,18 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               h('span', { style: `width: ${pct(item.sent, item.size)}%` }),
             ),
         ),
+        item.state === 'asking' &&
+          item.conflict &&
+          h(
+            'div',
+            { class: 'rf-up-ask', role: 'group', 'aria-label': `${t('upWhat')} ${item.name}` },
+            item.conflict.kind === 'name' && button(t('upReplace'), () => uploader.decide(item.id, 'replace', forAll), { class: 'rf-btn rf-small' }),
+            button(item.conflict.kind === 'name' ? t('upKeepBoth') : t('upAnyway'), () => uploader.decide(item.id, 'keep', forAll), { class: 'rf-btn rf-small' }),
+            button(t('upSkip'), () => uploader.decide(item.id, 'skip', forAll), { class: 'rf-btn rf-small rf-text' }),
+          ),
         item.state === 'done' && h('span', { class: 'rf-up-ok', 'aria-hidden': 'true' }, icon('check', 16)),
         (item.state === 'failed' || item.state === 'stopped') && button(t('tryAgain'), () => uploader.retry(item.id), { class: 'rf-retry' }),
-        (item.state === 'sending' || item.state === 'waiting') &&
+        (item.state === 'sending' || item.state === 'waiting' || item.state === 'checking') &&
           button(icon('close', 14), () => uploader.stop(item.id), { class: 'rf-btn rf-icon rf-up-stop', 'aria-label': `${t('stopUpload')} ${item.name}`, title: t('stopUpload') }),
       );
     };
@@ -2171,6 +2196,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           'span',
           { class: 'rf-bar rf-ups-bar', role: 'progressbar', 'aria-label': title, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct(sum.sent, sum.size)) },
           h('span', { style: `width: ${pct(sum.sent, sum.size)}%` }),
+        ),
+      uploadsOpen &&
+        sum.asking > 1 &&
+        h(
+          'label',
+          { class: 'rf-check rf-ups-all' },
+          h('input', { type: 'checkbox', checked: forAll, onChange: (event: Event) => ((forAll = (event.target as HTMLInputElement).checked), render()) }),
+          t('upForAll'),
         ),
       uploadsOpen && h('ul', { class: 'rf-ups-list' }, all.map(row)),
     );

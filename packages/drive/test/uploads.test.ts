@@ -81,3 +81,44 @@ describe('files going up', () => {
     expect(formatDuration(7200, 'es')).toBe('2 h');
   });
 });
+
+describe('files already in the drive', () => {
+  const there = { id: 'old', name: 'a', kind: 'file' } as unknown as import('@rebofiles/core').Entry;
+
+  it('wait, asked about, until it is said what to do; a new version, both, or none', async () => {
+    const { client, going } = slowClient();
+    const uploads = createUploads(client, {
+      onChange: () => undefined,
+      check: async (f) => ({ sha256: `h-${f.name}`, conflict: f.name === 'c' ? undefined : { kind: 'name', entry: there } }),
+    });
+    uploads.add([file('a', 10), file('b', 10), file('c', 10)], 'folder');
+    await tick();
+    expect(uploads.items.map((item) => item.state)).toEqual(['asking', 'asking', 'sending']);
+    expect(going.get('c')!.options).toMatchObject({ sha256: 'h-c', file: undefined });
+    expect(uploads.summary()).toMatchObject({ asking: 2 });
+
+    const [a, b] = uploads.items;
+    uploads.decide(a.id, 'replace');
+    await tick();
+    expect(going.get('a')!.options).toMatchObject({ file: 'old', sha256: 'h-a' });
+    uploads.decide(b.id, 'skip');
+    await tick();
+    expect(uploads.items[1].state).toBe('skipped');
+    expect(going.has('b')).toBe(false);
+  });
+
+  it('take what was chosen for all, for the others of its kind, now and after; the same bytes never replace', async () => {
+    const { client, going } = slowClient();
+    const uploads = createUploads(client, { onChange: () => undefined, check: async () => ({ conflict: { kind: 'same', entry: there } }) });
+    uploads.add([file('a', 10), file('b', 10)], null);
+    await tick();
+    uploads.decide(uploads.items[1].id, 'replace', true);
+    await tick();
+    expect([...going.keys()]).toEqual(['a', 'b']);
+    expect(going.get('a')!.options.file).toBeUndefined();
+    uploads.add([file('c', 10)], null);
+    await tick();
+    await tick();
+    expect(uploads.items[2].state).toBe('sending');
+  });
+});

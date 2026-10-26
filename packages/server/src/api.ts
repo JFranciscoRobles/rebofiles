@@ -30,6 +30,7 @@
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
 //   GET    /entries/:id/activity?limit=   what was done to it, and in it of a folder, the newest first
+//   POST   /duplicates                    { hashes }: the files with those bytes already, of what one may read
 //   GET    /shared                        what others shared with the one asking
 //   GET    /shared/new                    how many of those are new since they last looked
 //   POST   /shared/seen                   they looked: none is new any more
@@ -146,6 +147,8 @@ interface Pending {
   of?: EntryId;
   /** A smaller picture of a version of this one. */
   rendition?: { of: EntryId; version: string; size: number; width: number; height: number };
+  /** The SHA-256 of the bytes, as the page said: kept with the version, to tell the same file again. */
+  sha256?: string;
 }
 
 /** Where to read a file from, and until when. */
@@ -415,6 +418,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             file?: EntryId;
             type?: string;
             size: number;
+            sha256?: string;
             rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
           }>();
           const size = Number(asked.size);
@@ -462,6 +466,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             const used = core.usageOf(drive, owner);
             if (used + size > quota) throw new Refused(413, 'over-quota', `There is no room for it: ${bytes(used)} of ${bytes(quota)} are used, and it is ${bytes(size)}.`);
           }
+          if (typeof asked.sha256 === 'string' && /^[0-9a-f]{64}$/.test(asked.sha256)) pending.sha256 = asked.sha256;
           const key = `${pending.of ?? pending.file!.id}/${versionId}`;
           const plan = await options.storage.startUpload(key, type, size, base);
           return Response.json({ token: sealToken(options.secret, { ...pending, key, state: plan.state } satisfies Pending, UPLOAD_LIFE), parts: plan.parts });
@@ -479,7 +484,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             await options.storage.abortUpload(pending.key, pending.state, pending.size).catch(() => undefined);
             throw error;
           }
-          const version = { id: pending.versionId, key: pending.key, size: pending.size };
+          const version = { id: pending.versionId, key: pending.key, size: pending.size, ...(pending.sha256 ? { sha256: pending.sha256 } : {}) };
           return Response.json(
             await change(async (drive) => {
               if (pending.rendition) {
@@ -604,6 +609,18 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           return Response.json(core.packOf(drive, ids, (entry) => allowed.has(entry.id)));
         }
 
+        case 'POST /duplicates': {
+          // What is in the drive already with the same bytes, among what the one asking may read, for each hash asked.
+          const asked = await body<{ hashes?: unknown }>();
+          const hashes = (Array.isArray(asked.hashes) ? asked.hashes : []).filter((h): h is string => typeof h === 'string' && /^[0-9a-f]{64}$/.test(h)).slice(0, URLS_AT_ONCE);
+          const drive = await load();
+          const found: Record<string, Entry[]> = {};
+          for (const [hash, files] of core.filesByHash(drive, hashes)) {
+            const seen = await readable(user, files, drive);
+            if (seen.length) found[hash] = seen;
+          }
+          return Response.json({ found });
+        }
         case 'POST /urls': {
           const asked = await body<{ ids?: unknown; inline?: boolean; size?: number }>();
           const ids = Array.isArray(asked.ids) ? asked.ids.filter((id): id is string => typeof id === 'string') : [];

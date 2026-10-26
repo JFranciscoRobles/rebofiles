@@ -162,6 +162,11 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
     pack: (ids) => run(() => core.packOf(drive, ids)),
+    duplicates: async (hashes) => {
+      const found: Record<string, Entry[]> = {};
+      for (const [hash, files] of core.filesByHash(drive, hashes)) found[hash] = files;
+      return found;
+    },
     usage: async () => ({ used: core.usageOf(drive, user), quota: settings.quota }),
     urls: async (ids, found = {}) => {
       const urls: Record<EntryId, { url: string; expires: string }> = {};
@@ -206,7 +211,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         const fileId = how.file ?? id();
         const key = `${fileId}/${versionId}`;
         blobs.set(key, file);
-        const version = { id: versionId, key, size: file.size };
+        const version = { id: versionId, key, size: file.size, ...(how.sha256 ? { sha256: how.sha256 } : {}) };
         const next = how.file
           ? core.addVersion(current, fileId, version, context())
           : core.addFile(current, { id: fileId, name, parent: how.parent ?? null, type: file.type || 'application/octet-stream', version }, context());

@@ -65,7 +65,7 @@ export function createFolder(drive: Drive, folder: NewFolder, context: Context):
 export interface NewFile extends NewFolder {
   type: string;
   /** Its first version: where the bytes were put, and how many. */
-  version: { id: string; key: string; size: number };
+  version: { id: string; key: string; size: number; sha256?: string };
 }
 
 /** A file uploaded. Its name is made free with "(2)", as a second upload of the same file should not replace the first. */

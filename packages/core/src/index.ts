@@ -38,7 +38,7 @@ export {
   purgeTrash,
   usageOf,
 } from './ops';
-export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor } from './versions';
+export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor, filesByHash } from './versions';
 export {
   type Language,
   type Theme,

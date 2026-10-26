@@ -91,6 +91,8 @@ export interface UploadOptions {
   renditions?: (file: Blob, images: ImageSettings) => Promise<MadeRendition[]>;
   /** Not a file: a smaller picture of a version of one. */
   rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
+  /** The SHA-256 of its bytes, in hex (`hashOf`): kept with the version, to tell the same file uploaded again. */
+  sha256?: string;
 }
 
 /** Where to read a file from, until when, and the size of the smaller picture it is when it is one. */
@@ -205,6 +207,9 @@ export function createDriveClient(options: ClientOptions) {
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
     /** What was done to an entry, and, of a folder, to what is right inside it: the newest first. */
     activity: async (id: EntryId, limit = 50) => (await ask<{ activity: Activity[] }>('GET', `/entries/${encodeURIComponent(id)}/activity?limit=${limit}`)).activity,
+    /** The files with these bytes already in the drive, of what the one asking may read, by their SHA-256; none from a server without the route. */
+    duplicates: async (hashes: string[]) =>
+      hashes.length ? (await ask<{ found: Record<string, Entry[]> }>('POST', '/duplicates', { hashes }).catch(() => ({ found: {} as Record<string, Entry[]> }))).found : {},
     /** How many of what is shared with the one asking is new since they last looked; 0 from a server without the route. */
     sharedNew: async () => (await ask<{ count: number }>('GET', '/shared/new').catch(() => ({ count: 0 }))).count,
     /** They looked at what is shared with them. */
@@ -279,7 +284,9 @@ export function createDriveClient(options: ClientOptions) {
       const remembered = memory.get(key);
       if (remembered) plan = await resume(remembered).catch(() => (memory.delete(key), null));
       if (!plan) {
-        const asked = options.rendition ? { rendition: options.rendition, type, size: file.size } : { name, parent: options.parent ?? null, file: options.file, type, size: file.size };
+        const asked = options.rendition
+          ? { rendition: options.rendition, type, size: file.size }
+          : { name, parent: options.parent ?? null, file: options.file, type, size: file.size, sha256: options.sha256 };
         const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', asked, signal);
         plan = { ...start, done: [] };
         memory.set(key, plan.token);
@@ -393,3 +400,13 @@ export function createLinkClient(options: { base: string; token: string; fetch?:
 }
 
 export type LinkClient = ReturnType<typeof createLinkClient>;
+
+/** The most bytes of a file hashed to tell it again: past it, hashing in the page takes longer than it is worth. */
+export const HASH_UP_TO = 64 * 1024 * 1024;
+
+/** The SHA-256 of a file's bytes, in hex; undefined for one larger than `HASH_UP_TO`, or where the page cannot. */
+export async function hashOf(file: Blob): Promise<string | undefined> {
+  if (file.size > HASH_UP_TO || typeof crypto === 'undefined' || !crypto.subtle) return undefined;
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
