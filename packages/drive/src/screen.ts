@@ -139,6 +139,46 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   /** Where a range picked with Shift starts. */
   let anchor: EntryId | null = null;
   let layout: 'list' | 'grid' = options.defaultView ?? 'list';
+  // How the list is put in order, and which kind of file it shows: as the person last chose, in this browser.
+  type SortBy = 'name' | 'owner' | 'modified' | 'size';
+  type KindFilter = 'all' | 'folder' | 'docx' | 'pdf' | 'sheet' | 'image' | 'video' | 'audio' | 'text' | 'other';
+  const remembered = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('rebofiles:order') ?? '{}') as { by?: SortBy; dir?: 1 | -1; chosen?: boolean };
+    } catch {
+      return {};
+    }
+  })();
+  let sortBy: SortBy = remembered.by ?? 'name';
+  let sortDir: 1 | -1 = remembered.dir ?? 1;
+  // Until one is chosen, Recent and a search keep the order the server gives: the latest, the closest.
+  let sortChosen = remembered.chosen ?? false;
+  let kindFilter: KindFilter = 'all';
+  const setSort = (by: SortBy, dir?: 1 | -1) => {
+    sortDir = dir ?? (by === sortBy ? (sortDir === 1 ? -1 : 1) : by === 'modified' || by === 'size' ? -1 : 1);
+    sortBy = by;
+    sortChosen = true;
+    try {
+      localStorage.setItem('rebofiles:order', JSON.stringify({ by: sortBy, dir: sortDir, chosen: true }));
+    } catch {}
+    render();
+  };
+  const sizeOfEntry = (entry: Entry) => (entry.kind === 'file' ? entry.versions[0].size : -1);
+  /** What the view shows, of the kind chosen, in the order chosen: folders first whatever it is. */
+  const arranged = (entries: Entry[]) => {
+    const shown = kindFilter === 'all' ? entries : entries.filter((entry) => kindOf(entry) === kindFilter);
+    if (!sortChosen && (section === 'recent' || query)) return shown;
+    const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
+    const by = (a: Entry, b: Entry) =>
+      sortBy === 'name'
+        ? collator.compare(a.name, b.name)
+        : sortBy === 'owner'
+          ? collator.compare(a.owner, b.owner) || collator.compare(a.name, b.name)
+          : sortBy === 'modified'
+            ? a.modified.localeCompare(b.modified)
+            : sizeOfEntry(a) - sizeOfEntry(b) || collator.compare(a.name, b.name);
+    return [...shown].sort((a, b) => (a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : by(a, b) * sortDir));
+  };
   let typed = '';
   let query = '';
   let dialog: Dialog = null;
@@ -372,11 +412,27 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // ---- Changes, each telling what else shows the drive, and the toast ----
 
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
-  const say = (text: string | null) => {
+  /** What the last change undoes with, while its toast is up: ⌘Z or Ctrl+Z, or its button. */
+  let undoing: (() => Promise<unknown>) | null = null;
+  const say = (text: string | null, undo?: () => Promise<unknown>) => {
     toast = text;
+    undoing = undo ?? null;
     clearTimeout(toastTimer);
-    if (text) toastTimer = setTimeout(() => ((toast = null), render()), 2800);
+    // Longer when it can be undone: time to see it and change one's mind.
+    if (text) toastTimer = setTimeout(() => ((toast = null), (undoing = null), render()), undo ? 7000 : 2800);
     render();
+  };
+  const undo = async () => {
+    const run = undoing;
+    if (!run) return;
+    undoing = null;
+    try {
+      await run();
+      say(t('undone'));
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error));
+    }
+    changed();
   };
   const changed = () => {
     revision++;
@@ -459,9 +515,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const each = async (entries: Entry[], work: (entry: Entry) => Promise<unknown>, done: 'movedMany' | 'trashedMany' | 'restoredMany' | 'deletedMany') => {
     let failed = 0;
     let why = '';
+    const went: Entry[] = [];
     for (const entry of entries) {
       try {
         await work(entry);
+        went.push(entry);
       } catch (error) {
         failed++;
         why = error instanceof Error ? error.message : String(error);
@@ -469,12 +527,20 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     }
     if (done !== 'movedMany') picked = new Set();
     if (done !== 'movedMany') selected = null;
+    // Into the trash and moved, undone by bringing back those that went, each to where it was.
+    const back =
+      went.length && done === 'trashedMany'
+        ? () => Promise.all(went.map((entry) => client.restore(entry.id)))
+        : went.length && done === 'movedMany'
+          ? () => Promise.all(went.map((entry) => client.move(entry.id, entry.parent)))
+          : undefined;
     say(
       failed
         ? t('notAll', { done: entries.length - failed, n: entries.length, why })
         : entries.length === 1 && done === 'trashedMany'
           ? t('movedToTrash', { name: entries[0].name })
           : t(done, { n: entries.length }),
+      back,
     );
     changed();
   };
@@ -663,6 +729,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       } else if ((event.key === 'Delete' || event.key === 'Backspace') && many.length) {
         event.preventDefault();
         if (section !== 'trash') void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany');
+      } else if ((event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) && current) {
+        event.preventDefault();
+        const row = element.querySelector(`[data-id="${quoted(current.id)}"]`)?.getBoundingClientRect();
+        openContext(many.length ? many : [current], { x: (row?.left ?? 0) + 24, y: (row?.bottom ?? 0) - 4 });
       } else if (event.key === 'F2' && current) {
         event.preventDefault();
         if (section !== 'trash') (dialog = { kind: 'rename', entry: current, name: current.name }), render();
@@ -697,6 +767,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           draggable: draggable ? 'true' : 'false',
           onClick: (event: MouseEvent) => (event.shiftKey ? pickRange(entries, entry.id, event.ctrlKey || event.metaKey) : event.ctrlKey || event.metaKey ? toggle(entry.id) : select(entry.id)),
           onDblclick: () => void open(entry),
+          onContextmenu: (event: MouseEvent) => {
+            event.preventDefault();
+            // On one not picked, that one alone; on one picked, all that is.
+            if (!picked.has(entry.id)) select(entry.id);
+            openContext(
+              entries.filter((e) => picked.has(e.id) || e.id === entry.id),
+              { x: event.clientX, y: event.clientY },
+            );
+          },
           onDragstart: (event: DragEvent) => {
             // What is picked goes together, when the one dragged is among it.
             const dragged = picked.has(entry.id) && picked.size > 1 ? entries.filter((e) => picked.has(e.id)).map((e) => e.id) : [entry.id];
@@ -724,7 +803,6 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       },
       layout === 'list'
         ? [
-            h('div', { class: 'rf-cols', 'aria-hidden': 'true' }, h('span', null, t('name')), h('span', null, t('owner')), h('span', null, t('modified')), h('span', null, t('size'))),
             entries.map((entry) =>
               item(
                 entry,
@@ -824,6 +902,81 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       await new Promise((done) => setTimeout(done, 250));
     }
   };
+  // ---- The menu of an entry, at the pointer or at the one the keyboard is on ----
+
+  let contextMenu: { x: number; y: number; entries: Entry[] } | null = null;
+  const openContext = (entries: Entry[], at: { x: number; y: number }) => {
+    const box = element.getBoundingClientRect();
+    menuOpen = false;
+    contextMenu = { x: at.x - box.left, y: at.y - box.top, entries };
+    render();
+  };
+  const closeContext = (focusList = true) => {
+    if (!contextMenu) return;
+    contextMenu = null;
+    render();
+    if (focusList) afterRender.push(() => element.querySelector<HTMLElement>('.rf-items')?.focus());
+  };
+  function contextMenuView(menu: { x: number; y: number; entries: Entry[] }) {
+    const many = menu.entries;
+    const one = many.length === 1 ? many[0] : null;
+    const file = one?.kind === 'file' ? one : null;
+    const act = (label: string, name: IconName, run: () => void, danger = false) =>
+      button(
+        [icon(name, 16), label],
+        () => {
+          closeContext(false);
+          run();
+        },
+        { key: label, role: 'menuitem', tabindex: '-1', class: danger ? 'rf-danger' : undefined },
+      );
+    const inTrash = section === 'trash';
+    const actions: Child[] = inTrash
+      ? [
+          act(t('restore'), 'restore', () => void each(many, (entry) => client.restore(entry.id), 'restoredMany')),
+          act(t('deleteForever'), 'trash', () => ((dialog = { kind: 'delete', entries: many }), render()), true),
+        ]
+      : [
+          one && act(t('open'), file ? 'eye' : 'folder', () => void open(one)),
+          file ? act(t('download'), 'download', () => void attempt(() => downloadEach([file]))) : act(t('downloadZip'), 'download', () => void zipDownload(many)),
+          one && act(t('rename'), 'pencil', () => ((dialog = { kind: 'rename', entry: one, name: one.name }), render())),
+          act(t('move'), 'move', () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render())),
+          one && act(t('share'), 'users', () => ((dialog = { kind: 'share', entry: one, who: '', role: 'viewer' }), render())),
+          act(t('moveToTrash'), 'trash', () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), true),
+        ];
+    return h(
+      'div',
+      {
+        key: 'context',
+        class: 'rf-menu rf-ctx',
+        role: 'menu',
+        'aria-label': one ? one.name : t('pickedN', { n: many.length }),
+        style: `left: ${menu.x}px; top: ${menu.y}px`,
+        mount: (node: HTMLElement) => {
+          // Inside the drive, wherever it was asked for.
+          const box = element.getBoundingClientRect();
+          const own = node.getBoundingClientRect();
+          if (own.right > box.right - 8) node.style.left = `${Math.max(8, menu.x - own.width)}px`;
+          if (own.bottom > box.bottom - 8) node.style.top = `${Math.max(8, menu.y - own.height)}px`;
+          node.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+        },
+        onKeydown: (event: KeyboardEvent) => {
+          const all = [...element.querySelectorAll<HTMLButtonElement>('.rf-ctx [role="menuitem"]')];
+          const at = all.indexOf(document.activeElement as HTMLButtonElement);
+          const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: all.length - 1 }[event.key];
+          if (to !== undefined) {
+            event.preventDefault();
+            all[(to + all.length) % all.length]?.focus();
+          } else if (event.key === 'Escape' || event.key === 'Tab') {
+            event.preventDefault();
+            closeContext();
+          }
+        },
+      },
+      actions,
+    );
+  }
+
   /** A .zip being made, of what was picked: how far it is, and what stops it. */
   let zipping: { name: string; read: number; size: number; stop: AbortController } | null = null;
   const zipDownload = async (entries: Entry[]) => {
@@ -959,7 +1112,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 button(withIcon('pencil', t('rename')), () => ((dialog = { kind: 'rename', entry, name: entry.name }), render()), { class: 'rf-btn' }),
                 button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entries: [entry], at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
                 button(withIcon('users', t('share')), () => ((dialog = { kind: 'share', entry, who: '', role: 'viewer' }), render()), { class: 'rf-btn' }),
-                button(withIcon('trash', t('moveToTrash')), () => void attempt(() => client.moveToTrash(entry.id).then(gone), t('movedToTrash', { name: entry.name })), {
+                button(withIcon('trash', t('moveToTrash')), () => void each([entry], (one) => client.moveToTrash(one.id), 'trashedMany'), {
                   class: 'rf-btn rf-text rf-danger',
                 }),
               ],
@@ -1843,7 +1996,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       }
       case 'rename': {
         const { entry } = dialog;
-        return nameDialog(t('rename'), t('newName'), entry.name, t('save'), dialog.name, (name) => void attempt(() => client.rename(entry.id, name)));
+        return nameDialog(t('rename'), t('newName'), entry.name, t('save'), dialog.name, async (name) => {
+          try {
+            await client.rename(entry.id, name);
+            say(t('renamedTo', { name }), () => client.rename(entry.id, entry.name));
+          } catch (error) {
+            say(error instanceof RequestError ? error.message : String(error));
+          }
+          changed();
+        });
       }
       case 'move':
         return moveDialog(dialog.entries, dialog.at);
@@ -1867,7 +2028,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   function screen() {
     const key = JSON.stringify(viewOf());
     const { value, loading, error } = listing(key);
-    const entries = value?.entries ?? [];
+    const entries = arranged(value?.entries ?? []);
     const path = value?.path ?? [];
     shownEntries = entries;
     const pickedEntries = entries.filter((entry) => picked.has(entry.id));
@@ -1985,17 +2146,75 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 ),
                 section === 'trash' && entries.length > 0 && !query && button(t('emptyTrash'), () => ((dialog = { kind: 'empty' }), render()), { class: 'rf-btn rf-danger' }),
                 h(
+                  'select',
+                  {
+                    class: 'rf-select rf-kind',
+                    'aria-label': t('kindFilter'),
+                    value: kindFilter,
+                    onChange: (event: Event) => {
+                      kindFilter = (event.target as HTMLSelectElement).value as KindFilter;
+                      render();
+                    },
+                  },
+                  (['all', 'folder', 'docx', 'pdf', 'sheet', 'image', 'video', 'audio', 'text', 'other'] as KindFilter[]).map((kind) => h('option', { value: kind }, t(`kind_${kind}` as 'kind_all'))),
+                ),
+                layout === 'grid' &&
+                  h(
+                    'select',
+                    {
+                      class: 'rf-select',
+                      'aria-label': t('sortLabel'),
+                      value: `${sortBy}:${sortDir}`,
+                      onChange: (event: Event) => {
+                        const [by, dir] = (event.target as HTMLSelectElement).value.split(':');
+                        setSort(by as SortBy, Number(dir) as 1 | -1);
+                      },
+                    },
+                    (['name', 'modified', 'size', 'owner'] as SortBy[]).flatMap((by) => ([1, -1] as const).map((dir) => h('option', { value: `${by}:${dir}` }, `${t(by)} ${dir === 1 ? '↑' : '↓'}`))),
+                  ),
+                h(
                   'div',
                   { class: 'rf-seg', role: 'group', 'aria-label': `${t('list')} / ${t('grid')}` },
                   button(icon('list'), () => ((layout = 'list'), render()), { 'aria-pressed': layout === 'list', 'aria-label': t('list'), title: t('list') }),
                   button(icon('grid'), () => ((layout = 'grid'), render()), { 'aria-pressed': layout === 'grid', 'aria-label': t('grid'), title: t('grid') }),
                 ),
               ),
+          layout === 'list' &&
+            entries.length > 0 &&
+            h(
+              'div',
+              { class: 'rf-cols' },
+              (
+                [
+                  ['name', t('name')],
+                  ['owner', t('owner')],
+                  ['modified', t('modified')],
+                  ['size', t('size')],
+                ] as [SortBy, string][]
+              ).map(([by, label]) => {
+                const on = sortBy === by && (sortChosen || (section !== 'recent' && !query));
+                return button([label, on && h('span', { class: 'rf-sort-dir', 'aria-hidden': 'true' }, sortDir === 1 ? '↑' : '↓')], () => setSort(by), {
+                  key: by,
+                  class: `rf-col${on ? ' rf-on' : ''}`,
+                  'aria-label': on ? t(sortDir === 1 ? 'sortedUp' : 'sortedDown', { by: label }) : t('sortBy', { by: label }),
+                });
+              }),
+            ),
           items(
             entries,
             loading,
             error,
-            query ? t('noResults') : section === 'trash' ? t('trashIsEmpty') : section === 'recent' ? t('noRecent') : section === 'shared' ? t('noShared') : t('emptyFolder'),
+            kindFilter !== 'all' && (value?.entries.length ?? 0) > 0
+              ? t('noneOfKind')
+              : query
+                ? t('noResults')
+                : section === 'trash'
+                  ? t('trashIsEmpty')
+                  : section === 'recent'
+                    ? t('noRecent')
+                    : section === 'shared'
+                      ? t('noShared')
+                      : t('emptyFolder'),
           ),
           dropping && h('div', { class: 'rf-dropzone' }, t('dropHere')),
         ),
@@ -2026,8 +2245,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             ]
           : null,
       ),
-      toast && h('div', { class: 'rf-toast', role: 'status' }, toast),
+      toast && h('div', { class: 'rf-toast', role: 'status' }, h('span', null, toast), undoing && button(t('undo'), () => void undo(), { class: 'rf-toast-undo' })),
       uploader.items.length > 0 && uploadsPanel(),
+      contextMenu && contextMenuView(contextMenu),
       dialogs(),
       viewing && viewer(viewing),
       settingsPart && settings && settingsScreen(settingsPart),
@@ -2054,12 +2274,21 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   const closeMenu = (event: MouseEvent) => {
+    if (contextMenu && !element.querySelector('.rf-ctx')?.contains(event.target as Node)) closeContext(false);
     if (menuOpen && !element.querySelector('.rf-menu')?.contains(event.target as Node) && !element.querySelector('.rf-new')?.contains(event.target as Node)) {
       menuOpen = false;
       render();
     }
   };
   document.addEventListener('mousedown', closeMenu);
+  // ⌘Z or Ctrl+Z undoes the last change while its toast is up, unless it is a field's own.
+  element.addEventListener('keydown', (event) => {
+    const field = (event.target as HTMLElement).closest('input, textarea, select, [contenteditable], .rf-view-pages');
+    if (!field && undoing && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      void undo();
+    }
+  });
 
   client.info().then(
     (info) => ((storage = info.storage), render()),

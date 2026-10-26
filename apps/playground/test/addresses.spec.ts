@@ -17,7 +17,7 @@ test('a grid of pictures asks for their addresses in one request, and a picture 
   await page.goto('/?as=addresses');
   const colours = ['#0b57d0', '#0e7c52', '#c026d3', '#dc2626', '#ea580c', '#334155'];
   await page.locator('input[type=file]').setInputFiles(await Promise.all(colours.map(async (c, i) => ({ name: `p${i}.png`, mimeType: 'image/png', buffer: Buffer.from(await picture(page, c)) }))));
-  await expect(page.getByRole('option')).toHaveCount(6);
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(6);
 
   const asked: string[] = [];
   page.on('request', (request) => {

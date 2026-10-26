@@ -175,6 +175,20 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **The list in an order of one's choosing, and one kind of file.** A click
+  on a column of the list (name, owner, modified, size) puts it in that
+  order, a second the other way; in the grid, a choice of the order. Folders
+  go first whatever it is, and Recent and a search keep the server's order
+  until one is chosen. A choice of the kind shows only folders, documents,
+  PDFs, spreadsheets, pictures, videos, audio, text or the rest. The order is
+  kept in the browser for the next visit.
+- **A menu of each entry.** A right click on one, or Shift+F10 or the menu
+  key on the one the keyboard is on, opens what can be done to it, or to all
+  that is picked: open, download, rename, move, share, the trash; in the
+  trash, restore and delete for good. The arrows go round it, Escape gives
+  the keyboard back to the list.
+- **Undo.** Putting in the trash, moving and renaming say so in a toast
+  with Undo, for seven seconds, and ⌘Z or Ctrl+Z does it too.
 - **Uploads in a panel, several at once, with how long each has left.**
   Three files go up at once (each in parts, three at once too), the others
   waiting their turn; a card at the foot of the drive lists every one, with

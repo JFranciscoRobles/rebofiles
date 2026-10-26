@@ -62,6 +62,9 @@ export const CSS = `
 .rf-menu { position: absolute; z-index: 5; margin-top: 50px; min-width: 190px; padding: 6px; border-radius: 12px; background: var(--rf-bg); box-shadow: var(--rf-shadow-menu); border: 1px solid var(--rf-border); }
 .rf-menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: 8px; text-align: left; }
 .rf-menu button:hover, .rf-menu button:focus-visible { background: var(--rf-hover); }
+.rf-menu.rf-ctx { margin-top: 0; z-index: 16; min-width: 210px; }
+.rf-menu button.rf-danger { color: var(--rf-danger); }
+.rf-menu button svg { flex: none; }
 .rf-nav { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; border-radius: 999px; background: none; text-align: left; color: var(--rf-ink-soft); }
 .rf-nav:hover { background: var(--rf-hover); }
 .rf-nav[aria-current='true'] { background: var(--rf-brand-light); color: var(--rf-brand); font-weight: 600; }
@@ -96,6 +99,12 @@ export const CSS = `
 .rf-items:focus-visible { box-shadow: inset 0 0 0 3px var(--rf-focus); }
 .rf-cols, .rf-row { display: grid; grid-template-columns: minmax(0,1fr) 90px 110px 80px; gap: 12px; align-items: center; padding: 9px 16px; }
 .rf-cols { position: sticky; top: 0; z-index: 1; background: var(--rf-bg); font-size: 12px; font-weight: 500; color: var(--rf-muted); border-bottom: 1px solid var(--rf-divider); }
+.rf-col { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px; min-width: 0; cursor: pointer; border-radius: 6px; color: inherit; }
+.rf-col:hover { color: var(--rf-ink); }
+.rf-col:focus-visible { box-shadow: 0 0 0 3px var(--rf-focus); }
+.rf-col.rf-on { color: var(--rf-ink); font-weight: 600; }
+.rf-sort-dir { font-size: 11px; }
+.rf-head .rf-select { max-width: 160px; }
 .rf-row { border-bottom: 1px solid var(--rf-divider); cursor: default; user-select: none; color: var(--rf-ink-soft); font-size: 13px; }
 .rf-row:hover { background: var(--rf-surface); }
 .rf-row[aria-selected='true'] { background: var(--rf-brand-light); }
@@ -198,6 +207,10 @@ export const CSS = `
 .rf-retry:hover { background: var(--rf-hover); }
 
 .rf-toast { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 6; background: var(--rf-toast); color: var(--rf-on-toast); font-size: 14px; border-radius: 12px; padding: 12px 18px; box-shadow: var(--rf-shadow-menu); max-width: calc(100% - 32px); animation: rf-pop .5s cubic-bezier(.2,.8,.2,1); }
+.rf-toast { display: flex; align-items: center; gap: 14px; }
+.rf-toast-undo { all: unset; cursor: pointer; font-weight: 700; color: var(--rf-brand-light); padding: 2px 6px; border-radius: 6px; }
+.rf-toast-undo:hover { text-decoration: underline; }
+.rf-toast-undo:focus-visible { box-shadow: 0 0 0 2px var(--rf-brand-light); }
 @keyframes rf-pop { from { opacity: 0; transform: translate(-50%, 8px); } }
 
 .rf-dialog { border: 0; padding: 0; border-radius: 16px; box-shadow: var(--rf-shadow-menu); width: min(420px, calc(100vw - 32px)); color: var(--rf-ink); background: var(--rf-bg); font: 14px/1.45 var(--rf-font); }

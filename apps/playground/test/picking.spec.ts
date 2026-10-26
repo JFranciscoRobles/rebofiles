@@ -65,8 +65,8 @@ test('picked with the keyboard, restored together, and deleted for good together
 
   await page.getByRole('button', { name: 'Trash' }).click();
   // The trash lists the last thrown first.
-  const first = page.getByRole('option').first();
-  await expect(page.getByRole('option')).toHaveCount(3);
+  const first = page.getByRole('listbox').getByRole('option').first();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(3);
   const firstName = ((await first.textContent()) ?? '').replace(/picker2.*/, '');
   await first.click();
   // ⌘ or Ctrl with the arrows only moves; Space picks.
@@ -75,12 +75,12 @@ test('picked with the keyboard, restored together, and deleted for good together
   await expect(bar(page)).toContainText('2 selected');
   await bar(page).getByRole('button', { name: 'Restore' }).click();
   await expect(page.getByText('Restored 2 items')).toBeVisible();
-  await expect(page.getByRole('option')).toHaveCount(1);
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(1);
   expect(firstName).toMatch(/\.md$/);
 
   await page.getByRole('button', { name: 'My files' }).first().click();
-  await expect(page.getByRole('option')).toHaveCount(2);
-  await page.getByRole('option').first().click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(2);
+  await page.getByRole('listbox').getByRole('option').first().click();
   await page
     .getByRole('option')
     .last()
@@ -88,8 +88,8 @@ test('picked with the keyboard, restored together, and deleted for good together
   await bar(page).getByRole('button', { name: 'Move to trash' }).click();
   await expect(page.getByText('Moved 2 items to the trash')).toBeVisible();
   await page.getByRole('button', { name: 'Trash' }).click();
-  await expect(page.getByRole('option')).toHaveCount(3);
-  await page.getByRole('option').first().click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(3);
+  await page.getByRole('listbox').getByRole('option').first().click();
   await page.keyboard.press('ControlOrMeta+a');
   await expect(bar(page)).toContainText('3 selected');
   await bar(page).getByRole('button', { name: 'Delete forever' }).click();

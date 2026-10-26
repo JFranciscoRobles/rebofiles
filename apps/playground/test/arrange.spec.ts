@@ -1,0 +1,83 @@
+// The list put in order by a column or a choice, one kind of file shown; the
+// menu of an entry, by the mouse and by the keyboard; and a change undone.
+
+import AxeBuilder from '@axe-core/playwright';
+import { type Page, expect, test } from '@playwright/test';
+
+const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
+const names = (page: Page) => page.getByRole('listbox').getByRole('option').evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent));
+
+async function some(page: Page, who: string) {
+  await page.goto(`/?as=${who}`);
+  await page.locator('input[type=file]').setInputFiles([
+    { name: 'b-medium.txt', mimeType: 'text/plain', buffer: Buffer.alloc(3000, 97) },
+    { name: 'a-small.txt', mimeType: 'text/plain', buffer: Buffer.alloc(10, 97) },
+    { name: 'c-large.png', mimeType: 'image/png', buffer: Buffer.alloc(9000, 1) },
+  ]);
+  await expect(item(page, 'c-large.png')).toBeVisible();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(3);
+}
+
+test('in order by a column, the other way at a second click, kept for the next visit; and one kind alone', async ({ page }) => {
+  await some(page, 'order');
+  expect(await names(page)).toEqual(['a-small.txt', 'b-medium.txt', 'c-large.png']);
+  await page.getByRole('button', { name: 'Order by Size' }).click();
+  expect(await names(page)).toEqual(['c-large.png', 'b-medium.txt', 'a-small.txt']);
+  await page.getByRole('button', { name: /^Size, in order from the last/ }).click();
+  expect(await names(page)).toEqual(['a-small.txt', 'b-medium.txt', 'c-large.png']);
+  await page.reload();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(3);
+  await expect(page.getByRole('button', { name: /^Size, in order from the first/ })).toBeVisible();
+
+  await page.getByRole('combobox', { name: 'Kind of file' }).selectOption('image');
+  expect(await names(page)).toEqual(['c-large.png']);
+  await page.getByRole('combobox', { name: 'Kind of file' }).selectOption('video');
+  await expect(page.getByText('Nothing of this kind here.')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Kind of file' }).selectOption('all');
+  await page.getByRole('button', { name: 'Grid' }).click();
+  await page.getByRole('combobox', { name: 'Order' }).selectOption('name:-1');
+  expect(await page.getByRole('listbox').getByRole('option').evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent))).toEqual(['c-large.png', 'b-medium.txt', 'a-small.txt']);
+  await page.getByRole('combobox', { name: 'Order' }).selectOption('name:1');
+  await page.getByRole('button', { name: 'List' }).click();
+});
+
+test('the menu of an entry, by the mouse and by the keyboard, and a trash undone and a rename undone', async ({ page }) => {
+  await some(page, 'menu');
+  await item(page, 'b-medium.txt').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'b-medium.txt' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveText(['Open', 'Download', 'Rename', 'Move', 'Share', 'Move to trash']);
+  await expect(menu.getByRole('menuitem', { name: 'Open' })).toBeFocused();
+  expect.soft((await new AxeBuilder({ page }).include('.rf-ctx').analyze()).violations.map((v) => v.id)).toEqual([]);
+  // Up from the first is the last, as round a menu.
+  await page.keyboard.press('ArrowUp');
+  await expect(menu.getByRole('menuitem', { name: 'Move to trash' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(item(page, 'b-medium.txt')).toHaveCount(0);
+  // The toast says it, and undoes it.
+  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click();
+  await expect(item(page, 'b-medium.txt')).toBeVisible();
+  await expect(page.getByText('Undone')).toBeVisible();
+
+  // From the keyboard: Shift+F10 on the one the list is on; several picked, the menu is of all of them.
+  await item(page, 'a-small.txt').click();
+  await item(page, 'c-large.png').click({ modifiers: ['Shift'] });
+  await page.keyboard.press('Shift+F10');
+  const many = page.getByRole('menu', { name: '3 selected' });
+  await expect(many.getByRole('menuitem')).toHaveText(['Download as .zip', 'Move', 'Move to trash']);
+  await page.keyboard.press('Escape');
+  await expect(many).toHaveCount(0);
+  await expect(page.locator('.rf-items')).toBeFocused();
+
+  // A rename, undone with ⌘Z or Ctrl+Z.
+  await item(page, 'a-small.txt').click();
+  await page.keyboard.press('F2');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('renamed.txt');
+  await page.keyboard.press('Enter');
+  await expect(item(page, 'renamed.txt')).toBeVisible();
+  await page.locator('.rf-items').focus();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(item(page, 'a-small.txt')).toBeVisible();
+  await expect(item(page, 'renamed.txt')).toHaveCount(0);
+});
