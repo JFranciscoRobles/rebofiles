@@ -9,6 +9,11 @@ export interface MetadataStore {
   load(): Promise<Drive>;
   save(changes: Changes): Promise<void>;
   /**
+   * What changes with every save, by any process: asked on each request, so the drive is loaded again only when it
+   * changed, and kept in memory meanwhile. Without it, it is loaded on every request.
+   */
+  revision?(): Promise<string>;
+  /**
    * `work`, a load and a save, while no other process changes the drive: for a store more than one process
    * writes to. Without it, changes are put in order inside one process only.
    */
@@ -22,7 +27,11 @@ export interface MetadataStore {
 export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
   let drive = driveOf(entries);
   const settings = new Map<string, unknown>();
+  let saved = 0;
   return {
+    async revision() {
+      return String(saved);
+    },
     async getSetting(name) {
       return settings.get(name);
     },
@@ -37,6 +46,7 @@ export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
       for (const entry of put) next.set(entry.id, entry);
       for (const id of removed) next.delete(id);
       drive = { entries: next };
+      saved++;
     },
   };
 }
@@ -51,9 +61,17 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const upsert = db.prepare('INSERT INTO rebofiles_entries (id, parent, entry) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET parent = excluded.parent, entry = excluded.entry');
   const remove = db.prepare('DELETE FROM rebofiles_entries WHERE id = ?');
   db.exec('CREATE TABLE IF NOT EXISTS rebofiles_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  // One row, one number, one more at every save: what says whether the drive in memory is the one in the file.
+  db.exec('CREATE TABLE IF NOT EXISTS rebofiles_revision (id INTEGER PRIMARY KEY CHECK (id = 1), n INTEGER NOT NULL)');
+  db.exec('INSERT OR IGNORE INTO rebofiles_revision (id, n) VALUES (1, 0)');
+  const revision = db.prepare('SELECT n FROM rebofiles_revision WHERE id = 1');
+  const bump = db.prepare('UPDATE rebofiles_revision SET n = n + 1 WHERE id = 1');
   const setting = db.prepare('SELECT value FROM rebofiles_settings WHERE name = ?');
   const keep = db.prepare('INSERT INTO rebofiles_settings (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value');
   return {
+    async revision() {
+      return String((revision.get() as { n: number }).n);
+    },
     async getSetting(name) {
       const row = setting.get(name) as { value: string } | undefined;
       return row ? JSON.parse(row.value) : undefined;
@@ -70,6 +88,7 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
       try {
         for (const entry of put) upsert.run(entry.id, entry.parent, JSON.stringify(entry));
         for (const id of removed) remove.run(id);
+        bump.run();
         db.exec('COMMIT');
       } catch (error) {
         db.exec('ROLLBACK');
@@ -126,9 +145,14 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     await db.query(`CREATE TABLE IF NOT EXISTS ${table} (id text PRIMARY KEY, parent text, entry jsonb NOT NULL)`);
     await db.query(`CREATE INDEX IF NOT EXISTS ${table}_parent ON ${table} (parent)`);
     await db.query(`CREATE TABLE IF NOT EXISTS ${table}_settings (name text PRIMARY KEY, value jsonb NOT NULL)`);
+    // One row, one number, one more at every save by any process: whether the drive another holds in memory is still the one here.
+    await db.query(`CREATE TABLE IF NOT EXISTS ${table}_revision (id int PRIMARY KEY CHECK (id = 1), n bigint NOT NULL)`);
+    await db.query(`INSERT INTO ${table}_revision (id, n) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`);
   });
   // One statement: the rows removed and the rows put, together or not at all, without a transaction to hold open.
-  const write = `WITH removed AS (DELETE FROM ${table} WHERE id = ANY($2::text[]))
+  // The revision goes up in the same statement: the change and the number that says it, together or not at all.
+  const write = `WITH removed AS (DELETE FROM ${table} WHERE id = ANY($2::text[])),
+    bumped AS (UPDATE ${table}_revision SET n = n + 1 WHERE id = 1)
     INSERT INTO ${table} (id, parent, entry) SELECT e->>'id', e->>'parent', e FROM jsonb_array_elements($1::jsonb) AS e
     ON CONFLICT (id) DO UPDATE SET parent = excluded.parent, entry = excluded.entry`;
   return {
@@ -142,6 +166,10 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
       if (put.length || removed.length) await db.query(write, [JSON.stringify(put), removed]);
     },
     lock: pool ? exclusive : undefined,
+    async revision() {
+      const { rows } = await db.query(`SELECT n FROM ${table}_revision WHERE id = 1`);
+      return String((rows[0] as { n: string | number } | undefined)?.n ?? 0);
+    },
     async getSetting(name) {
       const { rows } = await db.query(`SELECT value FROM ${table}_settings WHERE name = $1`, [name]);
       const value = (rows[0] as { value: unknown } | undefined)?.value;

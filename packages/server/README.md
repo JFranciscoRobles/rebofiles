@@ -109,8 +109,12 @@ against AWS or MinIO yet. Not on npm yet.
 - **Other buckets.** R2 is checked; AWS and MinIO not yet.
 - **One process on SQLite.** Changes are put in order inside a process; for
   more, Postgres with a pool.
-- **The whole drive loaded on each request.** Fine for a team, not for a
-  drive of millions of entries.
+- **The whole drive in memory.** It is read once and held, read again only
+  when the store's revision says it changed (a listing of 20,000 entries
+  went from 36 ms to under 1); but a change still loads it whole once in
+  every other process, and it is all in memory: fine for a team and well
+  beyond, not for millions of entries, which would need the store asked by
+  folder.
 - **Uploads left halfway** stay in the bucket as parts, for a day, to be
   gone on with (`POST /uploads/resume`); one never gone on with waits for a
   lifecycle rule of the bucket ("abort incomplete multipart uploads after 1

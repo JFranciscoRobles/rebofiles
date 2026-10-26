@@ -143,13 +143,29 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   const maxSize = options.maxSize ?? 5 * 1024 ** 3;
   const newId = options.newId ?? randomUUID;
   const now = () => (options.now?.() ?? new Date()).toISOString();
+  // The drive as it was last loaded, and the revision of the store it was then: loaded again only once that changed,
+  // by this process or another. The revision is read before the drive, so a change between the two only loads it again.
+  let held: { revision: string; drive: Drive } | undefined;
+  const load = async (): Promise<Drive> => {
+    if (!options.metadata.revision) return options.metadata.load();
+    const revision = await options.metadata.revision();
+    if (held?.revision === revision) return held.drive;
+    const drive = await options.metadata.load();
+    held = { revision, drive };
+    return drive;
+  };
+
   // Changes go one at a time, each on the drive the last one left; reads take the drive as it is.
   let queue: Promise<unknown> = Promise.resolve();
   const change = <T>(work: (drive: Drive) => Promise<{ drive: Drive; answer: T }>): Promise<T> => {
     const step = async () => {
-      const before = await options.metadata.load();
+      const before = await load();
       const { drive, answer } = await work(before);
-      if (drive !== before) await options.metadata.save(core.changes(before, drive));
+      if (drive !== before) {
+        await options.metadata.save(core.changes(before, drive));
+        // What was saved is what is held, under the lock that kept others out meanwhile: nothing to load for it.
+        if (options.metadata.revision) held = { revision: await options.metadata.revision(), drive };
+      }
       return answer;
     };
     // In order here, and under the store's lock when it has one, for the other processes on the same store.
@@ -227,7 +243,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
 
       switch (route) {
         case 'GET /entries': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const folder = folderOf(drive, url.searchParams.get('folder'));
           await allow(user, 'list', folder, drive);
           if (folder && core.isTrashed(drive, folder.id)) throw new Refused(409, 'in-trash', 'That folder is in the trash.');
@@ -241,32 +257,32 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           });
         }
         case 'GET /entries/:id': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const entry = core.getEntry(drive, id);
           await allow(user, 'read', entry, drive);
           return Response.json({ entry, path: await pathOf(user, drive, core.ancestors(drive, id)), trashed: core.isTrashed(drive, id) });
         }
         case 'GET /recent': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           return Response.json({ entries: await readable(user, core.recent(drive), drive) });
         }
         case 'GET /trash': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           // One's own trash: what one owns or put there, not what others threw away in a folder shared with them.
           return Response.json({ entries: await readable(user, core.trash(drive, user.id), drive) });
         }
         case 'GET /shared': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           return Response.json({ entries: await readable(user, core.sharedWith(drive, user.id), drive) });
         }
         case 'GET /search': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const within = url.searchParams.get('within') || undefined;
           const found = core.search(drive, url.searchParams.get('q') ?? '', { within, trashed: url.searchParams.get('trashed') === '1', limit: 200 });
           return Response.json({ entries: await readable(user, found, drive) });
         }
         case 'GET /settings': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const kept = await getSetting('drive');
           const settings = core.readDriveSettings(kept, defaults);
           const mine = core.readPersonalSettings(await getSetting(`person:${user.id}`));
@@ -281,7 +297,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
 
         case 'PUT /settings': {
           const asked = await body<unknown>();
-          await allow(user, 'configure', null, await options.metadata.load());
+          await allow(user, 'configure', null, await load());
           const settings = core.readDriveSettings(asked, await driveSettings());
           await setSetting('drive', settings);
           return Response.json({ drive: settings });
@@ -321,7 +337,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           if (!Number.isSafeInteger(size) || size < 0) throw new Refused(400, 'bad-size', 'Say the size of the file, in bytes.');
           if (size > maxSize) throw new Refused(413, 'too-large', `Files up to ${maxSize} bytes.`);
           const type = /^[\w.+-]+\/[\w.+-]+$/.test(asked.type ?? '') ? asked.type! : 'application/octet-stream';
-          const drive = await options.metadata.load();
+          const drive = await load();
           let pending: Omit<Pending, 'key' | 'state'>;
           const versionId = newId();
           if (asked.rendition) {
@@ -400,7 +416,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const pending = openToken<Pending>(options.secret, String(asked.token ?? ''));
           if (!pending || pending.user !== user.id) throw new Refused(403, 'bad-token', 'That upload is not yours, or it is out of date.');
           if (!options.storage.resumeUpload) throw new Refused(501, 'no-resume', 'This storage cannot go on with an upload: start it again.');
-          const drive = await options.metadata.load();
+          const drive = await load();
           if ([...drive.entries.values()].some((entry) => entry.kind === 'file' && entry.versions.some((v) => v.key === pending.key)))
             throw new Refused(409, 'upload-finished', 'That upload is finished already.');
           try {
@@ -418,7 +434,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const pending = openToken<Pending>(options.secret, String(asked.token ?? ''));
           if (!pending || pending.user !== user.id) throw new Refused(403, 'bad-token', 'That upload is not yours, or it is out of date.');
           // A token stays good after its upload is finished: the bytes of a version that is kept are not taken away.
-          const drive = await options.metadata.load();
+          const drive = await load();
           const kept = [...drive.entries.values()].some((entry) => entry.kind === 'file' && entry.versions.some((v) => v.key === pending.key));
           if (!kept) await options.storage.abortUpload(pending.key, pending.state, pending.size);
           return Response.json({ aborted: !kept });
@@ -476,7 +492,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
         }
 
         case 'GET /entries/:id/download': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const file = core.getFile(drive, id);
           await allow(user, 'download', file, drive);
           const wanted = url.searchParams.get('version');
@@ -488,7 +504,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const asked = await body<{ ids?: unknown; inline?: boolean; size?: number }>();
           const ids = Array.isArray(asked.ids) ? asked.ids.filter((id): id is string => typeof id === 'string') : [];
           if (ids.length > URLS_AT_ONCE) throw new Refused(400, 'too-many', `Up to ${URLS_AT_ONCE} at once.`);
-          const drive = await options.metadata.load();
+          const drive = await load();
           const size = typeof asked.size === 'number' ? asked.size : undefined;
           const urls: Record<string, Address> = {};
           // Each as its own route would answer it; one that may not be read, or is not a file, is left out.
@@ -536,7 +552,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           );
         }
         case 'GET /entries/:id/links/:link': {
-          const drive = await options.metadata.load();
+          const drive = await load();
           const entry = core.getEntry(drive, id);
           await allow(user, 'share', entry, drive);
           const link = entry.links?.find((l) => l.id === linkId);
@@ -571,7 +587,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   async function viaLink(path: string, url: URL): Promise<Response> {
     const [, , token = '', rest] = path.split('/');
     const sealed = openToken<LinkToken>(options.secret, decodeURIComponent(token));
-    const drive = await options.metadata.load();
+    const drive = await load();
     const root = sealed?.purpose === 'link' ? core.linked(drive, sealed.link, now()) : null;
     // One answer for a link changed, out of date, taken back or in the trash: which, is not for whoever holds it.
     if (!root) throw new Refused(404, 'no-link', 'This link does not work any more.');

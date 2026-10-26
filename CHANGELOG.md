@@ -175,6 +175,13 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **The drive held in memory.** The server reads the drive whole once and
+  holds it, reading it again only when the store's revision changed, by this
+  process or another: a number in a row of its own in SQLite and Postgres,
+  one more in the same statement that writes. Listing a folder of a drive of
+  20,000 entries went from 36 ms to 0.7. A store of your own gives
+  `revision()` to have it; without it, the drive is read on every request,
+  as before.
 - **Addresses that are asked for together, and kept.** `POST /urls` (and
   `client.urls(ids, { inline, size })`) gives the addresses of many files at
   once: a grid of pictures asks once, not once for each. Every address says
