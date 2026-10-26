@@ -145,7 +145,8 @@ describe('the client against a bucket', () => {
     expect([small, untyped, large].map((file) => s3.objects.get(file.versions[0].key)?.length)).toEqual([6, 1, PART_SIZE + 10]);
   });
 
-  it('gives up an upload when the bucket refuses a part, and leaves nothing of it there', async () => {
+  /** A drive on a bucket whose parts may be refused, as `refuse` says, and a client for it: a new one each call, as after the page is opened again. */
+  function flaky(refuse: (part: number) => boolean) {
     const s3 = memoryS3();
     const handle = createDriveHandler({
       storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
@@ -155,22 +156,91 @@ describe('the client against a bucket', () => {
       base: '/api/files',
     });
     const origin = 'http://drive.test';
-    const drive = createDriveClient({
-      base: `${origin}/api/files`,
-      parallel: 1,
-      fetch: (input, init) => {
-        if (String(input).startsWith(origin)) return handle(new Request(String(input), init));
-        // The second part refused, as a bucket does when its address is out of date.
-        if (new URL(String(input)).searchParams.get('partNumber') === '2') return Promise.resolve(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
-        return s3.fetch(input, init);
-      },
-    });
-    const error = await drive.upload(new File([new Uint8Array(3 * PART_SIZE)], 'big.bin')).catch((e: unknown) => e);
+    const asked: string[] = [];
+    const sentParts: number[] = [];
+    const saved = new Map<string, string>();
+    const open = (attempts = 5) =>
+      createDriveClient({
+        base: `${origin}/api/files`,
+        parallel: 1,
+        retry: { attempts, delay: 0 },
+        // Where the page keeps it between visits: localStorage, in a browser.
+        remember: { get: (key) => saved.get(key), set: (key, token) => saved.set(key, token), delete: (key) => saved.delete(key) },
+        fetch: (input, init) => {
+          if (String(input).startsWith(origin)) {
+            asked.push(new URL(String(input)).pathname.replace('/api/files', ''));
+            return handle(new Request(String(input), init));
+          }
+          const part = Number(new URL(String(input)).searchParams.get('partNumber'));
+          // Refused as a bucket does when an address is out of date, or not let through, as when the connection is cut.
+          if (part && refuse(part)) return Promise.resolve(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
+          if (part) sentParts.push(part);
+          return s3.fetch(input, init);
+        },
+      });
+    return { s3, asked, sentParts, saved, open };
+  }
+
+  it('tries a part again when it fails, asking what arrived, and sends only what did not', async () => {
+    let refused = 0;
+    const { s3, asked, sentParts, open } = flaky((part) => part === 2 && refused++ < 2);
+    const bytes = new Uint8Array(3 * PART_SIZE).map((_, i) => i % 251);
+    const entry = await open().upload(new File([bytes], 'big.bin'));
+    expect(Buffer.from(s3.objects.get(entry.versions[0].key)!).equals(Buffer.from(bytes))).toBe(true);
+    expect(asked.filter((path) => path === '/uploads/resume')).toHaveLength(2);
+    expect(sentParts).toEqual([1, 2, 3]);
+  });
+
+  it('keeps what arrived when it cannot go on, and goes on with it when the same file is uploaded again', async () => {
+    let cut = true;
+    const { s3, asked, sentParts, saved, open } = flaky((part) => part === 2 && cut);
+    const file = new File([new Uint8Array(3 * PART_SIZE)], 'big.bin', { lastModified: 1 });
+    const progress: number[] = [];
+    const error = await open(2)
+      .upload(file)
+      .catch((e: unknown) => e);
     expect(error).toMatchObject({ status: 403, code: 'upload' });
+    // Not given up: the part that arrived waits in the bucket, and the page remembers the upload.
+    expect(s3.uploads.size).toBe(1);
+    expect(saved.size).toBe(1);
+
+    cut = false;
+    const entry = await open().upload(file, { onProgress: ({ sent }) => progress.push(sent) });
+    expect(s3.objects.get(entry.versions[0].key)?.length).toBe(3 * PART_SIZE);
+    expect(asked.filter((path) => path === '/uploads')).toHaveLength(1);
+    expect(sentParts).toEqual([1, 2, 3]);
+    // What had arrived counted from the start, as gone.
+    expect(progress[0]).toBe(PART_SIZE);
+    expect(saved.size).toBe(0);
+    // Another file of the same name is another upload.
+    await open().upload(new File([new Uint8Array(3)], 'big.bin', { lastModified: 2 }));
+    expect(asked.filter((path) => path === '/uploads')).toHaveLength(2);
+  });
+
+  it('gives up an upload stopped by the person, and leaves nothing of it in the bucket', async () => {
+    const stop = new AbortController();
+    const { s3, saved, sentParts, open } = flaky((part) => {
+      if (part === 2) stop.abort();
+      return part === 2;
+    });
+    const error = await open()
+      .upload(new File([new Uint8Array(3 * PART_SIZE)], 'big.bin'), { signal: stop.signal })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
     expect(s3.uploads.size).toBe(0);
-    // The third part was not sent after the second was refused.
-    expect(s3.seen.filter((r) => r.url.searchParams.get('partNumber') === '3')).toEqual([]);
-    expect(await drive.search('big')).toEqual([]);
+    expect(saved.size).toBe(0);
+    expect(sentParts).toEqual([1]);
+  });
+
+  it('starts again when what it remembered is out of date', async () => {
+    const { asked, saved, open } = flaky(() => false);
+    const file = new File(['notes'], 'notes.txt', { lastModified: 1 });
+    const client = open();
+    await client.upload(file);
+    for (const key of [...saved.keys(), JSON.stringify(['http://drive.test/api/files', null, 'notes.txt', 5, 1, 'application/octet-stream'])]) saved.set(key, 'not a token');
+    const entry = await client.upload(file);
+    expect(entry.name).toBe('notes (2).txt');
+    expect(asked.filter((path) => path === '/uploads/resume')).toHaveLength(1);
   });
 });
 

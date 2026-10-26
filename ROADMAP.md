@@ -165,7 +165,7 @@ server, the preview of a Word document, a strict typecheck.
 
 ### 0.5.0 · Big files and other storage
 
-16. Uploads that resume after a cut, and files of several gigabytes.
+16. ✅ Uploads that resume after a cut, and files of several gigabytes.
 17. Google Cloud Storage and Azure Blob. (R2, MinIO and Backblaze are S3
     already.)
 

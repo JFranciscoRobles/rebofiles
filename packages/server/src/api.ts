@@ -12,6 +12,7 @@
 //   POST   /folders                       { name, parent }
 //   POST   /uploads                       { name, parent, type, size }, or { file, type, size } for a new version: where to send the parts
 //   POST   /uploads/finish                { token, parts: [{ number, etag }] }: the file, once its bytes are there
+//   POST   /uploads/resume                { token }: an upload cut, gone on with: what arrived, and where to send the rest
 //   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
 //   PATCH  /entries/:id                   { name } or { parent }, with { ifTaken: 'keep-both' } to add "(2)"
 //   POST   /entries/:id/trash             into the trash
@@ -39,7 +40,7 @@ import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
 import type { MetadataStore } from './metadata';
 import { Refused, answerTo } from './refused';
-import type { FinishedPart, Storage } from './storage';
+import { type FinishedPart, type Storage, UploadGone } from './storage';
 import { openToken, sealToken } from './tokens';
 
 export type { Action } from '@rebofiles/core';
@@ -288,6 +289,24 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               return { drive: next, answer: { entry: core.getEntry(next, file.id) } };
             }),
           );
+        }
+
+        case 'POST /uploads/resume': {
+          const asked = await body<{ token: string }>();
+          const pending = openToken<Pending>(options.secret, String(asked.token ?? ''));
+          if (!pending || pending.user !== user.id) throw new Refused(403, 'bad-token', 'That upload is not yours, or it is out of date.');
+          if (!options.storage.resumeUpload) throw new Refused(501, 'no-resume', 'This storage cannot go on with an upload: start it again.');
+          const drive = await options.metadata.load();
+          if ([...drive.entries.values()].some((entry) => entry.kind === 'file' && entry.versions.some((v) => v.key === pending.key)))
+            throw new Refused(409, 'upload-finished', 'That upload is finished already.');
+          try {
+            const plan = await options.storage.resumeUpload(pending.key, pending.state, pending.size, base);
+            const left = plan.parts.reduce((sum, part) => sum + part.to - part.from, 0);
+            return Response.json({ token: asked.token, done: plan.done, parts: plan.parts, sent: pending.size - left });
+          } catch (error) {
+            if (error instanceof UploadGone) throw new Refused(410, 'upload-gone', 'That upload is no longer in the storage: start it again.');
+            throw error;
+          }
         }
 
         case 'POST /uploads/abort': {

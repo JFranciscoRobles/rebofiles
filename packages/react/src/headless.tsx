@@ -164,12 +164,13 @@ export interface Upload {
   entry?: FileEntry;
 }
 
-/** Files sent one after another, each in parts; what has gone of each, for a bar. */
+/** Files sent one after another, each in parts; what has gone of each, for a bar. One that failed is tried again with `retry`, from what arrived. */
 export function useUploads() {
   const { client, changed } = useDrive();
   const [uploads, setUploads] = useState<Upload[]>([]);
   const queue = useRef(Promise.resolve());
   const counter = useRef(0);
+  const sends = useRef(new Map<number, () => void>());
   const set = useCallback((id: number, change: Partial<Upload>) => setUploads((all) => all.map((u) => (u.id === id ? { ...u, ...change } : u))), []);
 
   const upload = useCallback(
@@ -177,21 +178,30 @@ export function useUploads() {
       for (const file of files) {
         const id = ++counter.current;
         setUploads((all) => [...all.filter((u) => u.state !== 'done'), { id, name: file.name, size: file.size, sent: 0, state: 'waiting' }]);
-        queue.current = queue.current.then(async () => {
-          set(id, { state: 'sending' });
-          try {
-            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
-            set(id, { state: 'done', sent: file.size, entry });
-            onDone?.(entry);
-          } catch (error) {
-            set(id, { state: 'failed', error: (error as Error).message });
-          }
-          changed();
-        });
+        const send = () => {
+          queue.current = queue.current.then(async () => {
+            set(id, { state: 'sending', error: undefined });
+            try {
+              const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
+              sends.current.delete(id);
+              set(id, { state: 'done', sent: file.size, entry });
+              onDone?.(entry);
+            } catch (error) {
+              set(id, { state: 'failed', error: (error as Error).message });
+            }
+            changed();
+          });
+        };
+        sends.current.set(id, send);
+        send();
       }
     },
     [client, changed, set],
   );
-  const dismiss = useCallback((id: number) => setUploads((all) => all.filter((u) => u.id !== id)), []);
-  return { uploads, upload, dismiss };
+  const retry = useCallback((id: number) => sends.current.get(id)?.(), []);
+  const dismiss = useCallback((id: number) => {
+    sends.current.delete(id);
+    setUploads((all) => all.filter((u) => u.id !== id));
+  }, []);
+  return { uploads, upload, retry, dismiss };
 }

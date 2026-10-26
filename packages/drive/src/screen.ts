@@ -71,6 +71,8 @@ interface Upload {
   sent: number;
   state: 'waiting' | 'sending' | 'done' | 'failed';
   error?: string;
+  /** Sent again from where it was cut. */
+  retry?: () => void;
 }
 
 /** The type of what is dragged from the drive itself, apart from files dragged in from the computer. */
@@ -249,18 +251,22 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     for (const file of files) {
       const id = ++uploadCount;
       uploads = [...uploads.filter((u) => u.state !== 'done'), { id, name: file.name, size: file.size, sent: 0, state: 'waiting' }];
-      queue = queue.then(async () => {
-        set(id, { state: 'sending' });
-        try {
-          const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
-          set(id, { state: 'done', sent: file.size });
-          selected = entry.id;
-          say(t('uploaded', { name: entry.name }));
-        } catch (error) {
-          set(id, { state: 'failed', error: (error as Error).message });
-        }
-        changed();
-      });
+      // Tried again, the client goes on from what arrived.
+      const send = () => {
+        queue = queue.then(async () => {
+          set(id, { state: 'sending', error: undefined, retry: undefined });
+          try {
+            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }) });
+            set(id, { state: 'done', sent: file.size });
+            selected = entry.id;
+            say(t('uploaded', { name: entry.name }));
+          } catch (error) {
+            set(id, { state: 'failed', error: (error as Error).message, retry: send });
+          }
+          changed();
+        });
+      };
+      send();
     }
     render();
   };
@@ -1014,7 +1020,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               ),
             ]
           : failed
-            ? h('span', { class: 'rf-error', role: 'alert' }, `${failed.name}: ${failed.error}`)
+            ? [
+                h(
+                  'span',
+                  { class: 'rf-error', role: 'alert' },
+                  failed.sent > 0 ? t('uploadCut', { name: failed.name, pct: Math.round((failed.sent / Math.max(1, failed.size)) * 100) }) : `${failed.name}: ${failed.error}`,
+                ),
+                failed.retry && h('button', { type: 'button', class: 'rf-retry', onClick: failed.retry }, t('tryAgain')),
+              ]
             : null,
       ),
       toast && h('div', { class: 'rf-toast', role: 'status' }, toast),

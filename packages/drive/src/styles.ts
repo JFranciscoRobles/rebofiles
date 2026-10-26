@@ -159,6 +159,8 @@ export const CSS = `
 .rf-bar { width: 140px; height: 6px; border-radius: 999px; background: var(--rf-hover); overflow: hidden; }
 .rf-bar span { display: block; height: 100%; background: var(--rf-brand); transition: width .18s; }
 .rf-error { color: var(--rf-danger); }
+.rf-retry { font: inherit; font-weight: 600; color: var(--rf-ink); background: var(--rf-bg); border: 1px solid var(--rf-border-strong); border-radius: 8px; padding: 2px 10px; cursor: pointer; }
+.rf-retry:hover { background: var(--rf-hover); }
 
 .rf-toast { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 6; background: var(--rf-toast); color: var(--rf-on-toast); font-size: 14px; border-radius: 12px; padding: 12px 18px; box-shadow: var(--rf-shadow-menu); max-width: calc(100% - 32px); animation: rf-pop .5s cubic-bezier(.2,.8,.2,1); }
 @keyframes rf-pop { from { opacity: 0; transform: translate(-50%, 8px); } }

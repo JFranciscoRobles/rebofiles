@@ -1,7 +1,9 @@
 // What the page asks of the server, one function per route of
 // @rebofiles/server. An upload goes as the server says: each part straight to
 // where it was told (the bucket, or the server for a disk), a few at a time,
-// with how much has gone so far.
+// with how much has gone so far. A part cut is tried again, after asking the
+// server what arrived; and an upload left halfway is remembered, so the same
+// file uploaded again goes on from where it was.
 
 import type { Entry, EntryId, FileEntry, FolderEntry, Role } from '@rebofiles/core';
 
@@ -14,7 +16,42 @@ export interface ClientOptions {
   fetch?: typeof fetch;
   /** How many parts go at once. */
   parallel?: number;
+  /** How a part that fails is tried again: `attempts` times in a row (5), the first after `delay` milliseconds (1000), each wait twice the last. */
+  retry?: { attempts?: number; delay?: number };
+  /**
+   * Where an upload halfway is remembered, so the same file uploaded again to the same place goes on from where it
+   * was: the page's localStorage unless said, and always while the page is open. null for only while it is open.
+   */
+  remember?: UploadMemory | null;
 }
+
+/** Tokens of uploads not finished, by the file and where it goes. */
+export interface UploadMemory {
+  get(key: string): string | null | undefined;
+  set(key: string, token: string): void;
+  delete(key: string): void;
+}
+
+const REMEMBERED = 'rebofiles:upload:';
+
+/** The page's localStorage, when there is one that may be used; a private window or a blocked site has none. */
+const localMemory = (): UploadMemory | null => {
+  try {
+    const storage = globalThis.localStorage;
+    if (!storage) return null;
+    return {
+      get: (key) => storage.getItem(REMEMBERED + key),
+      set: (key, token) => {
+        try {
+          storage.setItem(REMEMBERED + key, token);
+        } catch {}
+      },
+      delete: (key) => storage.removeItem(REMEMBERED + key),
+    };
+  } catch {
+    return null;
+  }
+};
 
 /** What the server refused, with its code (`name-taken`, `forbidden`…) and the message it gave. */
 export class RequestError extends Error {
@@ -62,6 +99,21 @@ export function createDriveClient(options: ClientOptions) {
   const base = options.base.replace(/\/$/, '');
   const send = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const parallel = options.parallel ?? 3;
+  const attempts = options.retry?.attempts ?? 5;
+  const delay = options.retry?.delay ?? 1000;
+  // While the page is open, in any case; and where it says, to outlive it.
+  const kept = new Map<string, string>();
+  const lasting = options.remember === undefined ? localMemory() : options.remember;
+  const memory: UploadMemory = {
+    get: (key) => kept.get(key) ?? lasting?.get(key),
+    set: (key, token) => (kept.set(key, token), lasting?.set(key, token)),
+    delete: (key) => (kept.delete(key), lasting?.delete(key)),
+  };
+  const pause = (ms: number, signal?: AbortSignal) =>
+    new Promise<void>((done, fail) => {
+      const timer = setTimeout(done, ms);
+      signal?.addEventListener('abort', () => (clearTimeout(timer), fail(new DOMException('The upload was stopped.', 'AbortError'))), { once: true });
+    });
 
   async function ask<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const headers: Record<string, string> = { ...(await options.headers?.()) };
@@ -143,38 +195,80 @@ export function createDriveClient(options: ClientOptions) {
     url: async (id: EntryId, options: { version?: string; inline?: boolean } = {}) =>
       absolute((await ask<{ url: string }>('GET', `/entries/${encodeURIComponent(id)}/download${q({ version: options.version, inline: options.inline ? '1' : undefined })}`)).url),
 
-    async upload(file: Blob & { name?: string }, options: UploadOptions = {}): Promise<FileEntry> {
+    async upload(file: Blob & { name?: string; lastModified?: number }, options: UploadOptions = {}): Promise<FileEntry> {
       // A bucket signs the type of a file of one part, so each part goes with the type the server was told.
       const type = file.type || 'application/octet-stream';
-      const start = await ask<{ token: string; parts: Part[] }>(
-        'POST',
-        '/uploads',
-        { name: file.name ?? 'file', parent: options.parent ?? null, file: options.file, type, size: file.size },
-        options.signal,
-      );
-      const sent = new Map<number, number>();
-      const report = () => options.onProgress?.({ sent: [...sent.values()].reduce((a, b) => a + b, 0), size: file.size });
-      report();
-      const finished: { number: number; etag: string }[] = [];
-      const waiting = [...start.parts];
-      const worker = async () => {
-        for (let part = waiting.shift(); part; part = waiting.shift()) {
-          const { number } = part;
-          const etag = await sendPart(part.url, file.slice(part.from, part.to, type), (n) => (sent.set(number, n), report()), options.signal);
-          // A bucket that lets the page in but not its ETag: the parts arrived, and cannot be put together.
-          if (!etag && start.parts.length > 1) throw new RequestError(0, 'upload', 'The bucket did not let the page read the ETag of a part. Its rule of origins has to expose ETag.');
-          finished.push({ number, etag });
-        }
-      };
-      try {
-        await Promise.all(Array.from({ length: Math.min(parallel, start.parts.length) }, worker));
-      } catch (error) {
-        // Given up: no more parts go, and what arrived is taken away rather than left in the bucket. Not with the signal, which may be what stopped it.
-        waiting.length = 0;
-        await ask('POST', '/uploads/abort', { token: start.token }).catch(() => undefined);
-        throw error;
+      const name = file.name ?? 'file';
+      const signal = options.signal;
+      const key = JSON.stringify([base, options.file ?? options.parent ?? null, name, file.size, file.lastModified ?? null, type]);
+
+      type Plan = { token: string; parts: Part[]; done: { number: number; etag: string }[] };
+      const resume = (token: string) => ask<Plan>('POST', '/uploads/resume', { token }, signal);
+      // The same file to the same place, left halfway: gone on with, when the server still has it.
+      let plan: Plan | null = null;
+      const remembered = memory.get(key);
+      if (remembered) plan = await resume(remembered).catch(() => (memory.delete(key), null));
+      if (!plan) {
+        const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', { name, parent: options.parent ?? null, file: options.file, type, size: file.size }, signal);
+        plan = { ...start, done: [] };
+        memory.set(key, plan.token);
       }
-      return (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token: start.token, parts: finished }, options.signal)).entry;
+      const { token } = plan;
+      const several = plan.parts.length + plan.done.length > 1;
+
+      const finished = new Map(plan.done.map((part) => [part.number, part.etag]));
+      // What has gone of each part: those that arrived before, whole.
+      const sent = new Map<number, number>();
+      let before = file.size;
+      for (const part of plan.parts) before -= part.to - part.from;
+      const report = () => options.onProgress?.({ sent: before + [...sent.values()].reduce((a, b) => a + b, 0), size: file.size });
+      report();
+
+      let waiting = [...plan.parts];
+      for (let failures = 0; waiting.length; ) {
+        const queue = [...waiting];
+        const worker = async () => {
+          for (let part = queue.shift(); part; part = queue.shift()) {
+            const { number } = part;
+            try {
+              const etag = await sendPart(part.url, file.slice(part.from, part.to, type), (n) => (sent.set(number, n), report()), signal);
+              // A bucket that lets the page in but not its ETag: the parts arrived, and cannot be put together.
+              if (!etag && several) throw new RequestError(0, 'no-etag', 'The bucket did not let the page read the ETag of a part. Its rule of origins has to expose ETag.');
+              finished.set(number, etag);
+              failures = 0;
+            } catch (error) {
+              // No more parts go once one has failed; those under way finish first.
+              queue.length = 0;
+              throw error;
+            }
+          }
+        };
+        const failed = (await Promise.allSettled(Array.from({ length: Math.min(parallel, queue.length) }, worker))).find((done) => done.status === 'rejected');
+        if (!failed) break;
+        const error = (failed as PromiseRejectedResult).reason as RequestError;
+        // Stopped by the person: given up, and what arrived taken away. Not with the signal, which is what stopped it.
+        if (signal?.aborted || error.name === 'AbortError') {
+          memory.delete(key);
+          await ask('POST', '/uploads/abort', { token }).catch(() => undefined);
+          throw error;
+        }
+        // Cut, or its addresses out of date: what arrived stays, to go on with now, or when the file is uploaded again.
+        if (error.code === 'no-etag' || ++failures > attempts) throw error;
+        await pause(delay * 2 ** (failures - 1), signal);
+        // Asked again what arrived, with addresses good from now.
+        const again = await resume(token).catch((refused: RequestError) => {
+          if (refused.status >= 400 && refused.status < 500) memory.delete(key);
+          throw refused;
+        });
+        for (const part of again.done) finished.set(part.number, part.etag);
+        before = file.size - again.parts.reduce((sum, part) => sum + part.to - part.from, 0);
+        sent.clear();
+        report();
+        waiting = again.parts;
+      }
+      const entry = (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token, parts: [...finished].map(([number, etag]) => ({ number, etag })) }, signal)).entry;
+      memory.delete(key);
+      return entry;
     },
   };
 }

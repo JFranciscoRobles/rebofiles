@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Entry } from '@rebofiles/core';
-import { type DriveServerOptions, PART_SIZE, createDriveHandler, diskStorage, memoryMetadata, s3Storage, sqliteMetadata } from '../src';
+import { type DriveServerOptions, MAX_PARTS, PART_SIZE, createDriveHandler, diskStorage, memoryMetadata, partSizeOf, s3Storage, sqliteMetadata } from '../src';
+import { partsOf } from '../src/storage';
 import { type Handler, bytesOf, client, memoryS3 } from './helpers';
 
 const identify = (request: Request) => (request.headers.get('x-user') ? { id: request.headers.get('x-user')! } : null);
@@ -179,6 +180,95 @@ describe('an upload given up, on the disk', () => {
     const handle = onDisk();
     const asked = await client(handle, 'ana').ask('POST', '/api/files/uploads', { name: 'a.txt', parent: null, size: 1 });
     expect((await client(handle, 'bea').ask('POST', '/api/files/uploads/abort', { token: asked.body.token })).status).toBe(403);
+  });
+});
+
+type Part = { number: number; url: string; from: number; to: number };
+type Resumed = { done: { number: number; etag: string }[]; parts: Part[]; sent: number };
+
+/** An upload cut after some of its parts, gone on with through the route, and finished: the same bytes, whichever parts came first. */
+async function cutAndResume(handle: Handler, send: (url: string, bytes: Uint8Array) => Promise<Response>, bytes: Uint8Array, first: number[]) {
+  const { ask } = client(handle);
+  const start = await ask('POST', '/api/files/uploads', { name: 'cut.bin', parent: null, size: bytes.length });
+  const token = start.body.token as string;
+  for (const part of (start.body.parts as Part[]).filter((p) => first.includes(p.number))) await send(part.url, bytes.slice(part.from, part.to));
+  const resumed = (await ask('POST', '/api/files/uploads/resume', { token })).body as unknown as Resumed;
+  const etags = [...resumed.done];
+  for (const part of resumed.parts) etags.push({ number: part.number, etag: (await send(part.url, bytes.slice(part.from, part.to))).headers.get('etag') ?? '' });
+  const finished = await ask('POST', '/api/files/uploads/finish', { token, parts: etags });
+  return { resumed, finished, token, ask };
+}
+
+describe('an upload cut, gone on with', () => {
+  it('on the disk: the parts that arrived are kept, and only the rest is sent again', async () => {
+    const handle = onDisk();
+    const send = (url: string, bytes: Uint8Array) => handle(new Request(`http://drive.test${url}`, { method: 'PUT', body: bytes as Uint8Array<ArrayBuffer> }));
+    const bytes = bytesOf(2 * PART_SIZE + 9);
+    const { resumed, finished, token, ask } = await cutAndResume(handle, send, bytes, [1, 3]);
+    expect(resumed.done.map((part) => part.number)).toEqual([1, 3]);
+    expect(resumed.parts.map((part) => part.number)).toEqual([2]);
+    expect(resumed.sent).toBe(PART_SIZE + 9);
+    expect(finished.status).toBe(200);
+    const { url } = (await ask('GET', `/api/files/entries/${finished.body.entry.id}/download`)).body;
+    expect(same(new Uint8Array(await (await handle(new Request(`http://drive.test${url}`))).arrayBuffer()), bytes)).toBe(true);
+    // Finished, it has nothing more to go on with.
+    expect((await ask('POST', '/api/files/uploads/resume', { token })).body).toMatchObject({ error: 'upload-finished' });
+  });
+
+  it('is refused to someone else', async () => {
+    const handle = onDisk();
+    const asked = await client(handle, 'ana').ask('POST', '/api/files/uploads', { name: 'a.txt', parent: null, size: 1 });
+    expect((await client(handle, 'bea').ask('POST', '/api/files/uploads/resume', { token: asked.body.token })).status).toBe(403);
+  });
+
+  it('on S3: the parts the bucket lists, page after page, and the rest at new addresses', async () => {
+    const s3 = memoryS3({ listPage: 1 });
+    const handle = createDriveHandler({
+      storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
+      metadata: memoryMetadata(),
+      identify,
+      authorize: () => true,
+      secret: 'u',
+      base: '/api/files',
+    });
+    const send = (url: string, bytes: Uint8Array) => s3.fetch(url, { method: 'PUT', body: bytes as Uint8Array<ArrayBuffer> });
+    const bytes = bytesOf(3 * PART_SIZE + 1);
+    const { resumed, finished } = await cutAndResume(handle, send, bytes, [1, 2, 4]);
+    expect(resumed.done).toEqual([
+      { number: 1, etag: '"p1"' },
+      { number: 2, etag: '"p2"' },
+      { number: 4, etag: '"p4"' },
+    ]);
+    expect(resumed.parts.map((part) => [part.number, new URL(part.url).searchParams.get('partNumber')])).toEqual([[3, '3']]);
+    const entry = finished.body.entry;
+    if (entry.kind !== 'file') throw new Error('not a file');
+    expect(same(s3.objects.get(entry.versions[0].key), bytes)).toBe(true);
+
+    // A file of one part: there whole, or sent again at a new address signed with its type.
+    const { ask } = client(handle);
+    const one = await ask('POST', '/api/files/uploads', { name: 'one.txt', parent: null, type: 'text/plain', size: 4 });
+    const again = (await ask('POST', '/api/files/uploads/resume', { token: one.body.token })).body as unknown as Resumed;
+    expect(again.done).toEqual([]);
+    expect(new URL(again.parts[0].url).searchParams.get('X-Amz-SignedHeaders')).toContain('content-type');
+    await s3.fetch(again.parts[0].url, { method: 'PUT', headers: { 'content-type': 'text/plain' }, body: bytesOf(4) });
+    expect(((await ask('POST', '/api/files/uploads/resume', { token: one.body.token })).body as unknown as Resumed).parts).toEqual([]);
+
+    // Given up in the bucket: there is nothing to go on with.
+    const gone = await ask('POST', '/api/files/uploads', { name: 'gone.bin', parent: null, size: 2 * PART_SIZE });
+    await ask('POST', '/api/files/uploads/abort', { token: gone.body.token });
+    const refused = await ask('POST', '/api/files/uploads/resume', { token: gone.body.token });
+    expect([refused.status, refused.body.error]).toEqual([410, 'upload-gone']);
+  });
+});
+
+describe('files of many gigabytes', () => {
+  it('go in parts of more than 8 MiB when 10,000 of them would not hold the file', () => {
+    expect(partSizeOf(5 * 1024 ** 3)).toBe(PART_SIZE);
+    const size = 200 * 1024 ** 3;
+    const parts = partsOf(size);
+    expect(parts.length).toBeLessThanOrEqual(MAX_PARTS);
+    expect(parts.at(-1)!.to).toBe(size);
+    expect((parts[0].to - parts[0].from) % (1024 * 1024)).toBe(0);
   });
 });
 

@@ -5,9 +5,10 @@
 // `?theme=dark` (or `auto`) shows it dark.
 // `?as=bea` is the drive as Bea sees it, to share with her and look; a link
 // of the drive comes here as `?link=…`, and shows what it reads.
+// `?retries=0` gives up a cut upload at once, for its "Try again" to be seen.
 
 import type { FileEntry } from '@rebofiles/core';
-import { DriveProvider, FileDrive, SharedLink } from '@rebofiles/react';
+import { DriveProvider, FileDrive, SharedLink, createDriveClient } from '@rebofiles/react';
 import { previewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode, Suspense, lazy, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -20,11 +21,14 @@ const language = params.get('lang') === 'es' ? 'es' : 'en';
 const as = params.get('as');
 const theme = (['dark', 'auto'].includes(params.get('theme') ?? '') ? params.get('theme') : 'light') as 'light' | 'dark' | 'auto';
 const link = params.get('link');
+const headers = (): Record<string, string> => (as ? { 'x-user': as } : {});
+const retries = params.get('retries');
+const client = retries === null ? undefined : createDriveClient({ base: '/api/files', headers, retry: { attempts: Number(retries), delay: 200 } });
 
 function Playground() {
   const [open, setOpen] = useState<{ file: FileEntry; url: string } | null>(null);
   return (
-    <DriveProvider base="/api/files" language={language} headers={(): Record<string, string> => (as ? { 'x-user': as } : {})}>
+    <DriveProvider base="/api/files" client={client} language={language} headers={headers}>
       <FileDrive
         theme={theme}
         title={as ? `Playground · ${as}` : 'Playground'}

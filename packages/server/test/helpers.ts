@@ -32,8 +32,8 @@ export function client(handle: Handler, who = 'ana', origin = 'http://drive.test
 
 export const bytesOf = (size: number, seed = 1) => Uint8Array.from({ length: size }, (_, i) => (i * 31 + seed) % 251);
 
-/** An S3 in memory, as a `fetch`. It does not check signatures; what it was asked is kept to look at. */
-export function memoryS3() {
+/** An S3 in memory, as a `fetch`. It does not check signatures; what it was asked is kept to look at. `listPage`: how many parts it lists a page, 1000 as S3. */
+export function memoryS3({ listPage = 1000 } = {}) {
   const objects = new Map<string, Uint8Array>();
   const uploads = new Map<string, Map<number, Uint8Array>>();
   const seen: { method: string; url: URL }[] = [];
@@ -57,6 +57,16 @@ export function memoryS3() {
     if (method === 'PUT' && q.has('uploadId')) {
       uploads.get(q.get('uploadId')!)!.set(Number(q.get('partNumber')), body);
       return new Response(null, { headers: { etag: `"p${q.get('partNumber')}"` } });
+    }
+    if (method === 'GET' && q.has('uploadId')) {
+      const parts = uploads.get(q.get('uploadId')!);
+      if (!parts) return new Response('<Error><Code>NoSuchUpload</Code></Error>', { status: 404 });
+      const after = Number(q.get('part-number-marker') ?? 0);
+      const numbers = [...parts.keys()].sort((a, b) => a - b).filter((n) => n > after);
+      const page = numbers.slice(0, listPage);
+      const listed = page.map((n) => `<Part><PartNumber>${n}</PartNumber><ETag>&quot;p${n}&quot;</ETag><Size>${parts.get(n)!.length}</Size></Part>`).join('');
+      const more = numbers.length > page.length;
+      return new Response(`<ListPartsResult><IsTruncated>${more}</IsTruncated>${more ? `<NextPartNumberMarker>${page.at(-1)}</NextPartNumberMarker>` : ''}${listed}</ListPartsResult>`);
     }
     if (method === 'DELETE' && q.has('uploadId')) {
       uploads.delete(q.get('uploadId')!);

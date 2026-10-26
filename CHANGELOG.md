@@ -129,6 +129,18 @@ minor version (0.x.0) may change the API; such changes are listed under
   `authorize` decides for it as for them. `createMcpHandler` serves them over
   HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
   The playground serves them at `/api/mcp`.
+- **Uploads that go on after a cut.** A part that fails is tried again by
+  itself, up to five times, waiting longer each time, after asking the
+  server what arrived (`POST /uploads/resume`) and taking new addresses for
+  the rest, so a file of hours does not run out of them. One that cannot go
+  on keeps what arrived: "Try again" in the drive (`retry` of `useUploads`)
+  sends the rest, and so does uploading the same file to the same place
+  after the page was closed, as the client remembers it in localStorage
+  (`remember`). Stopped by the person, it is given up. Storages say what
+  arrived with `resumeUpload`: S3 lists the parts, the disk looks at them.
+  Checked against R2.
+- **Files of many gigabytes.** Parts are larger than 8 MiB when 10,000 of
+  them would not hold a file, as S3 puts no more together.
 - **Claude in the demo, through the MCP tools.** Its rename on the landing
   is the calls an assistant makes (`search`, `read_document`, `rename`),
   answered by the tools of `@rebofiles/mcp` and Rebodocs over the drive in
@@ -156,6 +168,9 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Changed
 
+- **A failed upload is not given up.** What arrived stays, to be gone on
+  with; only one stopped by the person is given up. Set a lifecycle rule on
+  the bucket for those never gone on with.
 - **Rebodocs 0.11.** The optional peers on `@rebodocs/core` ask for 0.11.0
   or later, the version `@rebodocs/mcp` is made with.
 

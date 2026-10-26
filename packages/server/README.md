@@ -85,9 +85,10 @@ against AWS or MinIO yet. Not on npm yet.
   more, Postgres with a pool.
 - **The whole drive loaded on each request.** Fine for a team, not for a
   drive of millions of entries.
-- **Uploads left when the page is closed halfway** stay in the bucket as
-  parts until a lifecycle rule takes them; one that fails or is stopped is
-  given up.
+- **Uploads left halfway** stay in the bucket as parts, for a day, to be
+  gone on with (`POST /uploads/resume`); one never gone on with waits for a
+  lifecycle rule of the bucket ("abort incomplete multipart uploads after 1
+  day"). One stopped by the person is given up at once.
 
 ## License
 

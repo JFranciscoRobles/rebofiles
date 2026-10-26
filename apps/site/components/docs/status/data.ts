@@ -13,12 +13,12 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/server',
-    count: 39,
+    count: 43,
     what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
   },
   {
     where: 'packages/drive',
-    count: 19,
+    count: 22,
     what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
   {
@@ -28,7 +28,7 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 21,
+    count: 23,
     what: 'The demo of the landing: Claude’s calls to the MCP tools, the rename seen, and left alone when the person renamed first. The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark; the drive with no framework; a drive from the hooks alone.',
   },
 ];
@@ -132,7 +132,11 @@ export const ROADMAP: Milestone[] = [
       { what: 'Rebodocs’ MCP and ReboFiles’ together: the drive’s Word documents edited, each change a version', done: true },
     ],
   },
-  { version: '0.5.0', name: 'Big files and other storage', items: [{ what: 'Uploads that resume after a cut, files of several gigabytes' }, { what: 'Google Cloud Storage and Azure Blob' }] },
+  {
+    version: '0.5.0',
+    name: 'Big files and other storage',
+    items: [{ what: 'Uploads that resume after a cut, files of several gigabytes', done: true }, { what: 'Google Cloud Storage and Azure Blob' }],
+  },
   { version: '0.6.0', name: 'The desktop', items: [{ what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' }, { what: 'The Tauri application, on a Mac first' }] },
   { version: '1.0.0', name: 'Settled', items: [{ what: 'Used in a real application, and fixed where that shows' }, { what: 'The API settled, and kept from then on' }] },
 ];

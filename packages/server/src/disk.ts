@@ -69,6 +69,18 @@ export function diskStorage(options: DiskOptions): Storage {
       await rename(whole, target);
     },
 
+    async resumeUpload(key, _state, size, base) {
+      // A part is there when a file of its exact size is: one cut halfway is sent again.
+      const done = [];
+      const parts = [];
+      for (const part of partsOf(size)) {
+        const arrived = (await stat(partPath(key, part.number)).catch(() => undefined))?.size;
+        if (arrived === part.to - part.from) done.push({ number: part.number, etag: `"${part.number}"` });
+        else parts.push({ ...part, url: address(base, { key, may: 'write', part: part.number, size: part.to - part.from }) });
+      }
+      return { done, parts };
+    },
+
     async abortUpload(key, _state, size) {
       for (const part of partsOf(size)) await rm(partPath(key, part.number), { force: true });
       await rm(`${pathOf(key)}.uploading`, { force: true });

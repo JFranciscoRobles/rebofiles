@@ -3,8 +3,16 @@
 // finishes and deletes. A storage that cannot be reached from a browser, as
 // a folder of the disk, serves those addresses itself (`serve`).
 
+const MiB = 1024 * 1024;
+
 /** How many bytes go in each part of an upload: S3 takes parts of 5 MiB at least, but for the last. */
-export const PART_SIZE = 8 * 1024 * 1024;
+export const PART_SIZE = 8 * MiB;
+
+/** The most parts S3 puts together into one object. */
+export const MAX_PARTS = 10_000;
+
+/** The bytes of each part of a file of `size`: PART_SIZE, or more, in whole MiB, for a file that would need more than MAX_PARTS. */
+export const partSizeOf = (size: number): number => Math.max(PART_SIZE, Math.ceil(size / MAX_PARTS / MiB) * MiB);
 
 export interface UploadPart {
   number: number;
@@ -27,6 +35,16 @@ export interface FinishedPart {
   etag: string;
 }
 
+/** An upload gone on with: the parts that arrived, and new addresses for the rest. */
+export interface ResumePlan {
+  done: FinishedPart[];
+  /** The parts still to send, each at an address good from now. */
+  parts: UploadPart[];
+}
+
+/** What a storage says of an upload it no longer has, given up or past its life: it can only start again. */
+export class UploadGone extends Error {}
+
 export interface Storage {
   /** How the storage is shown to a person: `s3://acme-files`, `disk:./storage`. */
   readonly label: string;
@@ -34,6 +52,12 @@ export interface Storage {
   startUpload(key: string, type: string, size: number, base: string): Promise<UploadPlan>;
   /** The upload made whole; refused when what arrived is not the size it said. */
   finishUpload(key: string, state: string, parts: FinishedPart[], size: number): Promise<void>;
+  /**
+   * What of an upload has arrived, and addresses good from now for the rest: to go on after a cut, or after the
+   * addresses of the start ran out. Throws `UploadGone` when it has no such upload. Without it, an upload cut
+   * starts again.
+   */
+  resumeUpload?(key: string, state: string, size: number, base: string): Promise<ResumePlan>;
   /** An upload given up: whatever of it arrived taken away. Only for a key no version points to. */
   abortUpload(key: string, state: string, size: number): Promise<void>;
   /** An address to read the bytes from, as an attachment named `name`, or shown in the page when `inline`. */
@@ -46,7 +70,8 @@ export interface Storage {
 /** The parts of a file of `size` bytes: one for a small file, as a part of its own costs a request. */
 export function partsOf(size: number): { number: number; from: number; to: number }[] {
   const parts = [];
-  for (let from = 0, number = 1; from < size || number === 1; from += PART_SIZE, number++) parts.push({ number, from, to: Math.min(size, from + PART_SIZE) });
+  const each = partSizeOf(size);
+  for (let from = 0, number = 1; from < size || number === 1; from += each, number++) parts.push({ number, from, to: Math.min(size, from + each) });
   return parts;
 }
 

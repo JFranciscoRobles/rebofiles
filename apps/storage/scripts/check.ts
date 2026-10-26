@@ -80,6 +80,29 @@ await step('an upload in parts given up, and gone from the bucket', async () => 
   if (late.ok) throw new Error('The bucket still took a part of the upload given up.');
 });
 
+await step('an upload in parts cut, gone on with from what the bucket lists, and read back', async () => {
+  const route = (path: string, body: unknown) =>
+    handle(new Request(`${origin}/api/files${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).then((r) => r.json());
+  const bytes = bytesOf(2 * PART_SIZE + 77, 6);
+  const started = (await route('/uploads', { name: 'cut.bin', parent: folder.id, type: 'application/octet-stream', size: bytes.length })) as {
+    token: string;
+    parts: { url: string; from: number; to: number }[];
+  };
+  const sent = await fetch(started.parts[1].url, { method: 'PUT', body: bytes.slice(started.parts[1].from, started.parts[1].to) });
+  if (!sent.ok) throw new Error(`The bucket answered ${sent.status} to the second part.`);
+  type Plan = { done: { number: number; etag: string }[]; parts: { number: number; url: string; from: number; to: number }[]; sent: number };
+  const plan = (await route('/uploads/resume', { token: started.token })) as Plan;
+  if (plan.done.map((p) => p.number).join() !== '2' || plan.parts.map((p) => p.number).join() !== '1,3') throw new Error(`The bucket listed ${JSON.stringify(plan.done)}.`);
+  const parts = [...plan.done];
+  for (const part of plan.parts) {
+    const answer = await fetch(part.url, { method: 'PUT', body: bytes.slice(part.from, part.to) });
+    if (!answer.ok) throw new Error(`The bucket answered ${answer.status} to part ${part.number}.`);
+    parts.push({ number: part.number, etag: answer.headers.get('etag') ?? '' });
+  }
+  const { entry } = (await route('/uploads/finish', { token: started.token, parts })) as { entry: { id: string } };
+  await readBack(entry.id, bytes);
+});
+
 const urls = await Promise.all([drive.url(one.id), drive.url(one.id, { version: versioned.versions[1].id }), drive.url(parts.id)]);
 await step('deleted for good', async () => {
   await drive.moveToTrash(folder.id);

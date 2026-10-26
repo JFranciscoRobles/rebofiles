@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { type Credentials, presign } from './sigv4';
-import { type FinishedPart, type Storage, type UploadPlan, attachment, partsOf } from './storage';
+import { type FinishedPart, type Storage, type UploadPart, type UploadPlan, UploadGone, attachment, partsOf } from './storage';
 
 /** How long an address handed to the browser is good for, in seconds. */
 const URL_LIFE = 15 * 60;
@@ -59,28 +59,64 @@ export function s3Storage(options: S3Options): Storage {
     return answer;
   };
 
+  const partUrl = (key: string, uploadId: string, part: { number: number; from: number; to: number }): UploadPart => ({
+    ...part,
+    url: presign(credentials, { method: 'PUT', url: at(key, { partNumber: String(part.number), uploadId }), expires: URL_LIFE, headers: { 'content-length': String(part.to - part.from) } }),
+  });
+  const wholeUrl = (key: string, type: string, size: number) =>
+    presign(credentials, { method: 'PUT', url: at(key), expires: URL_LIFE, headers: { 'content-type': type, 'content-length': String(size) } });
+
+  /** The parts of an upload the bucket has, with their ETags and sizes: a thousand a page, as S3 lists them. */
+  const listParts = async (key: string, uploadId: string) => {
+    const found = new Map<number, { etag: string; size: number }>();
+    for (let marker = '0'; ; ) {
+      const answer = await ask('GET', at(key, { uploadId, 'part-number-marker': marker }));
+      const text = await answer.text();
+      if (answer.status === 404) throw new UploadGone('The bucket no longer has that upload.');
+      for (const [, part] of text.matchAll(/<Part>([\s\S]*?)<\/Part>/g)) {
+        const number = Number(/<PartNumber>(\d+)</.exec(part)?.[1]);
+        const etag = (/<ETag>([^<]*)</.exec(part)?.[1] ?? '').replace(/&quot;/g, '"').replace(/&#34;/g, '"');
+        found.set(number, { etag, size: Number(/<Size>(\d+)</.exec(part)?.[1]) });
+      }
+      if (!/<IsTruncated>true</.test(text)) return found;
+      marker = /<NextPartNumberMarker>(\d+)</.exec(text)?.[1] ?? '';
+      if (!marker) return found;
+    }
+  };
+
   return {
     label: `s3://${options.bucket}`,
 
     async startUpload(key, type, size): Promise<UploadPlan> {
       const parts = partsOf(size);
-      if (parts.length === 1) {
-        const url = presign(credentials, { method: 'PUT', url: at(key), expires: URL_LIFE, headers: { 'content-type': type, 'content-length': String(size) } });
-        return { parts: [{ ...parts[0], url }], state: '' };
-      }
+      // The state is the bucket's id of the upload, and the type a file of one part is signed with, to sign it again.
+      if (parts.length === 1) return { parts: [{ ...parts[0], url: wholeUrl(key, type, size) }], state: `\n${type}` };
       const answer = await ask('POST', at(key, { uploads: '' }));
       const uploadId = /<UploadId>([^<]+)<\/UploadId>/.exec(await answer.text())?.[1];
       if (!uploadId) throw new Error('The bucket did not start the upload.');
+      return { parts: parts.map((part) => partUrl(key, uploadId, part)), state: `${uploadId}\n${type}` };
+    },
+
+    async resumeUpload(key, state, size) {
+      const [uploadId, type = 'application/octet-stream'] = state.split('\n');
+      const parts = partsOf(size);
+      if (!uploadId) {
+        // A file of one part is there whole, or not at all.
+        const head = await ask('HEAD', at(key));
+        if (head.status !== 404 && Number(head.headers.get('content-length')) === size) return { done: [{ number: 1, etag: head.headers.get('etag') ?? '' }], parts: [] };
+        return { done: [], parts: [{ ...parts[0], url: wholeUrl(key, type, size) }] };
+      }
+      const found = await listParts(key, uploadId);
+      // A part that arrived short is sent again: the bucket keeps the last one sent under its number.
+      const arrived = (part: { number: number; from: number; to: number }) => found.get(part.number)?.size === part.to - part.from;
       return {
-        parts: parts.map((part) => ({
-          ...part,
-          url: presign(credentials, { method: 'PUT', url: at(key, { partNumber: String(part.number), uploadId }), expires: URL_LIFE, headers: { 'content-length': String(part.to - part.from) } }),
-        })),
-        state: uploadId,
+        done: parts.filter(arrived).map((part) => ({ number: part.number, etag: found.get(part.number)!.etag })),
+        parts: parts.filter((part) => !arrived(part)).map((part) => partUrl(key, uploadId, part)),
       };
     },
 
-    async finishUpload(key, uploadId, parts: FinishedPart[], size) {
+    async finishUpload(key, state, parts: FinishedPart[], size) {
+      const [uploadId] = state.split('\n');
       if (uploadId) {
         const xml = parts
           .slice()
@@ -101,7 +137,8 @@ export function s3Storage(options: S3Options): Storage {
       }
     },
 
-    async abortUpload(key, uploadId) {
+    async abortUpload(key, state) {
+      const [uploadId] = state.split('\n');
       // The parts kept for an upload in parts; a file of one part may have arrived whole, under a key nothing points to.
       if (uploadId) await ask('DELETE', at(key, { uploadId }));
       else await ask('DELETE', at(key));
