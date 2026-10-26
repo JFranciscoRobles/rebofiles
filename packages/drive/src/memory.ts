@@ -6,7 +6,7 @@
 import * as core from '@rebofiles/core';
 import type { Context, Drive, DriveErrorCode, Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
 import { type DriveClient, RequestError, type UploadOptions } from './client';
-import { renditionsOf } from './images';
+import { placeholderOf, renditionsOf } from './images';
 
 export interface MemoryOptions {
   /** The drive to start with, made with core. */
@@ -46,6 +46,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'no-version': 404,
   'invalid-share': 400,
   'invalid-settings': 400,
+  'invalid-color': 400,
 };
 
 export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
@@ -139,6 +140,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         const next = core.createFolder(current, { id: folderId, name, parent }, context());
         return { drive: next, answer: core.getFolder(next, folderId) as FolderEntry };
       }),
+    setColor: (entryId, color) => change((current) => one(core.setColor(current, entryId, color), entryId)),
     rename: (entryId, name, ifTaken) => change((current) => one(core.rename(current, entryId, name, context(), { ifTaken }), entryId)),
     move: (entryId, parent, ifTaken) => change((current) => one(core.move(current, entryId, parent, context(), { ifTaken }), entryId)),
     moveToTrash: (entryId) => change((current) => one(core.moveToTrash(current, entryId, context()), entryId)),
@@ -235,9 +237,11 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         blobs.set(key, r.blob);
         drive = core.addRendition(drive, made.id, versionId, { size: r.size, width: r.width, height: r.height, key, type: r.blob.type, bytes: r.blob.size });
       }
+      const placeholder = how.images ? await placeholderOf(smaller[0]?.blob ?? file).catch(() => undefined) : undefined;
+      if (placeholder) drive = core.setPlaceholder(drive, made.id, versionId, placeholder);
       const text = how.text ? await how.text(file, name).catch(() => undefined) : undefined;
       if (text?.trim()) texts.set(made.id, { version: versionId, text: text.slice(0, 100_000) });
-      return smaller.length ? core.getFile(drive, made.id) : made;
+      return smaller.length || placeholder ? core.getFile(drive, made.id) : made;
     },
   };
 

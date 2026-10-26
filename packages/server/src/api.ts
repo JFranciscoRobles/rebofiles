@@ -32,6 +32,7 @@
 //   GET    /entries/:id/activity?limit=   what was done to it, and in it of a folder, the newest first
 //   GET    /search/text?q=                files by what is written in them, with a piece of it around what was found
 //   PUT    /entries/:id/text              { version, text }: what is written in a file, as the page read it, to find it by
+//   PUT    /entries/:id/placeholder       { version, placeholder }: the tiny picture shown blurred while a picture comes
 //   POST   /duplicates                    { hashes }: the files with those bytes already, of what one may read
 //   GET    /shared                        what others shared with the one asking
 //   GET    /shared/new                    how many of those are new since they last looked
@@ -389,6 +390,16 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           }
           return Response.json({ results: found });
         }
+        case 'PUT /entries/:id/placeholder':
+          return Response.json(
+            await change(async (drive) => {
+              const asked = await body<{ version?: string; placeholder?: string }>();
+              const file = core.getFile(drive, id);
+              await allow(user, 'upload', file, drive);
+              const next = core.setPlaceholder(drive, id, String(asked.version ?? ''), String(asked.placeholder ?? ''));
+              return { drive: next, answer: { entry: core.getEntry(next, id) } };
+            }, user.id),
+          );
         case 'PUT /entries/:id/text': {
           const asked = await body<{ version?: string; text?: string }>();
           const drive = await load();
@@ -573,7 +584,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
         }
 
         case 'PATCH /entries/:id': {
-          const asked = await body<{ name?: string; parent?: EntryId | null; ifTaken?: 'refuse' | 'keep-both' }>();
+          const asked = await body<{ name?: string; parent?: EntryId | null; color?: core.FolderColor | null; ifTaken?: 'refuse' | 'keep-both' }>();
           const ifTaken = asked.ifTaken === 'keep-both' ? 'keep-both' : 'refuse';
           return Response.json(
             await change(async (drive) => {
@@ -587,6 +598,11 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
               if (asked.name !== undefined) {
                 await allow(user, 'rename', entry, drive);
                 next = core.rename(next, id, String(asked.name), context(), { ifTaken });
+              }
+              // A folder's colour, as one who may rename it may give it.
+              if (asked.color !== undefined) {
+                await allow(user, 'rename', entry, drive);
+                next = core.setColor(next, id, asked.color);
               }
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
             }, user.id),

@@ -285,6 +285,24 @@ describe('the same file again', () => {
   });
 });
 
+describe('how an entry looks', () => {
+  it('a folder takes a colour from who may rename it, and a picture its placeholder from who may upload to it', async () => {
+    const d = drive();
+    const { clients, contract } = await anasClients(d);
+    expect((await d.ana.ask('PATCH', `/api/files/entries/${clients.id}`, { color: 'purple' })).body.entry).toMatchObject({ color: 'purple' });
+    expect((await d.ana.ask('PATCH', `/api/files/entries/${clients.id}`, { color: 'chartreuse' })).status).toBe(400);
+    expect((await d.bea.ask('PATCH', `/api/files/entries/${clients.id}`, { color: 'red' })).status).toBe(403);
+    expect((await d.ana.ask('PATCH', `/api/files/entries/${clients.id}`, { color: null })).body.entry).not.toHaveProperty('color');
+
+    const tiny = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==';
+    const version = (contract as FileEntry).versions[0].id;
+    const put = (who: typeof d.ana, placeholder: string) => who.ask('PUT', `/api/files/entries/${contract.id}/placeholder`, { version, placeholder });
+    expect(((await put(d.ana, tiny)).body.entry as FileEntry).versions[0].placeholder).toBe(tiny);
+    expect((await put(d.ana, 'javascript:alert(1)')).status).toBe(400);
+    expect((await put(d.bea, tiny)).status).toBe(403);
+  });
+});
+
 describe('byRoles', () => {
   it('lets anyone look at the top and put things there, and nothing else there', () => {
     const empty = { entries: new Map() };

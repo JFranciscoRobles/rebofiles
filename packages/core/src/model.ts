@@ -17,6 +17,8 @@ export interface Version {
   note?: string;
   /** The SHA-256 of its bytes, in hex, as the one who uploaded it said: to tell the same file uploaded again. */
   sha256?: string;
+  /** Of a picture, a tiny one of it as a data: URL, a few hundred bytes: shown blurred while the picture comes. */
+  placeholder?: string;
   /** The version this one brought back, when it was made by `restoreVersion`. */
   restoredFrom?: string;
   /** Of a picture: smaller ones made of it when it was uploaded, to show it; the bytes under `key` stay as they came. */
@@ -86,8 +88,14 @@ interface Base {
   links?: readonly Link[];
 }
 
+/** The colours a folder may be given, each shown as the theme has it; none is the drive's own. */
+export const FOLDER_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray'] as const;
+export type FolderColor = (typeof FOLDER_COLORS)[number];
+
 export interface FolderEntry extends Base {
   kind: 'folder';
+  /** Its colour, to tell it apart at a glance; the drive's own when left out. */
+  color?: FolderColor;
 }
 
 export interface FileEntry extends Base {

@@ -7,7 +7,20 @@
 //   const drive = mountDrive(document.getElementById('files')!, { base: '/api/files' });
 //   drive.destroy();
 
-import { type Activity, type DriveSettings, EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type PersonalSettings, type Role, versionNumber } from '@rebofiles/core';
+import {
+  type Activity,
+  type DriveSettings,
+  EVERYONE,
+  FOLDER_COLORS,
+  type FolderColor,
+  type Entry,
+  type EntryId,
+  type FileEntry,
+  type FolderEntry,
+  type PersonalSettings,
+  type Role,
+  versionNumber,
+} from '@rebofiles/core';
 import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
 import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
@@ -21,6 +34,19 @@ import { type UploadItem, createUploads, formatDuration, lookInDrive } from './u
 import { textOf } from './text';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
+
+/** The name of each colour of a folder, among the texts. */
+const COLOR_TEXT: Record<FolderColor, 'colorRed' | 'colorOrange' | 'colorYellow' | 'colorGreen' | 'colorTeal' | 'colorBlue' | 'colorPurple' | 'colorPink' | 'colorGray'> = {
+  red: 'colorRed',
+  orange: 'colorOrange',
+  yellow: 'colorYellow',
+  green: 'colorGreen',
+  teal: 'colorTeal',
+  blue: 'colorBlue',
+  purple: 'colorPurple',
+  pink: 'colorPink',
+  gray: 'colorGray',
+};
 
 export interface DriveOptions {
   /** Where the routes of @rebofiles/server are: `/api/files` unless said. */
@@ -146,11 +172,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let anchor: EntryId | null = null;
   let layout: 'list' | 'grid' = options.defaultView ?? 'list';
   // How the list is put in order, and which kind of file it shows: as the person last chose, in this browser.
-  type SortBy = 'name' | 'owner' | 'modified' | 'size';
+  type SortBy = 'name' | 'owner' | 'modified' | 'created' | 'size' | 'type' | 'color';
   type KindFilter = 'all' | 'folder' | 'docx' | 'pdf' | 'sheet' | 'image' | 'video' | 'audio' | 'text' | 'other';
   const remembered = (() => {
     try {
-      return JSON.parse(localStorage.getItem('rebofiles:order') ?? '{}') as { by?: SortBy; dir?: 1 | -1; chosen?: boolean };
+      return JSON.parse(localStorage.getItem('rebofiles:order') ?? '{}') as { by?: SortBy; dir?: 1 | -1; chosen?: boolean; foldersFirst?: boolean };
     } catch {
       return {};
     }
@@ -159,31 +185,51 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let sortDir: 1 | -1 = remembered.dir ?? 1;
   // Until one is chosen, Recent and a search keep the order the server gives: the latest, the closest.
   let sortChosen = remembered.chosen ?? false;
+  // Folders before files, as a drive has them, unless the person mixes them.
+  let foldersFirst = remembered.foldersFirst ?? true;
+  const keepOrder = () => {
+    try {
+      localStorage.setItem('rebofiles:order', JSON.stringify({ by: sortBy, dir: sortDir, chosen: sortChosen, foldersFirst }));
+    } catch {}
+  };
   let kindFilter: KindFilter = 'all';
   const setSort = (by: SortBy, dir?: 1 | -1) => {
-    sortDir = dir ?? (by === sortBy ? (sortDir === 1 ? -1 : 1) : by === 'modified' || by === 'size' ? -1 : 1);
+    sortDir = dir ?? (by === sortBy ? (sortDir === 1 ? -1 : 1) : by === 'modified' || by === 'created' || by === 'size' ? -1 : 1);
     sortBy = by;
     sortChosen = true;
-    try {
-      localStorage.setItem('rebofiles:order', JSON.stringify({ by: sortBy, dir: sortDir, chosen: true }));
-    } catch {}
+    keepOrder();
     render();
   };
   const sizeOfEntry = (entry: Entry) => (entry.kind === 'file' ? entry.versions[0].size : -1);
-  /** What the view shows, of the kind chosen, in the order chosen: folders first whatever it is. */
+  /** Where a folder's colour comes, in the order of the colours; one without, after them all. */
+  const colorRank = (entry: Entry) => (entry.kind === 'folder' && entry.color ? FOLDER_COLORS.indexOf(entry.color) : FOLDER_COLORS.length);
+  const extensionOf = (entry: Entry) => (entry.kind === 'file' ? (/\.([^.]+)$/.exec(entry.name)?.[1] ?? '').toLowerCase() : '');
+  /** What the view shows, of the kind chosen, in the order chosen: folders first, unless they are mixed with the files. */
   const arranged = (entries: Entry[]) => {
     const shown = kindFilter === 'all' ? entries : entries.filter((entry) => kindOf(entry) === kindFilter);
     if (!sortChosen && (section === 'recent' || query)) return shown;
     const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
-    const by = (a: Entry, b: Entry) =>
-      sortBy === 'name'
-        ? collator.compare(a.name, b.name)
-        : sortBy === 'owner'
-          ? collator.compare(a.owner, b.owner) || collator.compare(a.name, b.name)
-          : sortBy === 'modified'
-            ? a.modified.localeCompare(b.modified)
-            : sizeOfEntry(a) - sizeOfEntry(b) || collator.compare(a.name, b.name);
-    return [...shown].sort((a, b) => (a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : by(a, b) * sortDir));
+    const byName = (a: Entry, b: Entry) => collator.compare(a.name, b.name);
+    const by = (a: Entry, b: Entry): number => {
+      switch (sortBy) {
+        case 'name':
+          return byName(a, b);
+        case 'owner':
+          return collator.compare(a.owner, b.owner) || byName(a, b);
+        case 'modified':
+          return a.modified.localeCompare(b.modified);
+        case 'created':
+          return a.created.localeCompare(b.created);
+        case 'size':
+          return sizeOfEntry(a) - sizeOfEntry(b) || byName(a, b);
+        // Of a kind together, Word documents with Word documents, and by their extension within it.
+        case 'type':
+          return collator.compare(typeLabel(a), typeLabel(b)) || collator.compare(extensionOf(a), extensionOf(b)) || byName(a, b);
+        case 'color':
+          return colorRank(a) - colorRank(b) || byName(a, b);
+      }
+    };
+    return [...shown].sort((a, b) => (foldersFirst && a.kind !== b.kind ? (a.kind === 'folder' ? -1 : 1) : by(a, b) * sortDir));
   };
   let typed = '';
   let query = '';
@@ -367,6 +413,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     }
   };
   /** The first page of a document, small, made once for each version; undefined where there is no way to make it. */
+  /** A picture's placeholder, blurred, under where the picture will be: what shows of it until it has come. */
+  const blurred = (file: FileEntry) => {
+    const placeholder = file.versions[0].placeholder;
+    return placeholder ? h('img', { key: `ph:${file.versions[0].id}`, class: 'rf-ph', src: placeholder, alt: '', 'aria-hidden': 'true' }) : null;
+  };
+
   const docThumb = (file: FileEntry, fit: 'page' | 'width', wanted = 640): Child | undefined => {
     if (kindOf(file) !== 'docx') return undefined;
     // The picture made of its first page when it was uploaded, when there is one: nothing to draw.
@@ -687,8 +739,48 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // ---- The pieces of the screen ----
 
-  const tile = (entry: Entry) => h('span', { class: `rf-tile rf-k-${kindOf(entry)}`, 'aria-hidden': 'true' }, entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry));
+  const tile = (entry: Entry) =>
+    h(
+      'span',
+      { class: `rf-tile rf-k-${kindOf(entry)}${entry.kind === 'folder' && entry.color ? ` rf-fc-${entry.color}` : ''}`, 'aria-hidden': 'true' },
+      entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry),
+    );
+  /** The colours a folder may be given, the drive's own first, the one it has marked: for each of `folders`, at once. */
+  const swatches = (folders: FolderEntry[], role: 'radio' | 'menuitemradio', after?: () => void) => {
+    const now = folders.every((f) => (f.color ?? null) === (folders[0].color ?? null)) ? (folders[0].color ?? null) : undefined;
+    return h(
+      'div',
+      { key: 'colours', class: 'rf-swatches', role: role === 'radio' ? 'radiogroup' : 'group', 'aria-label': t('folderColor') },
+      [null, ...FOLDER_COLORS].map((color) =>
+        button(
+          icon('folder', 14),
+          () => {
+            after?.();
+            // Undone by giving each the colour it had.
+            const was = folders.map((f) => [f.id, f.color ?? null] as const);
+            void attempt(async () => {
+              await Promise.all(folders.map((f) => client.setColor(f.id, color)));
+              say(t('colorChanged'), () => Promise.all(was.map(([id, before]) => client.setColor(id, before))));
+            });
+          },
+          {
+            key: color ?? 'none',
+            role,
+            tabindex: role === 'menuitemradio' ? '-1' : undefined,
+            class: `rf-swatch${color ? ` rf-fc-${color}` : ''}`,
+            'aria-checked': now === color,
+            'aria-label': color ? t(COLOR_TEXT[color]) : t('colorNone'),
+            title: color ? t(COLOR_TEXT[color]) : t('colorNone'),
+          },
+        ),
+      ),
+    );
+  };
   const roleName = (role: Role) => t(role === 'viewer' ? 'roleViewer' : role === 'commenter' ? 'roleCommenter' : 'roleEditor');
+  /** A kind as a person reads it, for putting entries of one kind together. */
+  const typeLabel = (entry: Entry) => (entry.kind === 'folder' ? t('folder') : typeName(entry));
+  /** What each order is called, in the choice of one. */
+  const sortName = (by: SortBy) => t(({ name: 'name', owner: 'owner', modified: 'modified', created: 'createdAt', size: 'size', type: 'type', color: 'folderColor' } as const)[by]);
   const typeName = (file: FileEntry): string => {
     const kind = kindOf(file);
     if (kind === 'docx') return t('kindDocx');
@@ -908,9 +1000,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 'rf-card',
                 h(
                   'div',
-                  { class: `rf-thumb rf-k-${kind}` },
+                  { class: `rf-thumb rf-k-${kind}${entry.kind === 'folder' && entry.color ? ` rf-fc-${entry.color}` : ''}` },
                   tick(entry),
-                  url ? h('img', { src: url, alt: '', loading: 'lazy' }) : (entry.kind === 'file' && docThumb(entry, 'width', 320)) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
+                  url
+                    ? [blurred(entry as FileEntry), h('img', { key: url, src: url, alt: '', loading: 'lazy' })]
+                    : (entry.kind === 'file' && docThumb(entry, 'width', 320)) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
                 ),
                 h('div', { class: 'rf-name' }, tile(entry), named(entry)),
               );
@@ -957,9 +1051,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const page = pages.get(key);
     return h(
       'div',
-      { class: 'rf-preview' },
+      { class: `rf-preview${kind === 'image' && file.versions[0].placeholder ? ' rf-has-ph' : ''}` },
       kind === 'image' && url
-        ? h('img', { src: url, alt: file.name })
+        ? [blurred(file), h('img', { key: url, src: url, alt: file.name })]
         : kind === 'pdf' && url
           ? h('iframe', { src: `${url}#toolbar=0&view=FitH`, title: file.name })
           : kind === 'text' && typeof text === 'string'
@@ -1026,6 +1120,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           act(t('move'), 'move', () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render())),
           one && act(t('share'), 'users', () => ((dialog = { kind: 'share', entry: one, who: '', role: 'viewer' }), render())),
           act(t('moveToTrash'), 'trash', () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), true),
+          many.every((entry) => entry.kind === 'folder') && swatches(many as FolderEntry[], 'menuitemradio', () => closeContext(false)),
         ];
     return h(
       'div',
@@ -1044,7 +1139,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           node.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
         },
         onKeydown: (event: KeyboardEvent) => {
-          const all = [...element.querySelectorAll<HTMLButtonElement>('.rf-ctx [role="menuitem"]')];
+          const all = [...element.querySelectorAll<HTMLButtonElement>('.rf-ctx [role="menuitem"], .rf-ctx [role="menuitemradio"]')];
           const at = all.indexOf(document.activeElement as HTMLButtonElement);
           const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: all.length - 1 }[event.key];
           if (to !== undefined) {
@@ -1251,6 +1346,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 { class: 'rf-props' },
                 row(t('type'), file ? typeName(file) : t('folder'), file?.type),
                 file && row(t('size'), formatSize(file.versions[0].size, locale)),
+                !file && !inTrash && row(t('folderColor'), swatches([entry as FolderEntry], 'radio')),
                 row(t('owner'), entry.owner),
                 entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${s.with === EVERYONE ? t('everyone') : s.with} · ${roleName(s.role)}`).join(', ')) : null,
                 row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
@@ -1278,6 +1374,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const values = { by, name: a.name, was: a.was ?? '', with: a.with === EVERYONE ? t('everyone') : (a.with ?? ''), role: a.role ? roleName(a.role) : '' };
     const key = (
       {
+        colored: 'didColor',
         created: 'didCreate',
         uploaded: 'didUpload',
         version: 'didVersion',
@@ -1624,6 +1721,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         ? h(
             'div',
             { class: `rf-view-image${zoomed ? ' rf-zoomed' : ''}` },
+            !zoomed && blurred(file),
             h('img', { key: url, src: url, alt: file.name, onClick: () => ((zoomed = !zoomed), render()), title: zoomed ? t('fit') : t('zoom') }),
           )
         : h('div', { class: 'rf-view-wait' }, t('loading'));
@@ -2435,20 +2533,30 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   },
                   (['all', 'folder', 'docx', 'pdf', 'sheet', 'image', 'video', 'audio', 'text', 'other'] as KindFilter[]).map((kind) => h('option', { value: kind }, t(`kind_${kind}` as 'kind_all'))),
                 ),
-                layout === 'grid' &&
-                  h(
-                    'select',
-                    {
-                      class: 'rf-select',
-                      'aria-label': t('sortLabel'),
-                      value: `${sortBy}:${sortDir}`,
-                      onChange: (event: Event) => {
-                        const [by, dir] = (event.target as HTMLSelectElement).value.split(':');
-                        setSort(by as SortBy, Number(dir) as 1 | -1);
-                      },
+                h(
+                  'select',
+                  {
+                    class: 'rf-select',
+                    'aria-label': t('sortLabel'),
+                    value: `${sortBy}:${sortDir}`,
+                    onChange: (event: Event) => {
+                      const [by, dir] = (event.target as HTMLSelectElement).value.split(':');
+                      setSort(by as SortBy, Number(dir) as 1 | -1);
                     },
-                    (['name', 'modified', 'size', 'owner'] as SortBy[]).flatMap((by) => ([1, -1] as const).map((dir) => h('option', { value: `${by}:${dir}` }, `${t(by)} ${dir === 1 ? '↑' : '↓'}`))),
+                  },
+                  (['name', 'modified', 'created', 'size', 'type', 'owner', 'color'] as SortBy[]).flatMap((by) =>
+                    ([1, -1] as const).map((dir) => h('option', { value: `${by}:${dir}` }, `${sortName(by)} ${dir === 1 ? '↑' : '↓'}`)),
                   ),
+                ),
+                button(
+                  icon('folder', 16),
+                  () => {
+                    foldersFirst = !foldersFirst;
+                    keepOrder();
+                    render();
+                  },
+                  { class: 'rf-btn rf-icon rf-folders-first', 'aria-pressed': foldersFirst, 'aria-label': t('foldersFirst'), title: t('foldersFirst') },
+                ),
                 h(
                   'div',
                   { class: 'rf-seg', role: 'group', 'aria-label': `${t('list')} / ${t('grid')}` },

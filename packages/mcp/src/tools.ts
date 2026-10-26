@@ -7,7 +7,7 @@
 // what the server refused as an error the model reads, not as a failure of
 // the protocol.
 
-import { type Entry, type FileEntry, sizeOf, splitName, versionNumber } from '@rebofiles/core';
+import { type Entry, FOLDER_COLORS, type FileEntry, type FolderColor, sizeOf, splitName, versionNumber } from '@rebofiles/core';
 import type { Drive } from './drive';
 
 export interface Tool {
@@ -34,6 +34,7 @@ export const brief = (entry: Entry) => ({
   kind: entry.kind,
   ...(entry.kind === 'file' ? { type: entry.type, size: sizeOf(entry), versions: entry.versions.length } : {}),
   folder: entry.parent,
+  ...(entry.kind === 'folder' && entry.color ? { color: entry.color } : {}),
   owner: entry.owner,
   modified: entry.modified,
   ...(entry.trashed ? { trashed: true } : {}),
@@ -283,6 +284,18 @@ export const TOOLS: Tool[] = [
     async run(drive, args) {
       const renamed = await drive.rename(str(args, 'id'), str(args, 'name'));
       return { text: `Renamed to ${line(renamed)}.`, data: brief(renamed) };
+    },
+  },
+  {
+    name: 'set_folder_color',
+    title: 'Colour a folder',
+    description: `A folder given a colour, to tell it apart at a glance: ${FOLDER_COLORS.join(', ')}; or "none" for the drive's own.`,
+    inputSchema: { type: 'object', properties: { id, color: { type: 'string', enum: [...FOLDER_COLORS, 'none'] } }, required: ['id', 'color'], additionalProperties: false },
+    annotations: { ...WRITE, idempotentHint: true },
+    async run(drive, args) {
+      const color = str(args, 'color');
+      const done = await drive.setColor(str(args, 'id'), color === 'none' ? null : (color as FolderColor));
+      return { text: `"${done.name}" is ${color === 'none' ? 'the drive’s own colour' : color} now.`, data: brief(done) };
     },
   },
   {

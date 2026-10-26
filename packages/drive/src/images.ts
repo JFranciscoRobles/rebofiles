@@ -54,3 +54,27 @@ async function draw(bitmap: ImageBitmap, width: number, height: number, type: st
   if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });
   return new Promise((done, fail) => canvas.toBlob((blob) => (blob ? done(blob) : fail(new Error('The picture could not be made smaller.'))), type, quality));
 }
+
+/** The longest side of a placeholder, in pixels: blurred, a few are enough to show what is coming. */
+export const PLACEHOLDER_SIZE = 16;
+
+/**
+ * A tiny picture of `picture`, as a data: URL of a few hundred bytes, to keep with its version and show blurred while
+ * the picture itself comes. Undefined for what the page cannot draw.
+ */
+export async function placeholderOf(picture: Blob): Promise<string | undefined> {
+  if (!makesRenditions(picture.type) || typeof createImageBitmap !== 'function') return undefined;
+  const bitmap = await createImageBitmap(picture);
+  try {
+    const scale = PLACEHOLDER_SIZE / Math.max(bitmap.width, bitmap.height, 1);
+    const width = Math.max(1, Math.round(bitmap.width * Math.min(1, scale)));
+    const height = Math.max(1, Math.round(bitmap.height * Math.min(1, scale)));
+    const blob = await draw(bitmap, width, height, 'image/jpeg', 0.6);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return `data:image/jpeg;base64,${btoa(binary)}`;
+  } finally {
+    bitmap.close();
+  }
+}

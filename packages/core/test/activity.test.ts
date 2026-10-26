@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityFor, activityOf, addLink, addVersion, createFolder, deleteForever, move, moveToTrash, removeLink, rename, restore, share, unshare } from '../src';
+import { activityFor, activityOf, addLink, addVersion, createFolder, deleteForever, move, moveToTrash, removeLink, rename, restore, setColor, share, unshare } from '../src';
 import { ana, demoDrive, v } from './drive';
 
 const at = '2026-10-06T09:00:00.000Z';
@@ -24,6 +24,7 @@ describe('activity', () => {
     const linked = addLink(drive, 'clients', { id: 'l', expires: '2026-12-01T00:00:00.000Z' }, ana);
     expect(said(drive, linked).map(([action]) => action)).toEqual(['linked']);
     expect(said(linked, removeLink(linked, 'clients', 'l')).map(([action]) => action)).toEqual(['unlinked']);
+    expect(said(drive, setColor(drive, 'clients', 'blue'))).toEqual([['colored', 'Clients', '']]);
   });
 
   it('tells a new version, and finds what was done in a folder', () => {

@@ -36,7 +36,7 @@ test('a grid of pictures asks for their addresses in one request, and a picture 
     return route.continue();
   });
   await page.getByRole('button', { name: 'Grid' }).click();
-  const pictures = page.locator('.rf-thumb img');
+  const pictures = page.locator('.rf-thumb img:not(.rf-ph)');
   await expect(pictures).toHaveCount(6);
   await expect.poll(() => pictures.evaluateAll((all) => all.every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true);
   expect(failedOnce.size).toBeGreaterThanOrEqual(6);

@@ -11,6 +11,8 @@ export {
   type Share,
   type Link,
   type FolderEntry,
+  type FolderColor,
+  FOLDER_COLORS,
   type FileEntry,
   type Entry,
   type Drive,
@@ -37,8 +39,9 @@ export {
   emptyTrash,
   purgeTrash,
   usageOf,
+  setColor,
 } from './ops';
-export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor, filesByHash } from './versions';
+export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor, filesByHash, setPlaceholder, PLACEHOLDER, PLACEHOLDER_MOST } from './versions';
 export {
   type Language,
   type Theme,

@@ -5,8 +5,8 @@
 // server what arrived; and an upload left halfway is remembered, so the same
 // file uploaded again goes on from where it was.
 
-import type { Activity, DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
-import { type MadeRendition, renditionsOf } from './images';
+import type { Activity, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
+import { type MadeRendition, placeholderOf, renditionsOf } from './images';
 
 export interface ClientOptions {
   /** Where the routes are: `/api/files`. */
@@ -228,6 +228,8 @@ export function createDriveClient(options: ClientOptions) {
 
     createFolder: (name: string, parent: EntryId | null) => one('POST', '/folders', { name, parent }) as Promise<FolderEntry>,
     rename: (id: EntryId, name: string, ifTaken?: 'keep-both') => one('PATCH', `/entries/${encodeURIComponent(id)}`, { name, ifTaken }),
+    /** A folder given a colour, or the drive's own again with null. */
+    setColor: (id: EntryId, color: FolderColor | null) => one('PATCH', `/entries/${encodeURIComponent(id)}`, { color }),
     move: (id: EntryId, parent: EntryId | null, ifTaken?: 'keep-both') => one('PATCH', `/entries/${encodeURIComponent(id)}`, { parent, ifTaken }),
     moveToTrash: (id: EntryId) => one('POST', `/entries/${encodeURIComponent(id)}/trash`),
     restore: (id: EntryId) => one('POST', `/entries/${encodeURIComponent(id)}/restore`),
@@ -361,9 +363,16 @@ export function createDriveClient(options: ClientOptions) {
       if (options.images && !options.rendition) {
         const version = entry.versions[0].id;
         try {
-          for (const made of await (options.renditions ?? renditionsOf)(file, options.images)) {
-            entry = await api.upload(made.blob, { rendition: { file: entry.id, version, size: made.size, width: made.width, height: made.height }, signal });
+          const made = await (options.renditions ?? renditionsOf)(file, options.images);
+          for (const one of made) {
+            entry = await api.upload(one.blob, { rendition: { file: entry.id, version, size: one.size, width: one.width, height: one.height }, signal });
           }
+          // And the tiny one, from the smallest made, or the picture itself when it is smaller than all of them.
+          const placeholder = await placeholderOf(made[0]?.blob ?? file).catch(() => undefined);
+          if (placeholder)
+            entry = await one('PUT', `/entries/${encodeURIComponent(entry.id)}/placeholder`, { version, placeholder })
+              .then((e) => e as FileEntry)
+              .catch(() => entry);
         } catch (error) {
           if (signal?.aborted) throw error;
         }

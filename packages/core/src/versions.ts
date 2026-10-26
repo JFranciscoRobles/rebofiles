@@ -36,6 +36,7 @@ export function restoreVersion(drive: Drive, id: EntryId, versionId: string, new
     by: context.by,
     restoredFrom: old.id,
     ...(old.sha256 ? { sha256: old.sha256 } : {}),
+    ...(old.placeholder ? { placeholder: old.placeholder } : {}),
     ...(old.renditions ? { renditions: old.renditions } : {}),
   };
   return withFile(drive, { ...file, versions: [next, ...file.versions], modified: context.at, modifiedBy: context.by });
@@ -57,6 +58,20 @@ export function addRendition(drive: Drive, id: EntryId, versionId: string, rendi
   if (!version) throw new DriveError('no-version', `${file.name} has no version ${versionId}`);
   const renditions = [...(version.renditions ?? []).filter((r) => r.size !== rendition.size), rendition].sort((a, b) => a.size - b.size);
   return withFile(drive, { ...file, versions: file.versions.map((v) => (v === version ? { ...v, renditions } : v)) });
+}
+
+/** What a placeholder may be: a small picture, as a data: URL of a JPEG, a PNG or a WebP. */
+export const PLACEHOLDER = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+/** The most characters of one: a tiny picture, not a picture. */
+export const PLACEHOLDER_MOST = 4000;
+
+/** A version of a picture given its placeholder, the tiny picture shown blurred while it comes. */
+export function setPlaceholder(drive: Drive, id: EntryId, versionId: string, placeholder: string): Drive {
+  const file = getFile(drive, id);
+  const version = file.versions.find((v) => v.id === versionId);
+  if (!version) throw new DriveError('no-version', `${file.name} has no version ${versionId}`);
+  if (placeholder.length > PLACEHOLDER_MOST || !PLACEHOLDER.test(placeholder)) throw new DriveError('invalid-settings', 'A placeholder is a tiny picture, as a data: URL.');
+  return withFile(drive, { ...file, versions: file.versions.map((v) => (v === version ? { ...v, placeholder } : v)) });
 }
 
 /** The smallest rendition of a version that shows it at `size` pixels, or none when only the original does. */

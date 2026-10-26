@@ -6,7 +6,7 @@
 // upload, a restore from the trash) is made free with "(2)".
 
 import { DriveError } from './errors';
-import type { Context, Drive, Entry, EntryId, FileEntry, FolderEntry, Version } from './model';
+import { type Context, type Drive, type Entry, type EntryId, FOLDER_COLORS, type FileEntry, type FolderColor, type FolderEntry, type Version } from './model';
 import { checkName, takenBy, uniqueName } from './names';
 import { getEntry, getFolder, isTrashed, isWithin, subtree, trash } from './tree';
 
@@ -85,6 +85,15 @@ export function addFile(drive: Drive, file: NewFile, context: Context): Drive {
     versions: [{ ...file.version, at: context.at, by: context.by }],
   };
   return put(drive, entry);
+}
+
+/** A folder given a colour, or its own again with null. Not a change of what is in it: it is not modified by it. */
+export function setColor(drive: Drive, id: EntryId, color: FolderColor | null): Drive {
+  const folder = getFolder(drive, id);
+  if (color !== null && !FOLDER_COLORS.includes(color)) throw new DriveError('invalid-color', `"${color}" is not a colour of a folder: ${FOLDER_COLORS.join(', ')}`);
+  if ((folder.color ?? null) === color) return drive;
+  const { color: _, ...rest } = folder;
+  return { entries: new Map(drive.entries).set(id, color ? { ...rest, color } : rest) };
 }
 
 export function rename(drive: Drive, id: EntryId, name: string, context: Context, options: NameOptions = {}): Drive {

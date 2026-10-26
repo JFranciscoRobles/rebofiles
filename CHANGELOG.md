@@ -242,6 +242,22 @@ minor version (0.x.0) may change the API; such changes are listed under
   lets pages of those origins use the routes: the browser's question
   first answered, and the ETag of a part readable. For the desktop window,
   and for a page of another domain.
+- **Folders in colours.** A folder is given one of nine colours, or the
+  drive's own, from its details or its menu, several at once, and undone
+  from the toast; each has its pair for the dark theme (`color`,
+  `FOLDER_COLORS`, `setColor`, `PATCH /entries/:id { color }`,
+  `client.setColor`; `set_folder_color` for an assistant). In the activity
+  too.
+- **Pictures shown blurred while they come.** As a picture (or the first
+  page of a Word document) is uploaded, a tiny one of it, 16 pixels on its
+  longest side, a few hundred bytes as a data: URL, is kept with its
+  version (`placeholder`, `placeholderOf`, `setPlaceholder`, `PUT
+  /entries/:id/placeholder`). The grid, the details and the viewer show
+  it blurred where the picture will be, under it, until it has come.
+- **More ways to put the list in order.** By type, by when it was made and
+  by colour, besides name, owner, modified and size; the choice of order
+  in the list as well as in the grid; and the folders first or among the
+  files ("Folders first"), kept for the next visit.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

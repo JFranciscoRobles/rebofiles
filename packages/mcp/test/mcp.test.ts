@@ -35,6 +35,7 @@ describe('the protocol', () => {
       'update_text_file',
       'restore_version',
       'rename',
+      'set_folder_color',
       'move',
       'move_to_trash',
       'restore',
@@ -91,6 +92,8 @@ describe('the tools', () => {
     expect((await ana.call('read_file', { id: file.id, version: info.versions[1].id })).content[0].text).toBe('one');
 
     const archive = (await ana.call('create_folder', { name: 'Archive' })).structuredContent;
+    expect((await ana.call('set_folder_color', { id: archive.id, color: 'teal' })).structuredContent).toMatchObject({ color: 'teal' });
+    expect((await ana.call('set_folder_color', { id: archive.id, color: 'none' })).structuredContent).not.toHaveProperty('color');
     expect((await ana.call('rename', { id: file.id, name: 'minutes.txt' })).structuredContent.name).toBe('minutes.txt');
     expect((await ana.call('move', { id: file.id, folder: archive.id })).structuredContent.folder).toBe(archive.id);
     expect((await ana.call('move_to_trash', { id: file.id })).structuredContent.trashed).toBe(true);

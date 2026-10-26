@@ -90,3 +90,39 @@ test('the menu of an entry, by the mouse and by the keyboard, and a trash undone
   await expect(item(page, 'a-small.txt')).toBeVisible();
   await expect(item(page, 'renamed.txt')).toHaveCount(0);
 });
+
+test('in order by type, by when made and by colour, and with the folders among the files when asked', async ({ page }) => {
+  await some(page, 'kinds');
+  for (const [name, colour] of [
+    ['Zeta', 'Red'],
+    ['Alfa', null],
+  ] as const) {
+    await page.getByRole('button', { name: 'Upload', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'New folder' }).click();
+    await page.getByRole('textbox', { name: 'Folder name' }).fill(name);
+    await page.getByRole('button', { name: 'Create' }).click();
+    await expect(item(page, name)).toBeVisible();
+    if (colour) {
+      await item(page, name).click({ button: 'right' });
+      await page.getByRole('menu').getByRole('menuitemradio', { name: colour }).click();
+    }
+  }
+  const order = page.getByRole('combobox', { name: 'Order' });
+  await order.selectOption('type:1');
+  expect(await names(page)).toEqual(['Alfa', 'Zeta', 'c-large.png', 'a-small.txt', 'b-medium.txt']);
+  await order.selectOption('color:1');
+  expect(await names(page)).toEqual(['Zeta', 'Alfa', 'a-small.txt', 'b-medium.txt', 'c-large.png']);
+  // The newest made first: the folders, made after the files.
+  await order.selectOption('created:-1');
+  expect((await names(page)).slice(0, 2)).toEqual(['Alfa', 'Zeta']);
+
+  await order.selectOption('name:1');
+  const mixed = page.getByRole('button', { name: 'Folders first' });
+  await expect(mixed).toHaveAttribute('aria-pressed', 'true');
+  await mixed.click();
+  expect(await names(page)).toEqual(['a-small.txt', 'Alfa', 'b-medium.txt', 'c-large.png', 'Zeta']);
+  await page.reload();
+  await expect(item(page, 'Zeta')).toBeVisible();
+  expect(await names(page)).toEqual(['a-small.txt', 'Alfa', 'b-medium.txt', 'c-large.png', 'Zeta']);
+  await page.getByRole('button', { name: 'Folders first' }).click();
+});

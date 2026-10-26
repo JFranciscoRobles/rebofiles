@@ -5,8 +5,26 @@
 // ones, for `theme="dark"` or `"auto"` on a dark system, are the same pairs
 // made light on dark, each read at 4.5:1 or more as the light ones are.
 
+/** The colours a folder may be given: its tile's background and its mark, light and dark. */
+const FOLDERS: Record<string, [string, string, string, string]> = {
+  red: ['#fce8e6', '#c5221f', '#3c1f1d', '#f28b82'],
+  orange: ['#feefe0', '#b45309', '#3d2a17', '#fcad70'],
+  yellow: ['#fef7d6', '#946c00', '#3a3214', '#fdd663'],
+  green: ['#e6f4ea', '#1e7e34', '#1b3324', '#81c995'],
+  teal: ['#e0f5f3', '#00796b', '#133430', '#78d9cc'],
+  blue: ['#e8f0fe', '#1a62d6', '#1c2b45', '#8ab4f8'],
+  purple: ['#f3e8fd', '#8430ce', '#2f2140', '#c58af9'],
+  pink: ['#fde7f3', '#b80672', '#3d1d30', '#ff8bcb'],
+  gray: ['#eef0f1', '#5f6368', '#2a2d30', '#bdc1c6'],
+};
+const folderColours = (dark: boolean) =>
+  Object.entries(FOLDERS)
+    .map(([name, [bg, fg, darkBg, darkFg]]) => `--rf-fc-${name}: ${dark ? darkBg : bg}; --rf-fc-${name}-fg: ${dark ? darkFg : fg};`)
+    .join(' ');
+
 /** The colours that change with the theme, dark. */
 const DARK = `
+  ${folderColours(true)}
   --rf-brand: #4cc995; --rf-brand-hover: #74d8ad; --rf-brand-light: #17382a; --rf-focus: #2f8a62; --rf-on-brand: #0d1f17;
   --rf-docs: #8ab4f8; --rf-docs-hover: #aecbfa; --rf-on-docs: #0d1a2e;
   --rf-ink: #ecebe7; --rf-ink-soft: #d2d0ca; --rf-muted: #a9a69f; --rf-faint: #6f6c66;
@@ -32,6 +50,7 @@ export const CSS = `
   --rf-k-pdf: #fbe8ef; --rf-k-pdf-fg: #a23a5e; --rf-k-sheet: #e7f3ea; --rf-k-sheet-fg: #2e6b3c;
   --rf-k-image: #f0ebf8; --rf-k-image-fg: #6a4a9c; --rf-k-text: #fcebdd; --rf-k-text-fg: #a4521c;
   --rf-k-video: #e6f4f6; --rf-k-video-fg: #0e6672; --rf-k-audio: #eef0fb; --rf-k-audio-fg: #3d4aa8;
+  ${folderColours(false)}
   color-scheme: light;
   --rf-font: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --rf-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -144,6 +163,14 @@ export const CSS = `
 .rf-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-tile { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 8.5px; font-weight: 700; letter-spacing: .02em; }
 .rf-k-folder { background: var(--rf-k-folder); color: var(--rf-k-folder-fg); }
+${Object.keys(FOLDERS)
+  .map((name) => `.rf-k-folder.rf-fc-${name}, .rf-swatch.rf-fc-${name} { background: var(--rf-fc-${name}); color: var(--rf-fc-${name}-fg); }`)
+  .join('\n')}
+.rf-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.rf-swatch { width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--rf-border-strong); display: grid; place-items: center; padding: 0; background: var(--rf-k-folder); color: var(--rf-k-folder-fg); }
+.rf-swatch svg { fill: currentColor; width: 14px; height: 14px; }
+.rf-swatch[aria-checked='true'] { box-shadow: 0 0 0 2px var(--rf-bg), 0 0 0 4px var(--rf-ink); }
+.rf-ctx .rf-swatches { padding: 6px 12px 8px; }
 .rf-k-docx { background: var(--rf-k-docx); color: var(--rf-k-docx-fg); }
 .rf-k-pdf { background: var(--rf-k-pdf); color: var(--rf-k-pdf-fg); }
 .rf-k-sheet { background: var(--rf-k-sheet); color: var(--rf-k-sheet-fg); }
@@ -159,6 +186,14 @@ export const CSS = `
 .rf-card[aria-selected='true'] { background: var(--rf-brand-light); border-color: var(--rf-focus); }
 .rf-thumb { height: 96px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 8px; overflow: hidden; }
 .rf-thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* A picture's placeholder: a few pixels of it, blurred, where it will be, under it until it comes. */
+.rf-thumb img.rf-ph { position: absolute; inset: 0; filter: blur(8px); transform: scale(1.15); }
+.rf-thumb img:not(.rf-ph) { position: relative; }
+.rf-preview.rf-has-ph img { grid-area: 1 / 1; width: 100%; height: 100%; }
+/* Positioned, as what is blurred is painted over what is not. */
+.rf-preview.rf-has-ph img:not(.rf-ph) { position: relative; }
+.rf-preview img.rf-ph { filter: blur(10px); clip-path: inset(0); }
+.rf-view-image img.rf-ph { filter: blur(24px); cursor: default; pointer-events: none; }
 .rf-name-lines { display: flex; flex-direction: column; min-width: 0; }
 .rf-name .rf-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rf-ink-soft); font-size: 12px; font-weight: 400; }
 .rf-card .rf-name { font-size: 13px; gap: 8px; padding: 0 4px 2px; }
