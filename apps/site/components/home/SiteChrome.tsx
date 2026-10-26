@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { VERSION } from '@/lib/home';
-import { DOCS, GET_STARTED, NPM_ORG, REBODOCS, REPO, STATUS } from '@/lib/site';
+import { DEMOS, DOCS, GET_STARTED, NPM_ORG, REBODOCS, REPO, STATUS } from '@/lib/site';
 
 const ghost = 'rounded-lg px-3 py-2 text-ink transition-colors hover:bg-hover';
 export const primary = 'bg-brand font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(14,124,82,0.22)]';
@@ -31,7 +31,7 @@ export function SiteHeader() {
       </Link>
       <span className="rounded-full bg-pastel-green px-2.5 py-1 text-xs font-medium text-pastel-green-fg">Open source · MIT · v{VERSION}</span>
       <nav aria-label="Main" className="ml-auto flex flex-wrap items-center gap-0.5 text-[15px] font-medium">
-        <a href="/#demo" className={ghost}>
+        <a href={DEMOS} className={ghost}>
           Demo
         </a>
         <a href={DOCS} className={ghost}>
@@ -59,6 +59,9 @@ export function SiteFooter() {
     <footer className="border-t border-border">
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-6 gap-y-3 px-6 pb-10 pt-8 text-sm text-muted">
         <span className="font-display text-base font-extrabold tracking-[-0.03em] text-ink">ReboFiles</span>
+        <a href={DEMOS} className="hover:text-ink">
+          Demo
+        </a>
         <a href={DOCS} className="hover:text-ink">
           Docs
         </a>

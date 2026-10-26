@@ -8,6 +8,8 @@ export const REBODOCS = 'https://www.rebodocs.com';
 /** The documentation, and its page of what is checked. */
 export const DOCS = '/docs/';
 export const STATUS = '/docs/status/';
+/** The demos, side by side. */
+export const DEMOS = '/demo/';
 /** Where “Get started” goes. */
 export const GET_STARTED = '/docs/getting-started/';
 

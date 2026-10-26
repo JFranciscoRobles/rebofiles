@@ -27,6 +27,7 @@ export const PROPS: Prop[] = [
   { name: 'title', type: 'string', group: 'Look', does: 'The name over the drive: your application’s, or “Files”.' },
   { name: 'logo', type: 'ReactNode', group: 'Look', does: 'What goes before the title; ReboFiles’ mark unless given. A Node for mountDrive.' },
   { name: 'defaultView', type: "'list' | 'grid'", group: 'Look', does: 'How a folder is shown the first time.' },
+  { name: 'layout', type: "'full' | 'compact'", group: 'Look', does: '`compact`: no column on the left; New and the places in a strip over the list, for a drive in a smaller part of a page.' },
   { name: 'className', type: 'string', group: 'Look', does: 'A class of your own on `.rf-drive`, for its custom properties.' },
   { name: 'checkUploads', type: 'boolean', group: 'Files', does: '`false` uploads without looking for the same file, or one of its name, in the drive first: a taken name is made free with “(2)”.' },
   { name: 'onOpen', type: '(file, url) => void', group: 'Files', does: 'A file opened by a double click or Enter, your own way. Unless given, the drive’s viewer shows it.' },

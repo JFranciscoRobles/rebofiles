@@ -19,6 +19,7 @@ import {
   type FolderEntry,
   type PersonalSettings,
   type Role,
+  splitName,
   versionNumber,
 } from '@rebofiles/core';
 import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
@@ -26,7 +27,7 @@ import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
 import { type IconName, icon, logo as mark } from './icons';
-import { type DocumentPreview, badgeOf, kindOf } from './kinds';
+import { type DocumentPreview, type Kind, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
 import { type Picked, readChosen, readDropped } from './folders';
@@ -89,6 +90,8 @@ export interface DriveOptions {
   linkAddress?: (token: string) => string;
   /** Light, dark, or as the system is (`'auto'`): over the drive's settings, under each person's own. The drive's (light) unless given. */
   theme?: 'light' | 'dark' | 'auto';
+  /** `'compact'`: no column on the left; New and the places in a strip over the list, for a drive in a smaller part of a page. `'full'` unless given. */
+  layout?: 'full' | 'compact';
   /** False to leave out the settings of the server, and the button that changes them. */
   settings?: boolean;
   /** Each file looked for in the drive before it goes, and asked about when its bytes or its name are there already: true unless said. */
@@ -124,6 +127,9 @@ type Dialog =
 const DRAGGED = 'application/x-rebofiles-entry';
 /** Larger documents are not read for a preview: they would cost more than a glance is worth. */
 const PREVIEW_LIMIT = 20 * 1024 * 1024;
+/** The bars a sound is drawn with on its card, and the lines of a page that has no picture. */
+const WAVE = [10, 22, 14, 30, 18, 36, 24, 12, 28, 16, 34, 20, 8, 26, 14, 22];
+const LINES = [62, 100, 100, 84, 100, 58];
 /** How much of a text the viewer reads: enough for any file a person reads, not a log of a year. */
 const VIEW_LIMIT = 2 * 1024 * 1024;
 const ROLES: Role[] = ['viewer', 'commenter', 'editor'];
@@ -419,6 +425,77 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const blurred = (file: FileEntry) => {
     const placeholder = file.versions[0].placeholder;
     return placeholder ? h('img', { key: `ph:${file.versions[0].id}`, class: 'rf-ph', src: placeholder, alt: '', 'aria-hidden': 'true' }) : null;
+  };
+
+  /** The beginning of a text, the first piece of it that arrives, the rest not asked for: once for each version. */
+  const headOf = (file: FileEntry): string | null | undefined => {
+    const key = `${file.id}:${file.versions[0].id}`;
+    const url = !texts.has(key) && urlOf(file);
+    if (url) {
+      texts.set(key, null);
+      fetch(url)
+        .then(async (answer) => {
+          const reader = answer.body?.getReader();
+          const piece = await reader?.read();
+          await reader?.cancel();
+          return new TextDecoder().decode(piece?.value ?? new Uint8Array()).slice(0, 4096);
+        })
+        .then(
+          (read) => (texts.set(key, read), render()),
+          () => undefined,
+        );
+    }
+    return texts.get(key);
+  };
+  /**
+   * What a card shows of a file that is not a picture nor a Word document: the first lines of a text, the first rows
+   * of a table, a frame of a video, the shape of a sound; and a page with lines on it for a PDF and the rest.
+   */
+  const fileThumb = (file: FileEntry, kind: Kind): Child => {
+    if (kind === 'video') {
+      const url = urlOf(file);
+      return [
+        url && h('video', { key: `v:${url}`, src: `${url}#t=0.5`, muted: true, playsinline: true, preload: 'metadata', tabindex: '-1', 'aria-hidden': 'true' }),
+        h('span', { class: 'rf-play', 'aria-hidden': 'true' }, icon('play', 16)),
+      ];
+    }
+    if (kind === 'audio')
+      return h(
+        'span',
+        { class: 'rf-wave', 'aria-hidden': 'true' },
+        WAVE.map((height) => h('span', { style: `height:${height}px` })),
+      );
+    const ext = splitName(file.name).ext.slice(1).toLowerCase();
+    const table = kind === 'sheet' && (ext === 'csv' || ext === 'tsv');
+    const head = kind === 'text' || table ? headOf(file) : undefined;
+    if (typeof head === 'string' && head.trim()) {
+      return h(
+        'div',
+        { class: 'rf-paper', 'aria-hidden': 'true' },
+        table
+          ? h(
+              'table',
+              null,
+              h(
+                'tbody',
+                null,
+                rowsOf(head, ext === 'tsv' ? '\t' : ',', 9).map((row) =>
+                  h(
+                    'tr',
+                    null,
+                    row.slice(0, 4).map((cell) => h('td', null, cell)),
+                  ),
+                ),
+              ),
+            )
+          : head.slice(0, 700),
+      );
+    }
+    return h(
+      'div',
+      { class: 'rf-paper rf-lines', 'aria-hidden': 'true' },
+      LINES.map((width) => h('span', { style: `width:${width}%` })),
+    );
   };
 
   const docThumb = (file: FileEntry, fit: 'page' | 'width', wanted = 640): Child | undefined => {
@@ -747,6 +824,17 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       { class: `rf-tile rf-k-${kindOf(entry)}${entry.kind === 'folder' && entry.color ? ` rf-fc-${entry.color}` : ''}`, 'aria-hidden': 'true' },
       entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry),
     );
+  /** A file's own thumbnail made small, for a row of the list: its picture, its first page, its first lines; a folder's tile. */
+  const rowThumb = (entry: Entry) => {
+    if (entry.kind === 'folder') return tile(entry);
+    const kind = kindOf(entry);
+    const url = kind === 'image' ? urlOf(entry, 160) : null;
+    return h(
+      'span',
+      { class: `rf-tile rf-mini rf-k-${kind}`, 'aria-hidden': 'true' },
+      url ? [blurred(entry), h('img', { key: url, src: url, alt: '', loading: 'lazy' })] : docThumb(entry, 'width', 160) || fileThumb(entry, kind),
+    );
+  };
   /** The colours a folder may be given, the drive's own first, the one it has marked: for each of `folders`, at once. */
   const swatches = (folders: FolderEntry[], role: 'radio' | 'menuitemradio', after?: () => void) => {
     const now = folders.every((f) => (f.color ?? null) === (folders[0].color ?? null)) ? (folders[0].color ?? null) : undefined;
@@ -984,7 +1072,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               item(
                 entry,
                 'rf-row',
-                h('span', { class: 'rf-name' }, tick(entry), tile(entry), named(entry)),
+                h('span', { class: 'rf-name' }, tick(entry), rowThumb(entry), named(entry)),
                 h('span', null, entry.owner),
                 h('span', null, formatDate(entry.modified, locale)),
                 h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
@@ -1006,7 +1094,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   tick(entry),
                   url
                     ? [blurred(entry as FileEntry), h('img', { key: url, src: url, alt: '', loading: 'lazy' })]
-                    : (entry.kind === 'file' && docThumb(entry, 'width', 320)) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
+                    : entry.kind === 'folder'
+                      ? icon('folder', 34)
+                      : docThumb(entry, 'width', 320) || fileThumb(entry, kind),
                 ),
                 h('div', { class: 'rf-name' }, tile(entry), named(entry)),
               );
@@ -1023,21 +1113,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const reads = kind === 'text' || (kind === 'docx' && options.previewDocument && file.versions[0].size <= PREVIEW_LIMIT);
     const url = kind === 'image' ? urlOf(file, 640) : kind === 'pdf' || reads ? urlOf(file) : null;
     const key = `${file.id}:${file.versions[0].id}`;
-    if (url && kind === 'text' && !texts.has(key)) {
-      texts.set(key, null);
-      // Only the beginning: the first piece that arrives, and the rest is not asked for.
-      fetch(url)
-        .then(async (answer) => {
-          const reader = answer.body?.getReader();
-          const piece = await reader?.read();
-          await reader?.cancel();
-          return new TextDecoder().decode(piece?.value ?? new Uint8Array()).slice(0, 4096);
-        })
-        .then(
-          (read) => (texts.set(key, read), render()),
-          () => undefined,
-        );
-    }
+    if (kind === 'text') headOf(file);
     if (url && kind === 'docx' && reads && options.previewDocument && !pages.has(key)) {
       pages.set(key, null);
       const read = options.previewDocument;
@@ -2389,7 +2465,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
     return h(
       'div',
-      { class: `rf-drive${options.className ? ` ${options.className}` : ''}`, 'data-theme': themeNow(), 'data-rf': prefix },
+      { class: `rf-drive${options.layout === 'compact' ? ' rf-compact' : ''}${options.className ? ` ${options.className}` : ''}`, 'data-theme': themeNow(), 'data-rf': prefix },
       h('style', null, CSS),
       // Its own element for each colour: a stylesheet is not walked by morph, so another colour is another element.
       settings?.settings.brand ? h('style', { key: `brand${settings.settings.brand}` }, brandStyle(`.rf-drive[data-rf="${prefix}"]`, settings.settings.brand)) : null,

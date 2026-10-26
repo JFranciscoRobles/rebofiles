@@ -374,7 +374,12 @@ export const demos: DocPage = {
       title: 'This site',
       badge: 'npm run site',
       color: 'pink',
-      body: <P>The landing, with the demo in it, and these pages: Next.js and Tailwind, built as plain files.</P>,
+      body: (
+        <P>
+          The landing, with the demo in it, and these pages: Next.js and Tailwind, built as plain files. <a href="/demo/">/demo/</a> has the drive twice, in a tab each: <C>&lt;FileDrive&gt;</C> as it
+          comes, and an interface of a creative suite’s look built on the headless hooks alone.
+        </P>
+      ),
     },
   ],
 };

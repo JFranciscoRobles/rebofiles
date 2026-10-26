@@ -204,6 +204,18 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       }),
 
     async upload(file: Blob & { name?: string }, how: UploadOptions = {}): Promise<FileEntry> {
+      // A smaller picture of a version, as the drive keeps the first page of a document it has drawn: beside it, not a file of its own.
+      if (how.rendition) {
+        const r = how.rendition;
+        return run(() => {
+          const version = core.getFile(drive, r.file).versions.find((v) => v.id === r.version);
+          if (!version) throw new core.DriveError('not-found', `No version ${r.version}`);
+          const key = `${r.file}/${version.id}@${r.size}`;
+          blobs.set(key, file);
+          drive = core.addRendition(drive, r.file, version.id, { size: r.size, width: r.width, height: r.height, key, type: file.type, bytes: file.size });
+          return core.getFile(drive, r.file);
+        });
+      }
       const name = file.name ?? 'file';
       // Refused before anything goes, as the server refuses a bad name or a folder in the trash.
       await run(() => {

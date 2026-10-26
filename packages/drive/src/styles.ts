@@ -216,6 +216,44 @@ ${Object.keys(FOLDERS)
 .rf-doc-thumb.rf-wide img.rf-doc-pic { left: 4%; top: 4%; width: 92%; height: 92%; filter: drop-shadow(0 1px 3px rgba(var(--rf-shade),.22)); }
 .rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
 .rf-thumb .rf-doc-thumb { inset: 8px 10px 0; border-radius: 6px 6px 0 0; }
+/* What a card shows of the rest: the beginning of a text or a table on a page, a page with lines, a frame of a video, a sound's shape. */
+.rf-paper { position: absolute; inset: 8px 10px 0; overflow: hidden; padding: 8px 9px; border-radius: 6px 6px 0 0; background: #fff; box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); color: #3a3935; font: 6.5px/1.45 var(--rf-mono); white-space: pre-wrap; word-break: break-word; text-align: left; pointer-events: none; }
+.rf-paper table { width: 100%; border-collapse: collapse; font: 6.5px/1.35 var(--rf-font); table-layout: fixed; }
+.rf-paper td { border: 1px solid #dedcd6; padding: 1.5px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rf-paper tr:first-child td { background: var(--rf-k-sheet); color: var(--rf-k-sheet-fg); font-weight: 700; }
+.rf-lines { display: grid; align-content: start; gap: 6px; padding-top: 12px; color: inherit; }
+.rf-lines span { display: block; height: 4px; border-radius: 2px; background: #e6e4de; }
+.rf-lines span:first-child { height: 6px; background: currentColor; }
+.rf-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rf-play { position: relative; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: rgba(0,0,0,.5); color: #fff; }
+.rf-play svg { fill: currentColor; stroke: none; margin-left: 2px; }
+.rf-wave { display: flex; align-items: center; gap: 3px; height: 40px; }
+.rf-wave span { width: 3px; border-radius: 2px; background: currentColor; }
+/* The same, small, in a row of the list. */
+.rf-tile.rf-mini { position: relative; width: 28px; height: 28px; border-radius: 7px; overflow: hidden; }
+.rf-mini img { width: 100%; height: 100%; object-fit: cover; }
+.rf-mini img.rf-ph { position: absolute; inset: 0; filter: blur(4px); transform: scale(1.15); }
+.rf-mini img:not(.rf-ph) { position: relative; }
+.rf-mini .rf-doc-thumb, .rf-mini .rf-paper { inset: 4px 4px 0; border-radius: 2px 2px 0 0; }
+.rf-mini .rf-paper { padding: 2px; font-size: 1.8px; }
+.rf-mini .rf-paper table { font-size: 1.8px; }
+.rf-mini .rf-paper td { padding: 0 1px; border-width: .5px; }
+.rf-mini .rf-lines { gap: 2px; padding-top: 3px; }
+.rf-mini .rf-lines span { height: 1.5px; }
+.rf-mini .rf-lines span:first-child { height: 2px; }
+.rf-mini .rf-play { width: 16px; height: 16px; }
+.rf-mini .rf-play svg { width: 8px; height: 8px; margin-left: 1px; }
+.rf-mini .rf-wave { transform: scale(.38); }
+/* Compact: the column on the left made a strip over the list and the details. */
+.rf-compact .rf-body { grid-template-columns: minmax(0,1fr) 290px; grid-template-rows: auto minmax(0,1fr); }
+.rf-compact .rf-side { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 6px; overflow-x: auto; }
+.rf-compact .rf-new { margin: 0 6px 0 0; padding: 8px 14px; }
+.rf-compact .rf-nav { padding: 8px 12px; white-space: nowrap; }
+.rf-compact .rf-usage { flex-direction: row; align-items: center; gap: 10px; margin: 0 4px 0 auto; white-space: nowrap; }
+.rf-compact .rf-usage .rf-bar { width: 80px; }
+.rf-compact .rf-storage { display: none; }
+/* Where the files are is said once: on the left, or in the bar at the bottom when there is no column on the left. */
+.rf-drive:not(.rf-compact) .rf-where { display: none; }
 .rf-preview.rf-preview-doc { position: relative; height: 240px; }
 .rf-preview-doc .rf-doc-thumb { inset: 12px 12px 0; border-radius: 6px 6px 0 0; }
 .rf-preview { height: 150px; border-radius: 12px; background: var(--rf-surface); display: grid; place-items: center; overflow: hidden; border: 1px solid var(--rf-border); }
@@ -441,7 +479,7 @@ ${Object.keys(FOLDERS)
 .rf-link-rows .rf-btn { padding: 6px; }
 
 @media (max-width: 900px) {
-  .rf-body { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(320px,1fr) auto; overflow: auto; }
+  .rf-body, .rf-compact .rf-body { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(320px,1fr) auto; overflow: auto; }
   .rf-side { flex-direction: row; align-items: center; gap: 6px; overflow-x: auto; }
   .rf-new { margin: 0 4px 0 0; padding: 8px 14px; }
   .rf-nav { padding: 8px 12px; white-space: nowrap; }

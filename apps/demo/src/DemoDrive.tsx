@@ -19,9 +19,11 @@ export interface DemoDriveProps {
   /** Claude renames a contract three seconds in, and says so in a card. */
   claudeActivity?: boolean;
   language?: 'en' | 'es';
+  /** `'compact'`: the places in a strip over the list, with no column on the left. */
+  layout?: 'full' | 'compact';
 }
 
-export function DemoDrive({ defaultView = 'list', claudeActivity = true, language = 'en' }: DemoDriveProps) {
+export function DemoDrive({ defaultView = 'list', claudeActivity = true, language = 'en', layout = 'full' }: DemoDriveProps) {
   const [client, setClient] = useState<MemoryClient | null>(null);
   useEffect(() => {
     let live = true;
@@ -33,18 +35,19 @@ export function DemoDrive({ defaultView = 'list', claudeActivity = true, languag
   if (!client) return <div style={{ height: '100%', background: '#fff', borderRadius: 14, border: '1px solid #eae8e3' }} />;
   return (
     <DriveProvider client={client} language={language}>
-      <Demo client={client} defaultView={defaultView} claudeActivity={claudeActivity} language={language} />
+      <Demo client={client} defaultView={defaultView} claudeActivity={claudeActivity} language={language} layout={layout} />
     </DriveProvider>
   );
 }
 
-function Demo({ client, defaultView, claudeActivity, language }: Required<DemoDriveProps> & { client: MemoryClient }) {
+function Demo({ client, defaultView, claudeActivity, language, layout }: Required<DemoDriveProps> & { client: MemoryClient }) {
   const [open, setOpen] = useState<{ file: FileEntry; url: string } | null>(null);
   return (
     <div style={{ position: 'relative', height: '100%' }}>
       <FileDrive
         title="Acme Files"
         defaultView={defaultView}
+        layout={layout}
         previewDocument={previewDocx}
         viewDocument={viewDocx}
         thumbDocument={thumbDocx}

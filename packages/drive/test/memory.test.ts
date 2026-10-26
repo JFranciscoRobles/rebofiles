@@ -38,6 +38,18 @@ describe('the drive kept in the page', () => {
     expect(blobs.size).toBe(0);
   });
 
+  it('keeps a smaller picture of a version beside it, not as a file of its own', async () => {
+    const blobs = new Map<string, Blob>();
+    const drive = createMemoryClient({ blobs, uploadStep: 0 });
+    const doc = await drive.upload(new File(['page'], 'page.docx'));
+    const version = doc.versions[0].id;
+    const kept = await drive.upload(new Blob(['png'], { type: 'image/png' }), { rendition: { file: doc.id, version, size: 480, width: 371, height: 480 } });
+    expect(kept.id).toBe(doc.id);
+    expect(kept.versions[0].renditions).toMatchObject([{ size: 480, width: 371, height: 480 }]);
+    expect((await drive.list(null)).entries.map((e) => e.name)).toEqual(['page.docx']);
+    expect(blobs.has(`${doc.id}/${version}@480`)).toBe(true);
+  });
+
   it('takes a change made by someone else, as an assistant', async () => {
     const drive = createMemoryClient({ uploadStep: 0 });
     const file = await drive.upload(new File(['x'], 'contract-final(2).docx'));

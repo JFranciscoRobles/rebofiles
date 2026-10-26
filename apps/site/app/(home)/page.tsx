@@ -6,7 +6,7 @@ import { LiveDemo } from '@/components/home/LiveDemo';
 import { SiteFooter, SiteHeader, primary } from '@/components/home/SiteChrome';
 import { highlight } from '@/lib/highlight';
 import { PACKAGES, PASTEL_CLASS, PUBLISHED, type Pastel, TAGS, VERSION, npmOf, pastelAt } from '@/lib/home';
-import { DOCS, GET_STARTED, NPM_ORG, STATUS } from '@/lib/site';
+import { DEMOS, DOCS, GET_STARTED, NPM_ORG, STATUS } from '@/lib/site';
 import { TESTS } from '@/components/docs/status/data';
 
 const SAMPLES: [string, string, string][] = [
@@ -177,8 +177,8 @@ export default async function Home() {
           </div>
           <p className="mt-8 text-center text-[15px] text-muted">
             Claude’s rename goes through the MCP tools of @rebofiles/mcp and Rebodocs, here in the page. Same drive, your own UI →{' '}
-            <a href="/docs/hooks/" className="font-medium text-brand hover:text-brand-hover">
-              see it built with headless hooks
+            <a href={`${DEMOS}#headless`} className="font-medium text-brand hover:text-brand-hover">
+              see it in another look, built with the headless hooks
             </a>
           </p>
         </section>
