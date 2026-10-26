@@ -154,6 +154,12 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     linkToken: async (_entryId, link) => link,
     removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
+    urls: async (ids, found = {}) => {
+      const urls: Record<EntryId, { url: string; expires: string }> = {};
+      // Addresses of the page itself, good as long as it is open.
+      for (const entryId of ids) if (drive.entries.get(entryId)?.kind === 'file') urls[entryId] = { url: await client.url(entryId, found), expires: '9999-12-31T00:00:00.000Z' };
+      return urls;
+    },
     url: (entryId, found = {}) =>
       run(() => {
         const file = core.getFile(drive, entryId);

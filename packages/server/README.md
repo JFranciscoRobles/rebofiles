@@ -76,6 +76,15 @@ height } }`; they are kept with the version, the original untouched, and
 `GET /entries/:id/download?size=320` gives the smallest that shows it at
 that size. They come back with a version restored and go with the file.
 
+## Addresses
+
+The bytes are read from addresses the server signs. One to download a file
+is good for 15 minutes; one to show it in the page (`inline=1`) is signed
+from the start of the hour, the same all of it and good for two, with
+`Cache-Control: private, max-age=7200`, so a browser keeps a thumbnail it has
+read. Each answer says until when its address is good (`expires`), and
+`POST /urls { ids, inline, size }` gives those of many files at once.
+
 ## What is in it
 
 | Area | What it does |

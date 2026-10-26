@@ -42,6 +42,20 @@ export interface ResumePlan {
   parts: UploadPart[];
 }
 
+/** How long an address to download a file is good for, in seconds. */
+export const READ_LIFE = 15 * 60;
+/** The hour an address to show a file in the page is the same for; it is good for two, from the start of the first. */
+export const SHOWN_HOUR = 60 * 60;
+
+/**
+ * The window an address to show a file is signed for: from the start of this hour to the end of the next, so the
+ * address is the same all the hour and the browser takes what it already has instead of reading it again.
+ */
+export function shownWindow(now = Date.now()): { from: number; seconds: number; until: number } {
+  const from = Math.floor(now / (SHOWN_HOUR * 1000)) * SHOWN_HOUR * 1000;
+  return { from, seconds: 2 * SHOWN_HOUR, until: from + 2 * SHOWN_HOUR * 1000 };
+}
+
 /** What a storage says of an upload it no longer has, given up or past its life: it can only start again. */
 export class UploadGone extends Error {}
 
@@ -60,7 +74,10 @@ export interface Storage {
   resumeUpload?(key: string, state: string, size: number, base: string): Promise<ResumePlan>;
   /** An upload given up: whatever of it arrived taken away. Only for a key no version points to. */
   abortUpload(key: string, state: string, size: number): Promise<void>;
-  /** An address to read the bytes from, as an attachment named `name`, or shown in the page when `inline`. */
+  /**
+   * An address to read the bytes from, as an attachment named `name`, good for READ_LIFE; or, `inline`, to show them
+   * in the page, the same address for the hour of `shownWindow` and kept by the browser as long.
+   */
   downloadUrl(key: string, name: string, type: string, base: string, inline?: boolean): Promise<string>;
   remove(keys: string[]): Promise<void>;
   /** The requests to addresses of its own, for a storage the browser cannot reach; undefined for any other. */

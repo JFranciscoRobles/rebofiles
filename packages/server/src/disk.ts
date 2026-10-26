@@ -7,7 +7,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
-import { type Storage, attachment, partsOf } from './storage';
+import { READ_LIFE, type Storage, attachment, partsOf, shownWindow } from './storage';
 import { openToken, sealToken } from './tokens';
 
 const URL_LIFE = 15 * 60;
@@ -21,6 +21,8 @@ interface Grant {
   name?: string;
   type?: string;
   inline?: boolean;
+  /** Kept by the browser this many seconds: an address to show the bytes, the same all its hour. */
+  cache?: number;
 }
 
 export interface DiskOptions {
@@ -87,7 +89,10 @@ export function diskStorage(options: DiskOptions): Storage {
     },
 
     async downloadUrl(key, name, type, base, inline) {
-      return address(base, { key, may: 'read', name, type, inline });
+      if (!inline) return `${base}/bytes?token=${sealToken(options.secret, { key, may: 'read', name, type } satisfies Grant, READ_LIFE)}`;
+      // Sealed from the start of the hour: the same address all of it, kept by the browser.
+      const window = shownWindow();
+      return `${base}/bytes?token=${sealToken(options.secret, { key, may: 'read', name, type, inline, cache: window.seconds } satisfies Grant, window.seconds, window.from)}`;
     },
 
     async remove(keys) {
@@ -111,7 +116,12 @@ export function diskStorage(options: DiskOptions): Storage {
         const size = (await stat(file).catch(() => undefined))?.size;
         if (size === undefined) return new Response('Not there.', { status: 404 });
         return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, {
-          headers: { 'content-type': grant.type ?? 'application/octet-stream', 'content-length': String(size), 'content-disposition': attachment(grant.name ?? 'file', grant.inline) },
+          headers: {
+            'content-type': grant.type ?? 'application/octet-stream',
+            'content-length': String(size),
+            'content-disposition': attachment(grant.name ?? 'file', grant.inline),
+            ...(grant.cache ? { 'cache-control': `private, max-age=${grant.cache}` } : {}),
+          },
         });
       }
       return new Response('Not with this address.', { status: 405 });

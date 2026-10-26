@@ -203,20 +203,78 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   });
   const detail = resource((id) => client.entry(id));
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
-  // Addresses to show a file in the page, one for each version, kept while the drive is mounted.
-  const inline = new Map<string, string | null>();
+  // Addresses to show a file in the page, by its version and the size it is shown at: kept until a minute before they
+  // are no longer good, and asked for together, those of one rendering in one request.
+  const shown = new Map<string, { url: string; until: number }>();
+  const asking = new Set<string>();
+  let wanted = new Map<string, { file: FileEntry; size?: number }>();
+  const askShown = async () => {
+    const batch = wanted;
+    wanted = new Map();
+    const bySize = new Map<number | undefined, [string, FileEntry][]>();
+    for (const [key, { file, size }] of batch) bySize.set(size, [...(bySize.get(size) ?? []), [key, file]]);
+    await Promise.all(
+      [...bySize].map(async ([size, files]) => {
+        let found: Record<EntryId, { url: string; expires: string }>;
+        try {
+          found = await client.urls(
+            files.map(([, file]) => file.id),
+            { inline: true, size },
+          );
+        } catch {
+          // A server without the route: one by one, as before.
+          found = {};
+          for (const [, file] of files) {
+            const url = await client.url(file.id, { inline: true, size }).catch(() => undefined);
+            if (url) found[file.id] = { url, expires: new Date(Date.now() + 10 * 60_000).toISOString() };
+          }
+        }
+        for (const [key, file] of files) {
+          asking.delete(key);
+          const address = found[file.id];
+          // One left out, that may not be read: not asked for again at every rendering, for a while.
+          shown.set(key, address ? { url: address.url, until: Date.parse(address.expires) } : { url: '', until: Date.now() + 5 * 60_000 });
+          // A picture that failed is loaded again, though its address be the same: the same all the hour, it is not told to by a new one.
+          for (const img of broken.get(key) ?? []) if (address) afterRender.push(() => img.isConnected && img.setAttribute('src', address.url));
+          broken.delete(key);
+        }
+      }),
+    );
+    render();
+  };
   /** With `size`, of a picture: the smaller one made of it that shows it at that size, once there is one. */
   const urlOf = (file: FileEntry, size?: number): string | null => {
     const key = `${file.id}:${file.versions[0].id}:${size ?? ''}:${file.versions[0].renditions?.length ?? 0}`;
-    if (!inline.has(key)) {
-      inline.set(key, null);
-      client.url(file.id, { inline: true, size }).then(
-        (url) => (inline.set(key, url), render()),
-        () => undefined,
-      );
+    const known = shown.get(key);
+    // The one there is meanwhile, while another is asked for.
+    if ((!known || known.until - Date.now() < 60_000) && !asking.has(key)) {
+      asking.add(key);
+      if (!wanted.size) queueMicrotask(() => void askShown());
+      wanted.set(key, { file, size });
     }
-    return inline.get(key) ?? null;
+    return known?.url || null;
   };
+  // A picture that did not load, as one whose address ran out while the page was closed on a laptop: asked for again, once.
+  const retried = new Set<string>();
+  const broken = new Map<string, HTMLImageElement[]>();
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  element.addEventListener(
+    'error',
+    (event) => {
+      const img = event.target;
+      if (!(img instanceof HTMLImageElement) || retried.has(img.src)) return;
+      retried.add(img.src);
+      for (const [key, address] of shown)
+        if (address.url === img.src) {
+          shown.set(key, { ...address, until: 0 });
+          broken.set(key, [...(broken.get(key) ?? []), img]);
+        }
+      // Those that fail together, as all the pictures of a grid left open past their hour, asked for together.
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(render, 50);
+    },
+    true,
+  );
   const texts = new Map<string, string | null>();
   const pages = new Map<string, DocumentPreview | null>();
   /** The first page of each Word document as its engine draws it, for thumbnails: null while it is made, an Error when it could not be. */
@@ -1947,6 +2005,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       alive = false;
       clearTimeout(toastTimer);
       clearTimeout(searchTimer);
+      clearTimeout(retryTimer);
       document.removeEventListener('mousedown', closeMenu);
       element.replaceChildren();
     },

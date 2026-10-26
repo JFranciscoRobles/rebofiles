@@ -173,6 +173,16 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **Addresses that are asked for together, and kept.** `POST /urls` (and
+  `client.urls(ids, { inline, size })`) gives the addresses of many files at
+  once: a grid of pictures asks once, not once for each. Every address says
+  until when it is good (`expires`), and the drive asks for another before
+  then; a picture that did not load is asked for again, those that fail
+  together in one request. An address to show a file (`inline`) is signed
+  from the start of the hour, the same all of it, good for two, and comes
+  with `Cache-Control: private, max-age=7200`: the browser keeps what it read
+  instead of reading it again. One to download it is good for 15 minutes, as
+  before. Checked on R2.
 - **Uploads that go on after a cut.** A part that fails is tried again by
   itself, up to five times, waiting longer each time, after asking the
   server what arrived (`POST /uploads/resume`) and taking new addresses for
@@ -212,6 +222,9 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Changed
 
+- **An address to show a file is good for one to two hours**, from the start
+  of its hour, instead of 15 minutes, so the browser can keep what it read.
+  One to download a file is still good for 15 minutes.
 - **A file opened is shown in the drive**, not in a new tab. Give `onOpen`
   to open it your own way, as before.
 - **The language and theme of `<FileDrive>`** are over the drive's settings

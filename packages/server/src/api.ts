@@ -22,6 +22,7 @@
 //   POST   /trash/empty
 //   GET    /entries/:id/download?version=&inline=1&size=  an address to read it from, or to show it in the page; with size, a smaller picture when there is one
 //   POST   /entries/:id/versions/:v/restore
+//   POST   /urls                          { ids, inline, size }: the addresses of many files at once, for a grid; until when each is good
 //   GET    /info                          where the bytes are, as a person reads it
 //   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
 //   PUT    /settings                      the drive's, for whoever may 'configure'
@@ -44,7 +45,7 @@ import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
 import type { MetadataStore } from './metadata';
 import { Refused, answerTo } from './refused';
-import { type FinishedPart, type Storage, UploadGone } from './storage';
+import { type FinishedPart, READ_LIFE, type Storage, UploadGone, shownWindow } from './storage';
 import { openToken, sealToken } from './tokens';
 
 export type { Action } from '@rebofiles/core';
@@ -121,6 +122,18 @@ interface Pending {
   rendition?: { of: EntryId; version: string; size: number; width: number; height: number };
 }
 
+/** Where to read a file from, and until when. */
+interface Address {
+  url: string;
+  /** ISO 8601. */
+  expires: string;
+  width?: number;
+  height?: number;
+}
+
+/** How many files' addresses are asked for in one request: a page of a grid, and more. */
+const URLS_AT_ONCE = 500;
+
 /** An upload left halfway is good for this long. */
 const UPLOAD_LIFE = 24 * 60 * 60;
 const MAX_BODY = 1_000_000;
@@ -161,6 +174,21 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     return entries.filter((_, i) => seen[i]);
   };
   const folderOf = (drive: Drive, id: string | null | undefined): Entry | null => (id ? core.getFolder(drive, id) : null);
+  /**
+   * Where to read a file from: its version, or the smaller picture that shows it at `size` when there is one, named as
+   * what it is; and until when the address is good, as a storage of the server's makes it.
+   */
+  const addressOf = async (file: core.FileEntry, inline: boolean, size?: number, wanted?: string): Promise<Address> => {
+    const version = wanted ? file.versions.find((v) => v.id === wanted) : file.versions[0];
+    if (!version) throw new Refused(404, 'no-version', `${file.name} has no version ${wanted}.`);
+    const expires = new Date(inline ? shownWindow().until : Date.now() + READ_LIFE * 1000).toISOString();
+    const smaller = size === undefined ? undefined : core.renditionFor(version, size);
+    if (smaller) {
+      const name = smaller.type === file.type ? file.name : `${core.splitName(file.name).base}.${smaller.type === 'image/jpeg' ? 'jpg' : smaller.type.split('/')[1]}`;
+      return { url: await options.storage.downloadUrl(smaller.key, name, smaller.type, base, inline), expires, width: smaller.width, height: smaller.height };
+    }
+    return { url: await options.storage.downloadUrl(version.key, file.name, file.type, base, inline), expires };
+  };
   /** The folders down to an entry that the one asking may read: from where it was shared with them, not above. */
   const pathOf = async (user: User, drive: Drive, folders: Entry[]) => readable(user, folders, drive);
   /** The same address for a link every time, as its token is sealed until the link expires. */
@@ -452,16 +480,26 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const file = core.getFile(drive, id);
           await allow(user, 'download', file, drive);
           const wanted = url.searchParams.get('version');
-          const version = wanted ? file.versions.find((v) => v.id === wanted) : file.versions[0];
-          if (!version) throw new Refused(404, 'no-version', `${file.name} has no version ${wanted}.`);
-          const inline = url.searchParams.get('inline') === '1';
-          // A smaller picture, when one shows it at that size: named as what it is.
-          const smaller = url.searchParams.has('size') ? core.renditionFor(version, Number(url.searchParams.get('size'))) : undefined;
-          if (smaller) {
-            const name = smaller.type === file.type ? file.name : `${core.splitName(file.name).base}.${smaller.type === 'image/jpeg' ? 'jpg' : smaller.type.split('/')[1]}`;
-            return Response.json({ url: await options.storage.downloadUrl(smaller.key, name, smaller.type, base, inline), width: smaller.width, height: smaller.height });
-          }
-          return Response.json({ url: await options.storage.downloadUrl(version.key, file.name, file.type, base, inline) });
+          const size = url.searchParams.has('size') ? Number(url.searchParams.get('size')) : undefined;
+          return Response.json(await addressOf(file, url.searchParams.get('inline') === '1', size, wanted ?? undefined));
+        }
+
+        case 'POST /urls': {
+          const asked = await body<{ ids?: unknown; inline?: boolean; size?: number }>();
+          const ids = Array.isArray(asked.ids) ? asked.ids.filter((id): id is string => typeof id === 'string') : [];
+          if (ids.length > URLS_AT_ONCE) throw new Refused(400, 'too-many', `Up to ${URLS_AT_ONCE} at once.`);
+          const drive = await options.metadata.load();
+          const size = typeof asked.size === 'number' ? asked.size : undefined;
+          const urls: Record<string, Address> = {};
+          // Each as its own route would answer it; one that may not be read, or is not a file, is left out.
+          await Promise.all(
+            [...new Set(ids)].map(async (id) => {
+              const entry = drive.entries.get(id);
+              if (entry?.kind !== 'file' || !(await options.authorize(user, 'download', entry, drive))) return;
+              urls[id] = await addressOf(entry, asked.inline === true, size);
+            }),
+          );
+          return Response.json({ urls });
         }
 
         case 'POST /entries/:id/shares': {

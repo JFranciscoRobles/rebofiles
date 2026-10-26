@@ -93,6 +93,15 @@ export interface UploadOptions {
   rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
 }
 
+/** Where to read a file from, until when, and the size of the smaller picture it is when it is one. */
+export interface FileAddress {
+  url: string;
+  /** ISO 8601: after it, another must be asked for. */
+  expires: string;
+  width?: number;
+  height?: number;
+}
+
 /** The settings as the server says them for the one asking. */
 export interface SettingsAnswer {
   /** The drive's. */
@@ -225,6 +234,16 @@ export function createDriveClient(options: ClientOptions) {
           )
         ).url,
       ),
+
+    /**
+     * The addresses of many files at once, by their ids, for a grid: as `url` gives each, with until when it is good.
+     * One that may not be read, or is not a file, is left out.
+     */
+    urls: async (ids: EntryId[], options: { inline?: boolean; size?: number } = {}): Promise<Record<EntryId, FileAddress>> => {
+      const { urls } = await ask<{ urls: Record<EntryId, FileAddress> }>('POST', '/urls', { ids, inline: options.inline, size: options.size });
+      for (const address of Object.values(urls)) address.url = absolute(address.url);
+      return urls;
+    },
 
     /** The drive's settings, the one asking's own, and whether they may change the drive's. */
     settings: () => ask<SettingsAnswer>('GET', '/settings'),

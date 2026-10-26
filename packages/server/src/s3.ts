@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { type Credentials, presign } from './sigv4';
-import { type FinishedPart, type Storage, type UploadPart, type UploadPlan, UploadGone, attachment, partsOf } from './storage';
+import { type FinishedPart, READ_LIFE, type Storage, type UploadPart, type UploadPlan, UploadGone, attachment, partsOf, shownWindow } from './storage';
 
 /** How long an address handed to the browser is good for, in seconds. */
 const URL_LIFE = 15 * 60;
@@ -145,7 +145,16 @@ export function s3Storage(options: S3Options): Storage {
     },
 
     async downloadUrl(key, name, type, _base, inline) {
-      return presign(credentials, { method: 'GET', url: at(key, { 'response-content-disposition': attachment(name, inline), 'response-content-type': type }), expires: URL_LIFE });
+      const query = { 'response-content-disposition': attachment(name, inline), 'response-content-type': type };
+      if (!inline) return presign(credentials, { method: 'GET', url: at(key, query), expires: READ_LIFE });
+      // Signed at the start of the hour: the same address all of it, kept by the browser.
+      const window = shownWindow();
+      return presign(credentials, {
+        method: 'GET',
+        url: at(key, { ...query, 'response-cache-control': `private, max-age=${window.seconds}` }),
+        expires: window.seconds,
+        at: new Date(window.from),
+      });
     },
 
     async remove(keys) {
