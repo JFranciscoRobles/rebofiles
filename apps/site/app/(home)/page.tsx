@@ -278,7 +278,7 @@ export default async function Home() {
               <p className="font-display text-[clamp(24px,2.6vw,32px)] font-bold leading-[1.3] tracking-[-0.03em]">Early, open, and built on Rebodocs.</p>
               <p className="mt-4 text-[17px] leading-[1.6] text-[#5c4a1e]">
                 A file manager with its own file model that keeps your files where you put them, previews Word documents with the Rebodocs engine and opens every .docx in its editor. {tests} automated
-                tests pass; nothing is on npm yet. Open source under MIT.
+                tests pass; {PUBLISHED ? `the packages are on npm at ${VERSION}` : 'nothing is on npm yet'}. Open source under MIT.
               </p>
               <p className="mt-6.5 flex flex-wrap gap-2.5">
                 <a href={DOCS} className={`rounded-xl px-5 py-[13px] ${primary}`}>

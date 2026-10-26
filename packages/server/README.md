@@ -50,8 +50,9 @@ handler is a Next.js route handler, a Bun or Deno server, or a Worker.
 ## Status
 
 Tested through its routes in `test/api.test.ts`, on the disk and on an S3
-kept in memory; the signature against AWS's example. Not tried against a
-real bucket yet. Not on npm yet.
+kept in memory; the signature against AWS's example. Run against Cloudflare
+R2 with `npm run storage:check` and by hand in the page (`apps/storage`); not
+against AWS or MinIO yet. Not on npm yet.
 
 ## Where it can improve
 
