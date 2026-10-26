@@ -109,6 +109,8 @@ export interface DriveServerOptions {
    * Called once an entry is shared with someone, or their role changed (`first: false`): to tell them, by mail or as
    * yours does. Its failure is not the request's, which is answered as soon as the share is kept.
    */
+  /** Pages of other origins that may use the routes, as `['tauri://localhost', 'https://app.example.com']`: none unless said. */
+  cors?: { origins: string[] };
   onShare?: (event: { entry: Entry; with: string; role: Role; by: User; first: boolean }) => void | Promise<void>;
   now?: () => Date;
   newId?: () => string;
@@ -285,7 +287,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     if (keys.length) await options.storage.remove(keys);
   };
 
-  return async (request) => {
+  const answer = async (request: Request): Promise<Response> => {
     try {
       await sweep().catch(() => undefined);
       const url = new URL(request.url);
@@ -747,6 +749,32 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     } catch (error) {
       return answerTo(error);
     }
+  };
+
+  // A page of another origin, as a desktop application's or one of another domain: answered as the browser asks
+  // first, and told it may read the answers. Only those listed; with them, cookies too, for a page that sends them.
+  const origins = new Set(options.cors?.origins ?? []);
+  return async (request) => {
+    const origin = request.headers.get('origin');
+    const allowed = origin && origins.has(origin) ? origin : null;
+    if (!allowed) return answer(request);
+    const told = { 'access-control-allow-origin': allowed, 'access-control-allow-credentials': 'true', vary: 'Origin' };
+    if (request.method === 'OPTIONS' && request.headers.get('access-control-request-method'))
+      return new Response(null, {
+        status: 204,
+        headers: {
+          ...told,
+          'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE',
+          'access-control-allow-headers': request.headers.get('access-control-request-headers') ?? '',
+          'access-control-max-age': '600',
+        },
+      });
+    const answered = await answer(request);
+    const headers = new Headers(answered.headers);
+    for (const [name, value] of Object.entries(told)) headers.set(name, value);
+    // The ETag of a part sent to the server's own storage, which the page reads to put the parts together.
+    headers.set('access-control-expose-headers', 'ETag');
+    return new Response(answered.body, { status: answered.status, statusText: answered.statusText, headers });
   };
 
   /** What a link reads: the entry it was made for and what is inside it, to anyone who has its address, while it lasts. */

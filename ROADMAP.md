@@ -174,7 +174,8 @@ server, the preview of a Word document, a strict typecheck.
 18. **`desktop`:** a folder of the disk kept like a folder of the drive,
     first one way, then both. Two changes to one file keep both, the second
     as a copy beside it.
-19. **`apps/desktop`:** the Tauri application, on a Mac first.
+19. ✅ **`apps/desktop`:** the Tauri application, on a Mac first: the drive
+    in a window, against a server. The sync of 18 goes into it once made.
 
 ### 1.0.0
 

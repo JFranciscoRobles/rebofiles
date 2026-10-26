@@ -44,7 +44,7 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 | [`@rebofiles/react`](packages/react) | `<FileDrive>`, and the hooks it is built from. | React 18+ |
 | [`@rebofiles/mcp`](packages/mcp) | Tools for an AI assistant, over HTTP or stdio, with the user's own rights; with Rebodocs, its Word documents edited, each change a version. | Node 22.12+ |
 
-`desktop` follows; see the roadmap.
+`apps/desktop` is the drive in a window of its own, with Tauri; the sync of a folder of the disk follows, see the roadmap.
 
 ## Development
 

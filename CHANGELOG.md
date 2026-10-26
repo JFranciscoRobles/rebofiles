@@ -231,6 +231,17 @@ minor version (0.x.0) may change the API; such changes are listed under
   `findText`): SQLite in a table of its full-text search, Postgres with a
   `tsvector`. An assistant searches them with `search_text`, and what it
   writes is kept to be found. PDFs are not read yet.
+- **The desktop application** (`apps/desktop`, `npm run desktop`). Tauri
+  around the page of the drive, on a Mac first, against any ReboFiles
+  server: its address and a token asked the first time, kept, tried at
+  every start; Server → Change Server… for another; what is downloaded
+  goes to Downloads, a name taken made free. Builds as ReboFiles.app
+  (`npm run build:desktop`). The sync of a folder of the disk is the next
+  step, not in it.
+- **`cors` on the server.** `createDriveHandler({ cors: { origins } })`
+  lets pages of those origins use the routes: the browser's question
+  first answered, and the ETag of a part readable. For the desktop window,
+  and for a page of another domain.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

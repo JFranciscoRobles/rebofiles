@@ -30,6 +30,8 @@ export const handle = createDriveHandler({
   authorize: byRoles,
   secret,
   base: '/api/files',
+  // The desktop application, as `npm run desktop` opens it: its page while it is made, and its window built.
+  cors: { origins: ['http://localhost:5190', 'tauri://localhost', 'http://tauri.localhost'] },
   // Where an application would send a mail.
   onShare: ({ entry, with: who, role, by, first }) => console.log(`${by.id} ${first ? 'shared' : 'changed'} “${entry.name}” with ${who} as ${role}`),
 });
