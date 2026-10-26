@@ -105,10 +105,7 @@ test('a link, opened signed out', async ({ page, context }) => {
   await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'linked.txt', mimeType: 'text/plain', buffer: Buffer.from('Through a link.') }]);
   await item(page, 'linked.txt').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: 'Create link' })
-    .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
   const address = await page.evaluate(() => navigator.clipboard.readText());
   await page.goto(address);

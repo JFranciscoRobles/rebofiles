@@ -30,6 +30,8 @@ export const handle = createDriveHandler({
   authorize: byRoles,
   secret,
   base: '/api/files',
+  // Where an application would send a mail.
+  onShare: ({ entry, with: who, role, by, first }) => console.log(`${by.id} ${first ? 'shared' : 'changed'} “${entry.name}” with ${who} as ${role}`),
 });
 
 // The tools for an assistant, at /api/mcp, asking the routes above in this process as the person `x-user`

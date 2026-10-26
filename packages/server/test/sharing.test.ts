@@ -131,6 +131,45 @@ describe('sharing, through the routes', () => {
     expect((await d.bea.ask('GET', `/api/files/entries?folder=${clients.id}`)).status).toBe(403);
   });
 
+  it('counts what is new in Shared with me until they look, and tells the application of each share', async () => {
+    const told: string[] = [];
+    let at = Date.parse('2026-03-01T10:00:00Z');
+    const d = drive({ now: () => new Date(at), onShare: ({ entry, with: who, role, by, first }) => void told.push(`${by.id}>${who}:${entry.name}:${role}:${first}`) });
+    const { clients, northwind } = await anasClients(d);
+    expect((await d.bea.ask('GET', '/api/files/shared/new')).body.count).toBe(0);
+    await d.ana.ask('POST', `/api/files/entries/${clients.id}/shares`, { with: 'bea', role: 'viewer' });
+    await d.ana.ask('POST', `/api/files/entries/${clients.id}/shares`, { with: 'bea', role: 'editor' });
+    await new Promise((done) => setTimeout(done, 0));
+    expect(told).toEqual(['ana>bea:Clients:viewer:true', 'ana>bea:Clients:editor:false']);
+    expect((await d.bea.ask('GET', '/api/files/shared/new')).body.count).toBe(1);
+
+    at += 60_000;
+    await d.bea.ask('POST', '/api/files/shared/seen');
+    expect((await d.bea.ask('GET', '/api/files/shared/new')).body.count).toBe(0);
+    at += 60_000;
+    const other = (await d.ana.ask('POST', '/api/files/folders', { name: 'Other', parent: null })).body.entry;
+    await d.ana.ask('POST', `/api/files/entries/${other.id}/shares`, { with: 'bea', role: 'viewer' });
+    expect((await d.bea.ask('GET', '/api/files/shared/new')).body.count).toBe(1);
+    // One shared inside what they have already is not new at the top: it is not there.
+    await d.ana.ask('POST', `/api/files/entries/${northwind.id}/shares`, { with: 'bea', role: 'editor' });
+    expect((await d.bea.ask('GET', '/api/files/shared/new')).body.count).toBe(1);
+  });
+
+  it('answers a share even when telling of it fails', async () => {
+    const d = drive({ onShare: () => Promise.reject(new Error('no mail today')) });
+    const { clients } = await anasClients(d);
+    const errors: unknown[] = [];
+    const log = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      expect((await d.ana.ask('POST', `/api/files/entries/${clients.id}/shares`, { with: 'bea', role: 'viewer' })).status).toBe(200);
+      await new Promise((done) => setTimeout(done, 0));
+    } finally {
+      console.error = log;
+    }
+    expect(errors).toHaveLength(1);
+  });
+
   it('shows everything one may read at the top, for one drive of a whole team', async () => {
     const d = drive({ top: 'everyone', authorize: () => true });
     await anasClients(d);

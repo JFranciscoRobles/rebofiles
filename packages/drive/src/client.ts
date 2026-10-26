@@ -203,6 +203,10 @@ export function createDriveClient(options: ClientOptions) {
     info: () => ask<{ storage: string; maxSize: number }>('GET', '/info'),
     /** What others shared with the one asking. */
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
+    /** How many of what is shared with the one asking is new since they last looked; 0 from a server without the route. */
+    sharedNew: async () => (await ask<{ count: number }>('GET', '/shared/new').catch(() => ({ count: 0 }))).count,
+    /** They looked at what is shared with them. */
+    sawShared: async () => void (await ask('POST', '/shared/seen').catch(() => undefined)),
 
     createFolder: (name: string, parent: EntryId | null) => one('POST', '/folders', { name, parent }) as Promise<FolderEntry>,
     rename: (id: EntryId, name: string, ifTaken?: 'keep-both') => one('PATCH', `/entries/${encodeURIComponent(id)}`, { name, ifTaken }),

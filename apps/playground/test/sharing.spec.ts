@@ -95,3 +95,28 @@ test('a link with a password asks for it before showing anything', async ({ page
   await dialog.getByRole('button', { name: /^Remove · Until/ }).click();
   await expect(dialog.getByText('No links.')).toBeVisible();
 });
+
+test('what is newly shared is counted beside Shared with me, until it is looked at', async ({ page }) => {
+  await page.goto('/?as=ana');
+  await page.getByRole('button', { name: 'Upload' }).click();
+  await page.getByRole('menuitem', { name: 'New folder' }).click();
+  await page.getByRole('textbox', { name: 'Folder name' }).fill('News');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await item(page, 'News').click();
+  await details(page).getByRole('button', { name: 'Share' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Share “News”' });
+  await dialog.getByRole('textbox', { name: 'Who, by their id' }).fill('bea');
+  await dialog.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(dialog.getByRole('combobox', { name: 'Role · bea' })).toBeVisible();
+
+  await page.goto('/?as=bea');
+  const nav = page.locator('.rf-nav', { hasText: 'Shared with me' });
+  await expect(nav).toHaveAccessibleName(/^Shared with me · \d+ new$/);
+  await nav.click();
+  await expect(item(page, 'News')).toBeVisible();
+  await expect(nav).toHaveAccessibleName('Shared with me');
+  const asked = page.waitForResponse((answer) => answer.url().includes('/shared/new'));
+  await page.reload();
+  expect(await (await asked).json()).toEqual({ count: 0 });
+  await expect(page.locator('.rf-badge')).toHaveCount(0);
+});

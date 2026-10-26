@@ -443,8 +443,20 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const changed = () => {
     revision++;
     options.onChange?.();
+    askShared();
     render();
   };
+  // How many of what others shared is new since one looked at Shared with me: asked after each change, when the page is
+  // seen again, and every minute, as what others do comes with no change of one's own.
+  let freshShared = 0;
+  const askShared = () =>
+    void client.sharedNew().then(
+      (n) => alive && n !== freshShared && ((freshShared = n), render()),
+      () => undefined,
+    );
+  const onSeen = () => document.visibilityState === 'visible' && askShared();
+  document.addEventListener('visibilitychange', onSeen);
+  const sharedTimer = setInterval(onSeen, 60_000);
   /** Does it, says what went wrong in the toast rather than in the console, and asks everything again. */
   const attempt = async (work: () => Promise<unknown>, done?: string) => {
     try {
@@ -459,6 +471,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   const go = (next: Section, to: EntryId | null = null) => {
     if (next === 'shared' || (next === 'files' && to === null)) from = next === 'shared' ? 'shared' : 'files';
+    if (next === 'shared' && freshShared) {
+      freshShared = 0;
+      void client.sawShared();
+    }
     section = next;
     folder = to;
     selected = null;
@@ -2169,8 +2185,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
     const count = entries.length === 1 ? t('item') : t('items', { n: entries.length });
     const title = options.title ?? 'Files';
-    const nav = (name: IconName, text: string, current: boolean, onClick: () => void, extra: Record<string, unknown> = {}) =>
-      h('button', { type: 'button', class: 'rf-nav', 'aria-current': current, onClick, ...extra }, icon(name), text);
+    const nav = (name: IconName, text: string, current: boolean, onClick: () => void, { badge, ...extra }: Record<string, unknown> = {}) =>
+      h(
+        'button',
+        { type: 'button', class: 'rf-nav', 'aria-current': current, onClick, ...extra },
+        icon(name),
+        text,
+        badge ? h('span', { class: 'rf-badge', 'aria-hidden': 'true' }, Number(badge) > 99 ? '99+' : String(badge)) : null,
+      );
     if (selected !== scrolledTo) {
       scrolledTo = selected;
       if (selected) afterRender.push(() => element.querySelector(`[data-id="${quoted(selected!)}"]`)?.scrollIntoView({ block: 'nearest' }));
@@ -2233,7 +2255,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             },
           }),
           nav('drive', t('myFiles'), section === 'files' && from === 'files' && !query, () => go('files'), dropTarget(null)),
-          nav('users', t('sharedWithMe'), (section === 'shared' || (section === 'files' && from === 'shared')) && !query, () => go('shared')),
+          nav('users', t('sharedWithMe'), (section === 'shared' || (section === 'files' && from === 'shared')) && !query, () => go('shared'), {
+            'aria-label': freshShared ? `${t('sharedWithMe')} · ${t('newShared', { n: freshShared })}` : undefined,
+            badge: freshShared,
+          }),
           nav('clock', t('recent'), section === 'recent' && !query, () => go('recent')),
           nav('trash', t('trash'), section === 'trash' && !query, () => go('trash'), {
             onDragover: (event: DragEvent) => event.dataTransfer?.types.includes(DRAGGED) && (event.preventDefault(), (event.currentTarget as HTMLElement).classList.add('rf-drop')),
@@ -2465,6 +2490,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     () => undefined,
   );
   void loadSettings();
+  askShared();
   render();
 
   return {
@@ -2484,6 +2510,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       clearTimeout(toastTimer);
       clearTimeout(searchTimer);
       clearTimeout(retryTimer);
+      clearInterval(sharedTimer);
+      document.removeEventListener('visibilitychange', onSeen);
       document.removeEventListener('mousedown', closeMenu);
       element.replaceChildren();
     },

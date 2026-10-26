@@ -30,6 +30,8 @@
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
 //   GET    /shared                        what others shared with the one asking
+//   GET    /shared/new                    how many of those are new since they last looked
+//   POST   /shared/seen                   they looked: none is new any more
 //   POST   /entries/:id/shares            { with, role }: shared, or given another role
 //   DELETE /entries/:id/shares/:with      no longer shared with them
 //   POST   /entries/:id/links             { days, password, once }: a link to read it without signing in, and its address
@@ -99,6 +101,11 @@ export interface DriveServerOptions {
   maxSize?: number;
   /** The settings of the drive until someone who may 'configure' changes them: its language, theme, colour, and the sizes pictures are made in. */
   settings?: Partial<Omit<core.DriveSettings, 'images'>> & { images?: Partial<core.ImageSettings> };
+  /**
+   * Called once an entry is shared with someone, or their role changed (`first: false`): to tell them, by mail or as
+   * yours does. Its failure is not the request's, which is answered as soon as the share is kept.
+   */
+  onShare?: (event: { entry: Entry; with: string; role: Role; by: User; first: boolean }) => void | Promise<void>;
   now?: () => Date;
   newId?: () => string;
 }
@@ -318,6 +325,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const drive = await load();
           return Response.json({ entries: await readable(user, core.sharedWith(drive, user.id), drive) });
         }
+        case 'GET /shared/new': {
+          const drive = await load();
+          const since = (await getSetting(`seen-shared:${user.id}`)) as string | undefined;
+          return Response.json({ count: (await readable(user, core.sharedSince(drive, user.id, since), drive)).length });
+        }
+        case 'POST /shared/seen':
+          await setSetting(`seen-shared:${user.id}`, now());
+          return Response.json({ ok: true });
         case 'GET /search': {
           const drive = await load();
           const within = url.searchParams.get('within') || undefined;
@@ -588,13 +603,20 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
 
         case 'POST /entries/:id/shares': {
           const asked = await body<{ with: string; role: Role }>();
-          return Response.json(
-            await change(async (drive) => {
-              await allow(user, 'share', core.getEntry(drive, id), drive);
-              const next = core.share(drive, id, String(asked.with ?? ''), asked.role, context());
-              return { drive: next, answer: { entry: core.getEntry(next, id) } };
-            }),
-          );
+          const who = String(asked.with ?? '');
+          let first = false;
+          const answer = await change(async (drive) => {
+            await allow(user, 'share', core.getEntry(drive, id), drive);
+            first = !core.getEntry(drive, id).shares?.some((s) => s.with === who);
+            const next = core.share(drive, id, who, asked.role, context());
+            return { drive: next, answer: { entry: core.getEntry(next, id) } };
+          });
+          const before = answer.entry.shares?.find((s) => s.with === who);
+          if (options.onShare && before)
+            void Promise.resolve()
+              .then(() => options.onShare!({ entry: answer.entry, with: who, role: before.role, by: user, first }))
+              .catch((error) => console.error('onShare failed:', error));
+          return Response.json(answer);
         }
         case 'DELETE /entries/:id/shares/:with':
           return Response.json(

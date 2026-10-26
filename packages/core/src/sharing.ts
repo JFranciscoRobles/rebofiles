@@ -92,6 +92,11 @@ export function sharedWith(drive: Drive, user: string): Entry[] {
   return found.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).map(({ entry }) => entry);
 }
 
+/** Of what is shared with `user`, what was shared with them after `since`, or all of it when never looked at: news to show them. */
+export function sharedSince(drive: Drive, user: string, since: string | undefined): Entry[] {
+  return sharedWith(drive, user).filter((entry) => (entry.shares ?? []).some((s) => (s.with === user || s.with === EVERYONE) && s.by !== user && (since === undefined || s.at > since)));
+}
+
 /** A link to read an entry, and what is inside it, until `expires`. */
 export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string; locked?: boolean; uses?: number }, context: Context): Drive {
   const entry = getEntry(drive, id);

@@ -194,6 +194,12 @@ minor version (0.x.0) may change the API; such changes are listed under
   looking or seeing a file in the page, and still works a quarter of an hour
   after, for the files of that download (`uses`, `used`, `spent`,
   `useLink`, `LINK_GRACE`). The dialog marks each link with what it has.
+- **Told of what is shared.** `onShare` on the server is called with each
+  entry shared, or a role changed (`first`), with who and by whom: for the
+  application to send a mail or a notice; its failure is not the share's.
+  Beside Shared with me, the drive counts what was shared since one last
+  looked there (`GET /shared/new`, `POST /shared/seen`, `sharedSince`),
+  asked after each change, when the page is seen again and every minute.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

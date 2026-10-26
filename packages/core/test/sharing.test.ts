@@ -16,6 +16,7 @@ import {
   restore,
   share,
   sharedWith,
+  sharedSince,
   trash,
   unshare,
   useLink,
@@ -136,6 +137,18 @@ describe('shared with me', () => {
     expect(sharedWith(drive, 'luis').map((e) => e.id)).toEqual(['logo', 'clients']);
     expect(sharedWith(drive, 'ana')).toEqual([]);
     expect(sharedWith(moveToTrash(drive, 'clients', ana), 'luis').map((e) => e.id)).toEqual(['logo']);
+  });
+});
+
+describe('what is new in Shared with me', () => {
+  it('is what was shared after one last looked, or all of it before ever looking', () => {
+    let drive = share(demoDrive(), 'logo', 'luis', 'viewer', bea);
+    expect(sharedSince(drive, 'luis', undefined).map((e) => e.id)).toEqual(['logo']);
+    expect(sharedSince(drive, 'luis', bea.at)).toEqual([]);
+    drive = share(drive, 'clients', EVERYONE, 'viewer', { by: 'ana', at: '2026-10-04T09:00:00.000Z' });
+    expect(sharedSince(drive, 'luis', bea.at).map((e) => e.id)).toEqual(['clients']);
+    // Not what one shared oneself.
+    expect(sharedSince(share(demoDrive(), 'logo', 'luis', 'viewer', { by: 'luis', at: bea.at }), 'luis', undefined)).toEqual([]);
   });
 });
 

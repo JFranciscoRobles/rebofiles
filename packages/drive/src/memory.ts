@@ -89,6 +89,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
   let settings = core.readDriveSettings(options.settings ?? {});
   let saved = options.settings !== undefined;
   let mine: core.PersonalSettings = {};
+  let seenShared: string | undefined;
 
   const client: DriveClient = {
     settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved }),
@@ -113,6 +114,8 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     recent: () => run(() => core.recent(drive)),
     trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
     shared: () => run(() => core.sharedWith(drive, user)),
+    sharedNew: async () => core.sharedSince(drive, user, seenShared).length,
+    sawShared: async () => void (seenShared = context().at),
     search: (query, found = {}) => run(() => core.search(drive, query, { within: found.within, trashed: found.trashed, limit: 200 })),
     info: async () => ({ storage: options.label ?? 'memory', maxSize: Number.MAX_SAFE_INTEGER }),
 
