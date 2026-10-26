@@ -3,7 +3,7 @@
 // where it was told (the bucket, or the server for a disk), a few at a time,
 // with how much has gone so far.
 
-import type { Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
+import type { Entry, EntryId, FileEntry, FolderEntry, Role } from '@rebofiles/core';
 
 export interface ClientOptions {
   /** Where the routes are: `/api/files`. */
@@ -119,6 +119,8 @@ export function createDriveClient(options: ClientOptions) {
     search: async (query: string, options: { within?: EntryId; trashed?: boolean } = {}) =>
       (await ask<{ entries: Entry[] }>('GET', `/search${q({ q: query, within: options.within, trashed: options.trashed ? '1' : undefined })}`)).entries,
     info: () => ask<{ storage: string; maxSize: number }>('GET', '/info'),
+    /** What others shared with the one asking. */
+    shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
 
     createFolder: (name: string, parent: EntryId | null) => one('POST', '/folders', { name, parent }) as Promise<FolderEntry>,
     rename: (id: EntryId, name: string, ifTaken?: 'keep-both') => one('PATCH', `/entries/${encodeURIComponent(id)}`, { name, ifTaken }),
@@ -127,6 +129,15 @@ export function createDriveClient(options: ClientOptions) {
     restore: (id: EntryId) => one('POST', `/entries/${encodeURIComponent(id)}/restore`),
     deleteForever: async (id: EntryId) => (await ask<{ removed: EntryId[] }>('DELETE', `/entries/${encodeURIComponent(id)}`)).removed,
     emptyTrash: async () => (await ask<{ removed: EntryId[] }>('POST', '/trash/empty')).removed,
+    /** Shared with someone, or with everyone signed in as `'*'`, or given another role. */
+    share: (id: EntryId, user: string, role: Role) => one('POST', `/entries/${encodeURIComponent(id)}/shares`, { with: user, role }),
+    /** No longer shared with them; anyone may leave what was shared with themselves. */
+    unshare: (id: EntryId, user: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/shares/${encodeURIComponent(user)}`),
+    /** A link to read it without signing in, for `days`; the token is what goes in its address. */
+    createLink: (id: EntryId, days?: number) => ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days }),
+    /** The token of a link made before: the same every time. */
+    linkToken: async (id: EntryId, link: string) => (await ask<{ token: string }>('GET', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`)).token,
+    removeLink: (id: EntryId, link: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`),
     restoreVersion: (id: EntryId, version: string) => one('POST', `/entries/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}/restore`) as Promise<FileEntry>,
     /** An address to read the file from, for a few minutes; `inline` to show it in the page rather than save it. */
     url: async (id: EntryId, options: { version?: string; inline?: boolean } = {}) =>
@@ -167,3 +178,32 @@ export function createDriveClient(options: ClientOptions) {
     },
   };
 }
+
+export interface LinkListing {
+  /** What the link was made for. */
+  root: Entry;
+  /** The folder shown, the root itself or one inside it; for a link to a file, the file. */
+  folder: Entry;
+  /** From the root down to the folder. */
+  path: Entry[];
+  entries: Entry[];
+}
+
+/** What a link reads, for someone not signed in: its folders and an address to read each file from. */
+export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch }) {
+  const base = `${options.base.replace(/\/$/, '')}/links/${encodeURIComponent(options.token)}`;
+  const send = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
+  const ask = async <T>(path: string): Promise<T> => {
+    const answer = await send(base + path);
+    const said = (await answer.json().catch(() => ({}))) as { error?: string; message?: string };
+    if (!answer.ok) throw new RequestError(answer.status, said.error ?? 'server', said.message ?? `The server answered ${answer.status}.`);
+    return said as T;
+  };
+  const absolute = (url: string) => (/^https?:/.test(url) ? url : new URL(url, /^https?:/.test(base) ? base : typeof location === 'undefined' ? 'http://localhost' : location.href).toString());
+  return {
+    list: (folder?: EntryId) => ask<LinkListing>(folder ? `?folder=${encodeURIComponent(folder)}` : ''),
+    url: async (id: EntryId, how: { inline?: boolean } = {}) => absolute((await ask<{ url: string }>(`/download?id=${encodeURIComponent(id)}${how.inline ? '&inline=1' : ''}`)).url),
+  };
+}
+
+export type LinkClient = ReturnType<typeof createLinkClient>;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as core from '@rebofiles/core';
 import { rename } from '@rebofiles/core';
 import { RequestError } from '../src/client';
 import { createMemoryClient } from '../src/memory';
@@ -43,5 +44,17 @@ describe('the drive kept in the page', () => {
     drive.apply((current, context) => rename(current, file.id, 'contract-northwind.docx', context), 'Claude');
     expect((await drive.entry(file.id)).entry).toMatchObject({ name: 'contract-northwind.docx', modifiedBy: 'Claude' });
     expect(drive.drive.entries.size).toBe(1);
+  });
+
+  it('keeps the top to the user’s own unless it is one drive for everyone, and shares as the server does', async () => {
+    let drive = core.createFolder(core.emptyDrive(), { id: 'a', name: 'Ana’s', parent: null }, { by: 'ana', at: '2026-10-01T00:00:00Z' });
+    drive = core.share(drive, 'a', 'me', 'viewer', { by: 'ana', at: '2026-10-01T00:00:00Z' });
+    expect((await createMemoryClient({ drive, uploadStep: 0 }).list(null)).entries).toEqual([]);
+    expect((await createMemoryClient({ drive, uploadStep: 0, top: 'everyone' }).list(null)).entries.map((e) => e.name)).toEqual(['Ana’s']);
+    const mine = createMemoryClient({ drive, uploadStep: 0 });
+    expect((await mine.shared()).map((e) => e.name)).toEqual(['Ana’s']);
+    const own = await mine.createFolder('Mine', null);
+    const { token } = await mine.createLink(own.id);
+    expect(await mine.linkToken(own.id, token)).toBe(token);
   });
 });

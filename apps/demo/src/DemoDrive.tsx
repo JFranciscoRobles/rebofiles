@@ -23,7 +23,7 @@ export function DemoDrive({ defaultView = 'list', claudeActivity = true, languag
   const [client, setClient] = useState<MemoryClient | null>(null);
   useEffect(() => {
     let live = true;
-    seed().then(({ drive, blobs }) => live && setClient(createMemoryClient({ drive, blobs, user: YOU, label: 's3://acme-files' })));
+    seed().then(({ drive, blobs }) => live && setClient(createMemoryClient({ drive, blobs, user: YOU, label: 's3://acme-files', top: 'everyone' })));
     return () => {
       live = false;
     };

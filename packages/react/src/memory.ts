@@ -19,6 +19,8 @@ export interface MemoryOptions {
   /** How long an upload takes to go, in milliseconds per step of 12%; 0 for at once. 180 unless said, as a real one is seen to move. */
   uploadStep?: number;
   now?: () => Date;
+  /** What My files shows at the top, as the server's option says: the user's own (the default), or everything there. */
+  top?: 'own' | 'everyone';
 }
 
 export type MemoryClient = DriveClient & {
@@ -84,11 +86,14 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     list: (folder) =>
       run(() => {
         const found = folder ? core.getFolder(drive, folder) : null;
-        return { folder: found, path: found ? [...core.ancestors(drive, found.id), found] : [], entries: core.children(drive, folder) };
+        const inside = core.children(drive, folder);
+        const entries = found || options.top === 'everyone' ? inside : inside.filter((entry) => entry.owner === user);
+        return { folder: found, path: found ? [...core.ancestors(drive, found.id), found] : [], entries };
       }),
     entry: (entryId) => run(() => ({ entry: core.getEntry(drive, entryId), path: core.ancestors(drive, entryId), trashed: core.isTrashed(drive, entryId) })),
     recent: () => run(() => core.recent(drive)),
-    trash: () => run(() => core.trash(drive)),
+    trash: () => run(() => core.trash(drive).filter((entry) => options.top === 'everyone' || entry.owner === user || entry.trashed?.by === user)),
+    shared: () => run(() => core.sharedWith(drive, user)),
     search: (query, found = {}) => run(() => core.search(drive, query, { within: found.within, trashed: found.trashed, limit: 200 })),
     info: async () => ({ storage: options.label ?? 'memory', maxSize: Number.MAX_SAFE_INTEGER }),
 
@@ -118,6 +123,17 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       forget(removed.keys);
       return removed.removed;
     },
+    share: (entryId, who, role) => change((current) => one(core.share(current, entryId, who, role, context()), entryId)),
+    unshare: (entryId, who) => change((current) => one(core.unshare(current, entryId, who), entryId)),
+    // No server to sign it: a link's token is its id, and nothing outside the page reads it.
+    createLink: (entryId, days = 7) =>
+      change((current) => {
+        const link = { id: id(), expires: new Date(Date.parse(context().at) + days * 86_400_000).toISOString() };
+        const next = core.addLink(current, entryId, link, context());
+        return { drive: next, answer: { entry: core.getEntry(next, entryId), token: link.id } };
+      }),
+    linkToken: async (_entryId, link) => link,
+    removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
     url: (entryId, found = {}) =>
       run(() => {

@@ -5,9 +5,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDriveHandler, diskStorage, everyone, memoryMetadata, PART_SIZE, s3Storage } from '@rebofiles/server';
+import { byRoles, createDriveHandler, diskStorage, everyone, memoryMetadata, PART_SIZE, s3Storage } from '@rebofiles/server';
 import { memoryS3 } from '../../server/test/helpers';
-import { RequestError, createDriveClient } from '../src/client';
+import { RequestError, createDriveClient, createLinkClient } from '../src/client';
 import { formatDate, formatSize } from '../src/i18n';
 import { kindOf } from '../src/kinds';
 
@@ -77,6 +77,50 @@ describe('the client', () => {
     const file = await drive.upload(new File(['hello'], 'hello.txt', { type: 'text/plain' }));
     // Relative to the base, which is a whole address here.
     expect(await drive.url(file.id, { inline: true })).toMatch(/^http:\/\/drive\.test\/api\/files\/bytes\?token=/);
+  });
+});
+
+describe('the client, sharing', () => {
+  function two() {
+    const handle = createDriveHandler({
+      storage: diskStorage({ folder: join(folder, String(Math.random())), secret: 's' }),
+      metadata: memoryMetadata(),
+      identify: (request) => ({ id: request.headers.get('x-user') ?? 'ana' }),
+      authorize: byRoles,
+      secret: 'u',
+      base: '/api/files',
+    });
+    const origin = 'http://drive.test';
+    const fetch = (input: RequestInfo | URL, init?: RequestInit) => handle(new Request(new URL(String(input), origin), init));
+    const as = (who: string) => createDriveClient({ base: `${origin}/api/files`, headers: () => ({ 'x-user': who }), fetch });
+    return { ana: as('ana'), bea: as('bea'), link: (token: string) => createLinkClient({ base: `${origin}/api/files`, token, fetch }) };
+  }
+
+  it('shares a folder, and the other sees it in Shared with me and may leave it', async () => {
+    const { ana, bea } = two();
+    const clients = await ana.createFolder('Clients', null);
+    const shared = await ana.share(clients.id, 'bea', 'viewer');
+    expect(shared.shares).toMatchObject([{ with: 'bea', role: 'viewer' }]);
+    expect((await bea.shared()).map((e) => e.name)).toEqual(['Clients']);
+    await bea.unshare(clients.id, 'bea');
+    expect(await bea.shared()).toEqual([]);
+  });
+
+  it('makes a link, reads through it without signing in, and takes it back', async () => {
+    const { ana, link } = two();
+    const clients = await ana.createFolder('Clients', null);
+    await ana.upload(new File(['through the link'], 'note.txt', { type: 'text/plain' }), { parent: clients.id });
+    const { entry, token } = await ana.createLink(clients.id, 3);
+    expect(await ana.linkToken(clients.id, entry.links![0].id)).toBe(token);
+
+    const reader = link(token);
+    const listing = await reader.list();
+    expect(listing.root.name).toBe('Clients');
+    expect(listing.entries.map((e) => e.name)).toEqual(['note.txt']);
+    expect(await reader.url(listing.entries[0].id)).toMatch(/^http:\/\/drive\.test\/api\/files\/bytes\?token=/);
+
+    await ana.removeLink(clients.id, entry.links![0].id);
+    expect(await reader.list().catch((e: unknown) => e)).toMatchObject({ status: 404, code: 'no-link' });
   });
 });
 
