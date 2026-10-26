@@ -4,7 +4,7 @@
 
 import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, createDriveClient, translator } from '@rebofiles/drive';
+import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, translator } from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;
@@ -175,16 +175,6 @@ export function useActions() {
   }, [client, changed]);
 }
 
-export interface Upload {
-  id: number;
-  name: string;
-  size: number;
-  sent: number;
-  state: 'waiting' | 'sending' | 'done' | 'failed';
-  error?: string;
-  entry?: FileEntry;
-}
-
 /** The settings of the drive and one's own, and saving them: for a panel of settings of your own. */
 export function useSettings() {
   const { client, changed, settings } = useDrive();
@@ -212,47 +202,50 @@ export function useSettings() {
   );
 }
 
-/** Files sent one after another, each in parts; what has gone of each, for a bar. One that failed is tried again with `retry`, from what arrived. */
+/** A file going up: how far it is, how fast, how long it has left. */
+export type Upload = UploadItem;
+
+/**
+ * Files going up, a few at once, each in parts: how far each is, how fast and how long it has left, and the same for
+ * all of them (`summary`). One that failed is tried again with `retry`, from what arrived; one going is stopped with `stop`.
+ */
 export function useUploads() {
   const { client, changed, settings } = useDrive();
-  const [uploads, setUploads] = useState<Upload[]>([]);
-  // The sizes pictures are made in, as the drive's settings say when the upload starts.
+  const [, redraw] = useState(0);
+  // The sizes pictures are made in, as the drive's settings say when an upload starts.
   const images = useRef<ImageSettings | undefined>(undefined);
   images.current = settings?.settings.images;
-  const queue = useRef(Promise.resolve());
-  const counter = useRef(0);
-  const sends = useRef(new Map<number, () => void>());
-  const set = useCallback((id: number, change: Partial<Upload>) => setUploads((all) => all.map((u) => (u.id === id ? { ...u, ...change } : u))), []);
-
+  const done = useRef(new Map<number, (entry: FileEntry) => void>());
+  const uploads = useMemo(
+    () =>
+      createUploads(client, {
+        extra: () => ({ images: images.current }),
+        onChange: () => redraw((n) => n + 1),
+        onDone: (entry, item) => {
+          done.current.get(item.id)?.(entry);
+          done.current.delete(item.id);
+          changed();
+        },
+        onFail: () => changed(),
+      }),
+    [client, changed],
+  );
   const upload = useCallback(
     (files: Iterable<File>, parent: EntryId | null, onDone?: (entry: FileEntry) => void) => {
-      for (const file of files) {
-        const id = ++counter.current;
-        setUploads((all) => [...all.filter((u) => u.state !== 'done'), { id, name: file.name, size: file.size, sent: 0, state: 'waiting' }]);
-        const send = () => {
-          queue.current = queue.current.then(async () => {
-            set(id, { state: 'sending', error: undefined });
-            try {
-              const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: images.current });
-              sends.current.delete(id);
-              set(id, { state: 'done', sent: file.size, entry });
-              onDone?.(entry);
-            } catch (error) {
-              set(id, { state: 'failed', error: (error as Error).message });
-            }
-            changed();
-          });
-        };
-        sends.current.set(id, send);
-        send();
-      }
+      const from = uploads.items.length;
+      uploads.add(files, parent);
+      if (onDone) for (const item of uploads.items.slice(from)) done.current.set(item.id, onDone);
     },
-    [client, changed, set],
+    [uploads],
   );
-  const retry = useCallback((id: number) => sends.current.get(id)?.(), []);
-  const dismiss = useCallback((id: number) => {
-    sends.current.delete(id);
-    setUploads((all) => all.filter((u) => u.id !== id));
-  }, []);
-  return { uploads, upload, retry, dismiss };
+  return {
+    uploads: uploads.items as Upload[],
+    summary: uploads.summary(),
+    upload,
+    retry: uploads.retry,
+    stop: uploads.stop,
+    stopAll: uploads.stopAll,
+    dismiss: uploads.dismiss,
+    clear: uploads.clear,
+  };
 }

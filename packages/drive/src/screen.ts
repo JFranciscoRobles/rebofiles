@@ -16,6 +16,7 @@ import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
+import { type UploadItem, createUploads, formatDuration } from './uploads';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
@@ -87,17 +88,6 @@ type Dialog =
   | { kind: 'empty' }
   | null;
 
-interface Upload {
-  id: number;
-  name: string;
-  size: number;
-  sent: number;
-  state: 'waiting' | 'sending' | 'done' | 'failed';
-  error?: string;
-  /** Sent again from where it was cut. */
-  retry?: () => void;
-}
-
 /** The type of what is dragged from the drive itself, apart from files dragged in from the computer. */
 const DRAGGED = 'application/x-rebofiles-entry';
 /** Larger documents are not read for a preview: they would cost more than a glance is worth. */
@@ -157,7 +147,6 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let dropping = false;
   let menuOpen = false;
   let tab: 'details' | 'versions' = 'details';
-  let uploads: Upload[] = [];
   let revision = 0;
   let alive = true;
 
@@ -516,37 +505,26 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     }
   };
 
-  let queue = Promise.resolve();
-  let uploadCount = 0;
-  const set = (id: number, change: Partial<Upload>) => {
-    uploads = uploads.map((u) => (u.id === id ? { ...u, ...change } : u));
-    render();
-  };
-  /** Files sent one after another, each in parts; what has gone of each, for the bar. */
+  // Files going up, a few at once; what was selected when each was chosen, to show it once it is up unless that changed.
+  const selectedWhen = new Map<number, EntryId | null>();
+  const uploader = createUploads(client, {
+    extra: () => ({ images: settings?.settings.images, renditions: picturesOf }),
+    onChange: render,
+    onDone: (entry, item) => {
+      if (selectedWhen.get(item.id) === selected && picked.size <= 1 && !viewing && !dialog) select(entry.id);
+      selectedWhen.delete(item.id);
+      say(t('uploaded', { name: entry.name }));
+      changed();
+    },
+    onFail: () => changed(),
+  });
+  let uploadsOpen = true;
   const uploadInto = (files: Iterable<File>, parent: EntryId | null) => {
-    for (const file of files) {
-      const id = ++uploadCount;
-      uploads = [...uploads.filter((u) => u.state !== 'done'), { id, name: file.name, size: file.size, sent: 0, state: 'waiting' }];
-      // Tried again, the client goes on from what arrived.
-      const send = () => {
-        queue = queue.then(async () => {
-          set(id, { state: 'sending', error: undefined, retry: undefined });
-          const before = selected;
-          try {
-            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: settings?.settings.images, renditions: picturesOf });
-            set(id, { state: 'done', sent: file.size });
-            // Shown once it is up, unless the person picked something else meanwhile.
-            if (selected === before && picked.size <= 1 && !viewing) select(entry.id);
-            say(t('uploaded', { name: entry.name }));
-          } catch (error) {
-            set(id, { state: 'failed', error: (error as Error).message, retry: send });
-          }
-          changed();
-        });
-      };
-      send();
-    }
-    render();
+    const chosen = [...files];
+    const first = uploader.items.length;
+    uploader.add(chosen, parent);
+    for (const item of uploader.items.slice(first)) selectedWhen.set(item.id, selected);
+    uploadsOpen = true;
   };
 
   /** What a folder, a crumb or a section does with what is dropped on it: files from the computer go up into it, entries of the drive move into it. */
@@ -1781,6 +1759,81 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
 
+  /** Every file going up, and those gone: how far each is, how fast, how long it has left; and all of them together. */
+  function uploadsPanel() {
+    const all = uploader.items;
+    const sum = uploader.summary();
+    const going = sum.sending + sum.waiting;
+    const pct = (sent: number, size: number) => Math.round((sent / Math.max(1, size)) * 100);
+    const title = going
+      ? `${t('upGoing', { done: sum.done, n: all.length })}${sum.remaining !== undefined ? ` · ${t('upLeft', { time: formatDuration(sum.remaining, locale) })}` : ''}`
+      : sum.failed
+        ? t('upFailedN', { n: sum.failed })
+        : t('upDone', { n: sum.done });
+    const row = (item: UploadItem) => {
+      const stateText =
+        item.state === 'waiting'
+          ? t('upWaiting')
+          : item.state === 'sending'
+            ? [
+                t('upOf', { sent: formatSize(item.sent, locale), size: formatSize(item.size, locale) }),
+                item.speed !== undefined && ` · ${t('upSpeed', { speed: formatSize(item.speed, locale) })}`,
+                item.remaining !== undefined && ` · ${t('upLeft', { time: formatDuration(item.remaining, locale) })}`,
+              ]
+            : item.state === 'done'
+              ? t('upUploaded')
+              : item.state === 'stopped'
+                ? t('upStopped')
+                : item.sent > 0
+                  ? t('uploadCut', { name: item.name, pct: pct(item.sent, item.size) })
+                  : `${item.name}: ${item.error}`;
+      return h(
+        'li',
+        { key: `up${item.id}`, class: `rf-up rf-up-${item.state}` },
+        h('span', { class: `rf-tile rf-k-${kindOf({ kind: 'file', name: item.name, type: '' } as unknown as Entry)}`, 'aria-hidden': 'true' }, badgeOf({ name: item.name } as Entry)),
+        h(
+          'div',
+          { class: 'rf-up-text' },
+          h('span', { class: 'rf-up-name', title: item.name }, item.name),
+          h('span', { class: 'rf-up-state', ...(item.state === 'failed' ? { role: 'alert' } : {}) }, stateText),
+          (item.state === 'sending' || item.state === 'waiting') &&
+            h(
+              'span',
+              { class: 'rf-bar', role: 'progressbar', 'aria-label': item.name, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct(item.sent, item.size)) },
+              h('span', { style: `width: ${pct(item.sent, item.size)}%` }),
+            ),
+        ),
+        item.state === 'done' && h('span', { class: 'rf-up-ok', 'aria-hidden': 'true' }, icon('check', 16)),
+        (item.state === 'failed' || item.state === 'stopped') && button(t('tryAgain'), () => uploader.retry(item.id), { class: 'rf-retry' }),
+        (item.state === 'sending' || item.state === 'waiting') &&
+          button(icon('close', 14), () => uploader.stop(item.id), { class: 'rf-btn rf-icon rf-up-stop', 'aria-label': `${t('stopUpload')} ${item.name}`, title: t('stopUpload') }),
+      );
+    };
+    return h(
+      'section',
+      { key: 'uploads', class: 'rf-ups', 'aria-label': t('uploadsLabel') },
+      h(
+        'div',
+        { class: 'rf-ups-head' },
+        h('strong', { class: 'rf-ups-title' }, title),
+        going > 1 && button(t('stopAll'), () => uploader.stopAll(), { class: 'rf-btn rf-small rf-text' }),
+        button(icon('chevron', 16), () => ((uploadsOpen = !uploadsOpen), render()), {
+          class: `rf-btn rf-icon rf-ups-fold${uploadsOpen ? ' rf-open' : ''}`,
+          'aria-expanded': uploadsOpen,
+          'aria-label': uploadsOpen ? t('hideUploads') : t('showUploads'),
+        }),
+        !going && button(icon('close', 16), () => uploader.clear(), { class: 'rf-btn rf-icon', 'aria-label': t('closeUploads'), title: t('closeUploads') }),
+      ),
+      going > 0 &&
+        h(
+          'span',
+          { class: 'rf-bar rf-ups-bar', role: 'progressbar', 'aria-label': title, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct(sum.sent, sum.size)) },
+          h('span', { style: `width: ${pct(sum.sent, sum.size)}%` }),
+        ),
+      uploadsOpen && h('ul', { class: 'rf-ups-list' }, all.map(row)),
+    );
+  }
+
   function dialogs() {
     if (!dialog) return null;
     switch (dialog.kind) {
@@ -1819,8 +1872,6 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     shownEntries = entries;
     const pickedEntries = entries.filter((entry) => picked.has(entry.id));
     const selectedEntry = pickedEntries.length > 1 ? null : (entries.find((entry) => entry.id === selected) ?? null);
-    const sending = uploads.find((u) => u.state === 'sending' || u.state === 'waiting');
-    const failed = uploads.find((u) => u.state === 'failed');
     const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
     const count = entries.length === 1 ? t('item') : t('items', { n: entries.length });
     const title = options.title ?? 'Files';
@@ -1973,34 +2024,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               ),
               button(t('cancel'), () => zipping?.stop.abort(), { class: 'rf-retry' }),
             ]
-          : sending
-            ? [
-                h('span', null, t('uploading', { name: sending.name, pct: Math.round((sending.sent / Math.max(1, sending.size)) * 100) })),
-                h(
-                  'span',
-                  {
-                    class: 'rf-bar',
-                    role: 'progressbar',
-                    'aria-label': sending.name,
-                    'aria-valuemin': '0',
-                    'aria-valuemax': '100',
-                    'aria-valuenow': String(Math.round((sending.sent / Math.max(1, sending.size)) * 100)),
-                  },
-                  h('span', { style: `width: ${(sending.sent / Math.max(1, sending.size)) * 100}%` }),
-                ),
-              ]
-            : failed
-              ? [
-                  h(
-                    'span',
-                    { class: 'rf-error', role: 'alert' },
-                    failed.sent > 0 ? t('uploadCut', { name: failed.name, pct: Math.round((failed.sent / Math.max(1, failed.size)) * 100) }) : `${failed.name}: ${failed.error}`,
-                  ),
-                  failed.retry && h('button', { type: 'button', class: 'rf-retry', onClick: failed.retry }, t('tryAgain')),
-                ]
-              : null,
+          : null,
       ),
       toast && h('div', { class: 'rf-toast', role: 'status' }, toast),
+      uploader.items.length > 0 && uploadsPanel(),
       dialogs(),
       viewing && viewer(viewing),
       settingsPart && settings && settingsScreen(settingsPart),

@@ -10,6 +10,8 @@ const details = (page: Page) => page.getByRole('complementary', { name: 'Details
 
 /** What axe finds, said as one line each, so a failure reads as a list of what to fix. */
 async function axe(page: Page) {
+  // Once what comes in has come: halfway, a toast's text is faded and reads as too faint.
+  await expect.poll(() => page.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').length)).toBe(0);
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
   return violations.map((v) => `${v.id} (${v.impact}): ${v.help} · ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }

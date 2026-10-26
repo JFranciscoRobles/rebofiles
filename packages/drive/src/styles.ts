@@ -224,6 +224,23 @@ export const CSS = `
 .rf-gear { margin-left: auto; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 0; background: none; color: var(--rf-muted); cursor: pointer; }
 .rf-gear:hover { background: var(--rf-hover); color: var(--rf-ink); }
 .rf-gear:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--rf-focus); }
+/* The uploads: a card at the foot of the drive, each file going up with how far it is and how long it has left. */
+.rf-ups { position: absolute; right: 16px; bottom: 44px; z-index: 15; width: min(380px, calc(100% - 32px)); max-height: min(60%, 460px); display: flex; flex-direction: column; background: var(--rf-bg); border: 1px solid var(--rf-border); border-radius: 14px; box-shadow: var(--rf-shadow-menu); overflow: hidden; }
+.rf-ups-head { display: flex; align-items: center; gap: 4px; padding: 10px 8px 10px 14px; border-bottom: 1px solid var(--rf-divider); }
+.rf-ups-title { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-ups-fold svg { transform: rotate(90deg); transition: transform .15s; }
+.rf-ups-fold.rf-open svg { transform: rotate(-90deg); }
+.rf-ups-bar { display: block; width: auto; margin: 0; border-radius: 0; height: 3px; }
+.rf-ups-list { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; }
+.rf-up { display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 14px; }
+.rf-up-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rf-up-name { font-size: 13px; font-weight: 500; color: var(--rf-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-up-state { font-size: 12px; color: var(--rf-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rf-up-failed .rf-up-state { color: var(--rf-danger); white-space: normal; }
+.rf-up .rf-bar { display: block; width: auto; height: 4px; margin: 0; }
+.rf-up-ok { color: var(--rf-brand); display: grid; }
+.rf-up-stop { padding: 4px; color: var(--rf-muted); }
+
 /* The viewer: a file shown whole over the drive, dark around it as a light table is. */
 .rf-view { position: absolute; inset: 0; z-index: 19; display: flex; flex-direction: column; background: #161514; color: #ecebe7; border-radius: inherit; overflow: hidden; outline: none; animation: rf-set-in .16s ease-out; }
 .rf-view-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.08); }

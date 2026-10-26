@@ -175,6 +175,16 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **Uploads in a panel, several at once, with how long each has left.**
+  Three files go up at once (each in parts, three at once too), the others
+  waiting their turn; a card at the foot of the drive lists every one, with
+  how much has gone, how fast and how long it has left, worked out from the
+  last few seconds, and the same for all of them in its title. Each can be
+  stopped, one stopped or failed sent again from what arrived, all stopped
+  at once; the card folds, and closes once they are up, while the drive goes
+  on being used. `createUploads` holds it, for the screen and for
+  `useUploads`, which now gives `summary`, `stop`, `stopAll` and `clear`,
+  and each upload its `speed` and `remaining`.
 - **Download as .zip.** Several picked, or a folder from its details, go
   in one .zip made in the page: the server says what goes in it and at
   which path (`POST /zip`, `packOf` in core), asking `authorize` for each
@@ -246,6 +256,8 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **An address to show a file is good for one to two hours**, from the start
   of its hour, instead of 15 minutes, so the browser can keep what it read.
   One to download a file is still good for 15 minutes.
+- **Uploads go three at a time**, not one after another, and their progress
+  is in a panel of its own, not in the status bar.
 - **Downloading several downloads one .zip**, not each file in turn.
 - **A file opened is shown in the drive**, not in a new tab. Give `onOpen`
   to open it your own way, as before.
