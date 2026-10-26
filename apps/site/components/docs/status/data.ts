@@ -18,7 +18,7 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/drive',
-    count: 22,
+    count: 24,
     what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
   },
   {

@@ -41,7 +41,7 @@ export interface DriveOptions {
    * Shows a Word document's pages in the viewer, in `element`, and gives what takes them down: `viewDocx` of
    * `@rebofiles/drive/rebodocs`, by Rebodocs' engine. Without it, the viewer shows what `previewDocument` reads.
    */
-  viewDocument?: (element: HTMLElement, bytes: Uint8Array) => (() => void) | undefined | Promise<(() => void) | undefined>;
+  viewDocument?: (element: HTMLElement, bytes: Uint8Array) => ShownDocument | Promise<ShownDocument>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -54,6 +54,9 @@ export interface DriveOptions {
   /** Called after every change made from the drive, for what else in the page shows it to ask again. */
   onChange?: () => void;
 }
+
+/** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
+export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void } | undefined;
 
 export interface MountedDrive {
   readonly client: DriveClient;
@@ -1053,8 +1056,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let zoomed = false;
   /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
   const fullTexts = new Map<string, string | null | Error>();
-  /** What took down the last document shown in pages, to do before the next. */
-  let undoDocument: (() => void) | undefined;
+  /** The document shown in pages, to take down before the next, and to set out. */
+  let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void } | undefined;
+  let documentLayout: 'all' | 'pages' = 'all';
+  const undoDocument = () => {
+    shownDocument?.destroy();
+    shownDocument = undefined;
+  };
 
   const view = (id: EntryId) => {
     viewing = id;
@@ -1064,8 +1072,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     render();
   };
   const closeView = () => {
-    undoDocument?.();
-    undoDocument = undefined;
+    undoDocument();
     const back = viewing;
     viewing = null;
     if (back && picked.size <= 1) select(back);
@@ -1183,16 +1190,19 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         return h('div', {
           key: `doc:${url}`,
           class: 'rf-view-pages',
+          'data-own': true,
           mount: (node: HTMLElement) => {
-            undoDocument?.();
-            undoDocument = undefined;
+            undoDocument();
             fetch(url)
               .then((answer) => answer.arrayBuffer())
               .then((bytes) => show(node, new Uint8Array(bytes)))
               .then(
-                (undo) => {
-                  if (viewing === file.id) undoDocument = undo ?? undefined;
-                  else undo?.();
+                (shown) => {
+                  const handle = typeof shown === 'function' ? { destroy: shown } : shown;
+                  if (viewing !== file.id) return handle?.destroy();
+                  shownDocument = handle;
+                  if (documentLayout !== 'all') handle?.layout?.(documentLayout);
+                  render();
                 },
                 () => node.replaceChildren(h('p', { class: 'rf-view-cut' }, t('couldNotRead'))),
               );
@@ -1230,8 +1240,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const step = (by: number) => {
       const next = files[(at + by + files.length) % files.length];
       if (next && next.id !== id) {
-        undoDocument?.();
-        undoDocument = undefined;
+        undoDocument();
         view(next.id);
       }
     };
@@ -1259,6 +1268,30 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         h('span', { class: `rf-tile rf-k-${kind}`, 'aria-hidden': 'true' }, badgeOf(file)),
         h('div', { class: 'rf-view-title' }, h('strong', null, file.name), h('span', null, `${formatSize(file.versions[0].size, locale)} · ${formatDate(file.modified, locale)} · ${file.modifiedBy}`)),
         files.length > 1 && h('span', { class: 'rf-view-count', 'aria-live': 'polite' }, t('nOfM', { n: at + 1, m: files.length })),
+        kind === 'docx' &&
+          shownDocument?.layout && [
+            shownDocument.pages !== undefined && h('span', { class: 'rf-view-count' }, shownDocument.pages === 1 ? t('onePage') : t('pagesN', { n: shownDocument.pages })),
+            h(
+              'div',
+              { class: 'rf-view-seg', role: 'group', 'aria-label': t('pagesShown') },
+              (
+                [
+                  ['all', t('allPages')],
+                  ['pages', t('oneByOne')],
+                ] as const
+              ).map(([mode, label]) =>
+                button(
+                  label,
+                  () => {
+                    documentLayout = mode;
+                    shownDocument?.layout?.(mode);
+                    render();
+                  },
+                  { key: mode, 'aria-pressed': documentLayout === mode },
+                ),
+              ),
+            ),
+          ],
         options.onOpenDocument &&
           kind === 'docx' &&
           button(withIcon('doc', t('openInRebodocs')), () => void attempt(async () => options.onOpenDocument?.(file, await client.url(file.id, { inline: true }))), {

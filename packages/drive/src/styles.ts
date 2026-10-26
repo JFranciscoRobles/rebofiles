@@ -223,6 +223,9 @@ export const CSS = `
 .rf-view-title strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-view-title span { font-size: 12px; color: #a9a69f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-view-count { font-size: 13px; color: #a9a69f; white-space: nowrap; }
+.rf-view-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.08); }
+.rf-view-seg button { border: 0; border-radius: 8px; background: none; color: #d2d0ca; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.rf-view-seg button[aria-pressed='true'] { background: #ecebe7; color: #161514; font-weight: 600; }
 .rf-view-stage { position: relative; flex: 1; min-height: 0; display: flex; }
 .rf-view-content { flex: 1; min-width: 0; display: flex; }
 .rf-view-content > * { flex: 1; min-width: 0; }
@@ -233,10 +236,11 @@ export const CSS = `
 .rf-view-wait, .rf-view-none { display: grid; place-items: center; align-content: center; gap: 14px; color: #a9a69f; text-align: center; padding: 24px; }
 .rf-view-none p { margin: 0; }
 .rf-tile.rf-tile-big { width: 88px; height: 104px; border-radius: 14px; font-size: 16px; }
-.rf-view-image { display: grid; place-items: center; overflow: auto; padding: 16px 68px; }
-.rf-view-image img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
-.rf-view-image.rf-zoomed { place-items: start center; }
-.rf-view-image.rf-zoomed img { max-width: none; max-height: none; cursor: zoom-out; }
+/* A picture whole in the screen, however tall or wide: never a scroll, unless its real size is asked for. */
+.rf-view-image { position: relative; overflow: hidden; }
+.rf-view-image img { position: absolute; inset: 16px 68px; width: calc(100% - 136px); height: calc(100% - 32px); object-fit: contain; cursor: zoom-in; filter: drop-shadow(0 10px 30px rgba(0,0,0,.45)); }
+.rf-view-image.rf-zoomed { overflow: auto; }
+.rf-view-image.rf-zoomed img { position: static; display: block; margin: 0 auto; width: auto; height: auto; max-width: none; cursor: zoom-out; }
 .rf-view-pdf { border: 0; background: #fff; }
 .rf-view-video { max-width: 100%; max-height: 100%; background: #000; align-self: center; }
 .rf-view-audio { display: grid; place-items: center; align-content: center; gap: 22px; }
@@ -259,7 +263,8 @@ export const CSS = `
 .rf-view-cut { text-align: center; color: #a9a69f; font-size: 13px; margin: 14px 0 0; }
 .rf-view-pages { position: relative; padding: 0; background: #2a2926; }
 @media (max-width: 700px) {
-  .rf-view-image, .rf-view-doc, .rf-view-code, .rf-view-table { padding: 12px; }
+  .rf-view-doc, .rf-view-code, .rf-view-table { padding: 12px; }
+  .rf-view-image img { inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
   .rf-view-sheet { padding: 28px 22px; }
   .rf-view-step { top: auto; bottom: 14px; margin: 0; }
   .rf-view-bar { flex-wrap: wrap; }

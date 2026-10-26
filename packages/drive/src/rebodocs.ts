@@ -22,13 +22,78 @@ export function previewDocx(bytes: Uint8Array): DocumentPreview {
   return { title, paragraphs };
 }
 
+/** How a document is shown in the viewer: all its pages as many across as fit, or one by one, each whole. */
+export type DocumentLayout = 'all' | 'pages';
+
+/** A document shown in the viewer, as `viewDocument` gives it back. */
+export interface DocumentView {
+  /** How many pages it has. */
+  readonly pages: number;
+  layout(mode: DocumentLayout): void;
+  destroy(): void;
+}
+
+/** The least width a page is shown at when all of them are, in pixels: an overview, to be read one by one; and the gap between them. */
+const LEAST_WIDE = 140;
+const GAP = 24;
+
+/**
+ * The width each page is shown at so that all of them fit in `width` × `height`, as many across as that takes,
+ * the largest that does; when none is as wide as LEAST_WIDE, pages that wide, and the rest is scrolled to.
+ */
+export function pageWidthToFit(pages: number, ratio: number, width: number, height: number): number {
+  let best = 0;
+  for (let across = 1; across <= pages; across++) {
+    const wide = (width - GAP * (across + 1)) / across;
+    const rows = Math.ceil(pages / across);
+    const tall = Math.min(wide, (height - GAP * (rows + 1)) / rows / ratio);
+    best = Math.max(best, tall);
+  }
+  return best >= LEAST_WIDE ? best : Math.max(LEAST_WIDE, Math.min(220, (width - GAP * 2) / 2));
+}
+
 /**
  * A Word document's pages, by Rebodocs' editor, read only, for the viewer of the drive:
- * `mountDrive(element, { viewDocument: viewDocx })`. Its engine is loaded the first time one is shown.
+ * `mountDrive(element, { viewDocument: viewDocx })`. All of its pages at first, as large as lets them all fit on the
+ * screen, or at the editor's least zoom (a quarter) for one too long to; `layout('pages')` shows them one under another, each whole on the screen. Its engine is loaded the first time.
  */
-export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise<() => void> {
+export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise<DocumentView> {
   const { Editor } = await import('@rebodocs/editor');
   const editor = new Editor(element, importDocx(bytes));
   editor.readOnly = true;
-  return () => editor.destroy();
+  let current: DocumentLayout = 'all';
+  const layout = (mode: DocumentLayout) => {
+    current = mode;
+    if (mode === 'pages') {
+      editor.setView('column');
+      editor.setFit('page');
+    } else {
+      editor.setView('grid');
+      // The size of a page at zoom 1, from the one it is shown at now.
+      const page = element.querySelector<HTMLElement>('.dx-page');
+      const width = (page?.offsetWidth ?? 816) / editor.zoom;
+      const ratio = (page?.offsetHeight ?? 1056) / (page?.offsetWidth ?? 816);
+      const fits = pageWidthToFit(editor.pageCount, ratio, element.clientWidth, element.clientHeight);
+      editor.setZoom(Math.min(1, fits / width));
+      // The editor's own gaps and margins are not quite those reckoned: measured once it has drawn, and made
+      // smaller until all of it fits, as long as a page is still read.
+      let tries = 0;
+      const shrink = () => {
+        if (current !== 'all' || tries++ >= 4 || element.scrollHeight <= element.clientHeight + 1) return;
+        const smaller = editor.zoom * (element.clientHeight / element.scrollHeight) * 0.99;
+        const before = editor.zoom;
+        if (smaller * width < LEAST_WIDE) return;
+        editor.setZoom(smaller);
+        // The editor goes no smaller than its least zoom: a long document is then scrolled through.
+        if (editor.zoom === before) return;
+        requestAnimationFrame(() => requestAnimationFrame(shrink));
+      };
+      if (fits >= LEAST_WIDE) requestAnimationFrame(() => requestAnimationFrame(shrink));
+    }
+    // From the first page, whichever way.
+    element.scrollTop = 0;
+    for (const inside of element.querySelectorAll<HTMLElement>('*')) if (inside.scrollTop) inside.scrollTop = 0;
+  };
+  layout('all');
+  return { pages: editor.pageCount, layout, destroy: () => editor.destroy() };
 }

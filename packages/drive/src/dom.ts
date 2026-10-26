@@ -97,8 +97,8 @@ export function morph(from: Node, to: Node): void {
   for (const event of Object.keys(old.__on ?? {})) if (!next.__on || !(event in next.__on)) old.__on![event] = undefined as unknown as Handler;
   old.__mount = next.__mount;
 
-  // A style element is the stylesheet: the same text every time, not walked.
-  if (old.nodeName !== 'STYLE') morphChildren(old, next);
+  // A style element is the stylesheet: the same text every time, not walked; nor one whose inside is another's (`data-own`), as a document an editor draws.
+  if (old.nodeName !== 'STYLE' && !old.hasAttribute('data-own')) morphChildren(old, next);
 
   // After the children, so a select has its options before its value is set.
   if ('__value' in next) {

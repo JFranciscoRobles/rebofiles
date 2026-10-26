@@ -19,7 +19,16 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   // Popups of the drive's page: axe opens a page of its own, which is not one.
   const tabs: string[] = [];
   page.on('popup', (opened) => tabs.push(opened.url()));
-  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  // A picture taller than the screen, drawn in the page.
+  const pixel = Buffer.from(
+    await page.evaluate(async () => {
+      const canvas = new OffscreenCanvas(600, 2400);
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#0b57d0';
+      context.fillRect(0, 0, 600, 2400);
+      return Array.from(new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer()));
+    }),
+  );
   await page.locator('input[type=file]').setInputFiles([
     { name: 'a-agreement.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(sampleDocx()) },
     { name: 'b-house.png', mimeType: 'image/png', buffer: pixel },
@@ -50,12 +59,19 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('dialog', { name: 'b-house.png' }).getByRole('img', { name: 'b-house.png' })).toBeVisible();
+  // Whole on the screen: nothing to scroll.
+  expect(await page.locator('.rf-view-image').evaluate((box) => box.scrollHeight <= box.clientHeight && box.scrollWidth <= box.clientWidth)).toBe(true);
 
   await page.keyboard.press('ArrowLeft');
   const docx = page.getByRole('dialog', { name: 'a-agreement.docx' });
   // Its pages, by Rebodocs' engine.
   await expect(docx.locator('.rf-view-pages .dx-page').first()).toBeVisible({ timeout: 15_000 });
   await expect(docx.getByRole('button', { name: 'Open in Rebodocs' })).toBeVisible();
+  await expect(docx.getByText('1 page')).toBeVisible();
+  await expect(docx.getByRole('button', { name: 'All pages' })).toHaveAttribute('aria-pressed', 'true');
+  await docx.getByRole('button', { name: 'One by one' }).click();
+  await expect(docx.getByRole('button', { name: 'One by one' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(docx.locator('.rf-view-pages .dx-page').first()).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: /agreement/ })).toHaveCount(0);

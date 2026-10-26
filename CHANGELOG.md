@@ -142,7 +142,10 @@ minor version (0.x.0) may change the API; such changes are listed under
   elements, never of HTML, its links only to http, https and mail), a CSV as
   a table, JSON laid out, code and text; a Word document in its pages, by
   Rebodocs' editor read only, with `viewDocument: viewDocx` of
-  `@rebofiles/drive/rebodocs`. The arrows go to the files before and after;
+  `@rebofiles/drive/rebodocs`: all of its pages at once, as large as lets
+  them all fit on the screen (at the editor's least zoom, a quarter, for a
+  long one), or one by one, each whole. A picture is always whole on the
+  screen, with nothing to scroll; a click shows its real size. The arrows go to the files before and after;
   a tab of its own, when wanted, is a button away. New kinds: `video`,
   `audio`, and code among `text`.
 - **Settings, on a screen of their own.** A button at the top of the drive
