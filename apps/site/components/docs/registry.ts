@@ -4,6 +4,7 @@ import * as app from './pages/app';
 import * as files from './pages/files';
 import * as reference from './pages/reference';
 import * as running from './pages/running';
+import * as team from './pages/team';
 import * as schema from './pages/schema';
 import * as server from './pages/server';
 import * as start from './pages/start';
@@ -27,6 +28,7 @@ export const DOC_PAGES: Record<string, DocPage> = {
   previews: files.previews,
   search: files.search,
   live: running.live,
+  comments: team.comments,
   versions: files.versions,
   zip: files.zip,
   word: files.word,
@@ -39,6 +41,8 @@ export const DOC_PAGES: Record<string, DocPage> = {
   schema: schema.schema,
   sharing: server.sharing,
   activity: server.activity,
+  observability: team.observe,
+  retention: team.keeping,
   desktop: server.desktop,
   sync: running.sync,
   production: running.production,

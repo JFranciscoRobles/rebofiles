@@ -74,7 +74,13 @@ export const index: DocPage = {
               <strong>Asistentes de IA.</strong> Herramientas para Claude por MCP, con los permisos del usuario; documentos de Word editados con Rebodocs, cada cambio una versión.
             </>,
             <>
-              <strong>Teclado y lectores de pantalla</strong>, claro y oscuro, inglés, español y chino, una pantalla de ajustes y una aplicación de escritorio.
+              <strong>En el momento.</strong> Lo que cambia otra persona aparece al instante; comentarios con respuestas y @; carpetas de miles; el drive leído por partes.
+            </>,
+            <>
+              <strong>A salvo.</strong> Archivos revisados por sus bytes y con ClamAV, límites a quien pide demasiado, un mínimo de días, retención legal, todo lo de una persona exportado.
+            </>,
+            <>
+              <strong>Teclado y lectores de pantalla</strong>, claro y oscuro, inglés, español y chino, una pantalla de ajustes y una aplicación de escritorio que sincroniza una carpeta.
             </>,
           ]}
         />
@@ -320,7 +326,8 @@ export const demos: DocPage = {
       body: (
         <P>
           Copia <C>apps/storage/.env.example</C> a <C>.env</C>, complétalo, da al bucket la regla de orígenes de <C>apps/storage/cors.json</C>, y <C>npm run storage:check</C> hace todo el recorrido de
-          un archivo desde Node antes de que la página lo intente. <a href={to('storage')}>Almacenamiento</a> explica cómo.
+          un archivo desde Node antes de que la página lo intente. <a href={to('storage')}>Almacenamiento</a> explica cómo. Ahí está todo activo: <C>?as=bea</C> para compartir con Bea (en{' '}
+          <C>group:team</C> con Carl), enlaces con contraseña, comentarios, la primera página de un PDF hecha por el servidor, archivos revisados, el asistente en <C>/api/mcp</C>.
         </P>
       ),
     },
@@ -332,8 +339,8 @@ export const demos: DocPage = {
       lead: 'El drive en su propia ventana, con Tauri, contra el playground o cualquier servidor.',
       body: (
         <P>
-          Rust y las herramientas de línea de comandos de Xcode en un Mac. <C>npm run build:desktop</C> genera ReboFiles.app. <a href={to('desktop')}>Escritorio y otros orígenes</a> explica qué
-          necesita el servidor.
+          Rust y las herramientas de línea de comandos de Xcode en un Mac. <C>npm run build:desktop</C> genera ReboFiles.app; <strong>Server → Sync a Folder…</strong> mantiene una carpeta de la
+          computadora igual que el drive (<a href={to('sync')}>Sincronizar una carpeta</a>). <a href={to('desktop')}>Escritorio y otros orígenes</a> explica qué necesita el servidor.
         </P>
       ),
     },

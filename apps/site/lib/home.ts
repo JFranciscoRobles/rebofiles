@@ -40,7 +40,7 @@ export const PACKAGES: Package[] = [
   { name: '@rebofiles/drive', what: 'The whole drive with no framework, mounted on an element, and the client it is built on.', tag: 'No framework', color: 'yellow' },
   { name: '@rebofiles/react', what: 'The drive as a React component, or as headless hooks, with uploads and previews inside.', tag: 'React', color: 'green' },
   { name: '@rebofiles/server', what: 'The routes, authorize(), signed addresses, the bytes on S3 or a disk and the metadata in SQLite.', tag: 'Node', color: 'pink' },
-  { name: '@rebofiles/desktop', what: 'A folder on disk kept like a folder of the drive. The Tauri app it goes into is here already, in apps/desktop.', tag: 'Desktop', color: 'purple', comes: '0.6' },
+  { name: '@rebofiles/sync', what: 'A folder of the computer kept as a folder of the drive, both ways, in the desktop app and as a command.', tag: 'Sync', color: 'purple' },
   {
     name: '@rebofiles/mcp',
     what: 'Tools for an AI assistant to list, search, read, write, rename, move and trash files, and with Rebodocs to edit Word documents, with the user’s own rights.',
@@ -70,4 +70,7 @@ export const FEATURES: [icon: string, comes?: string][] = [
   ['M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10'],
   ['M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2a2 2 0 0 0-1 3.7A1.5 1.5 0 0 1 14 22zM7.5 10.5h.01M12 7.5h.01M16.5 10.5h.01'],
   ['M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'],
+  ['M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01'],
+  ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+  ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4'],
 ];

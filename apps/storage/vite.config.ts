@@ -14,11 +14,12 @@ function backend(): Plugin {
     configureServer(server) {
       const load = async () => (await server.ssrLoadModule('/server/bucket.ts')) as typeof import('./server/bucket');
       server.middlewares.use((request, response, next) => {
-        if (!request.url?.startsWith('/api/files')) return next();
+        const mcp = request.url?.startsWith('/api/mcp');
+        if (!request.url?.startsWith('/api/files') && !mcp) return next();
         load()
-          .then(async ({ handle }) => {
+          .then(async (backend) => {
             const { nodeHandler } = (await server.ssrLoadModule('@rebofiles/server')) as typeof import('@rebofiles/server');
-            await nodeHandler(handle)(request, response);
+            await nodeHandler(mcp ? backend.mcp : backend.handle)(request, response);
           })
           .catch(next);
       });

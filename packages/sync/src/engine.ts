@@ -186,7 +186,10 @@ export async function syncOnce(options: SyncOptions): Promise<{ state: SyncState
   const upload = async (path: string, as?: FileEntry) => {
     const bytes = await local.read(path);
     const after = await local.stat(path);
-    const made = await client.upload(new File([bytes as BlobPart], nameOf(path), { type: as?.type ?? typeOfName(path) }), as ? { file: as.id } : { parent: folderAt(parentOf(path)) });
+    const made = await client.upload(
+      new File([bytes as BlobPart], nameOf(path), { type: as?.type ?? typeOfName(path) }),
+      as ? { file: as.id, partHashes: true } : { parent: folderAt(parentOf(path)), partHashes: true },
+    );
     keep(path, { id: made.id, kind: 'file', version: made.versions[0].id, size: after?.size ?? bytes.length, modified: after?.modified ?? Date.now() });
     remote.set(fold(path), { entry: made, path });
     did({ do: 'upload', path });

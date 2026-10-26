@@ -1,7 +1,8 @@
 // What an assistant may do with the drive, one tool each: look, read, write
-// text, rename, move, and put in the trash and take out of it. Not delete for
-// good, and not share: nothing it does cannot be undone from the trash or the
-// versions of a file, and nothing it does reaches anyone else.
+// text, rename, move, put in the trash and take out of it, and comment. Not
+// delete for good, and not share: nothing it does cannot be undone from the
+// trash or the versions of a file, and what reaches anyone else is a comment
+// on what they may read already, in the name of the one it works for.
 //
 // Each answers in words for the model and as data for the client, and says
 // what the server refused as an error the model reads, not as a failure of
@@ -217,6 +218,38 @@ export const TOOLS: Tool[] = [
       const said = (a: (typeof found)[number]) =>
         `${a.at} ${a.by} ${a.action} ${a.kind} "${a.name}" (id ${a.entry})${a.was ? ` from "${a.was}"` : ''}${a.with ? ` with ${a.with}${a.role ? ` as ${a.role}` : ''}` : ''}`;
       return { text: found.length ? found.map(said).join('\n') : 'Nothing done there yet, or not since the activity is kept.', data: { activity: found } };
+    },
+  },
+  {
+    name: 'list_comments',
+    title: 'Read the comments',
+    description: 'What people said of a file or a folder, each thread with its replies under it, and whether it was resolved.',
+    inputSchema: { type: 'object', properties: { id }, required: ['id'], additionalProperties: false },
+    annotations: READ,
+    async run(drive, args) {
+      const found = await drive.comments(str(args, 'id'));
+      const said = (c: (typeof found)[number]) => `${c.replyTo ? '  ↳ ' : ''}${c.at} ${c.by}: ${c.text}${c.resolved ? ` (resolved by ${c.resolved.by})` : ''} [comment ${c.id}]`;
+      return { text: found.length ? found.map(said).join('\n') : 'No comments on it.', data: { comments: found } };
+    },
+  },
+  {
+    name: 'add_comment',
+    title: 'Comment',
+    description: 'A comment on a file or a folder, in the name of the one the assistant works for, seen by everyone who may read it; or a reply under another, with its id. Names with @ are told.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id,
+        text: { type: 'string', description: 'What to say: up to 5000 characters.' },
+        replyTo: { type: 'string', description: 'The id of the comment it answers, from list_comments.' },
+      },
+      required: ['id', 'text'],
+      additionalProperties: false,
+    },
+    annotations: WRITE,
+    async run(drive, args) {
+      const made = await drive.addComment(str(args, 'id'), str(args, 'text'), optional(args, 'replyTo') ?? undefined);
+      return { text: `Commented (comment ${made.id}).`, data: { comment: made } };
     },
   },
   {

@@ -4,6 +4,7 @@
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
 import { DOCX, QUEUE, RESUME, SAVE, SIZES, SPACE } from '../files';
+import { DERIVE_CODE } from '../team';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/files.tsx';
@@ -191,6 +192,35 @@ export const previews: DocPage = {
         </P>
       ),
     },
+    {
+      id: 'made-by-the-server',
+      title: 'Hechas por el servidor',
+      badge: 'derive',
+      color: 'orange',
+      lead: 'Lo que no viene de una página (un asistente, una sincronización, un script), y lo que ninguna página hace (la primera página de un PDF): lo hace el servidor un momento después de guardarlo.',
+      body: (
+        <>
+          <Code code={DERIVE_CODE} />
+          <List
+            items={[
+              <>
+                <C>pictures()</C>: una imagen en los tamaños del drive, nunca mayor que ella, y su placeholder, con <C>sharp</C>.
+              </>,
+              <>
+                <C>pdf()</C>: la primera página de un PDF dibujada, y el texto de sus primeras cincuenta páginas para la búsqueda, con <C>pdfjs-dist</C> y <C>@napi-rs/canvas</C>.
+              </>,
+              <>
+                <C>docx()</C> y <C>text()</C>: lo que tiene escrito un documento de Word, con Rebodocs, y un archivo de texto.
+              </>,
+            ]}
+          />
+          <P>
+            La página dice lo que hace ella misma, y el servidor hace solo el resto; cada biblioteca se pide al necesitarla, así que solo se instala lo que se usa. La página muestra lo que llega, como
+            lo avisan los eventos.
+          </P>
+        </>
+      ),
+    },
   ],
 };
 
@@ -343,7 +373,8 @@ export const word: DocPage = {
   source: SOURCE,
   lead: (
     <>
-      Rebodocs es una dependencia opcional: con <C>@rebodocs/editor</C> instalado, un .docx se lee con su motor. Sin él, el drive muestra un .docx como cualquier otro archivo.
+      Rebodocs es una dependencia opcional: con <C>@rebodocs/core</C> y <C>@rebodocs/viewer</C> instalados, un .docx se lee con su motor y se muestra en el visor de Rebodocs. Sin él, el drive muestra
+      un .docx como cualquier otro archivo.
     </>
   ),
   sections: [

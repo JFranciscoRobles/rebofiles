@@ -53,8 +53,13 @@ jobs:
           REBOFILES_TEST_POSTGRES: postgres://postgres:postgres@localhost:5432/postgres
 
   browser:
-    name: In Chrome
+    name: In ${{ matrix.browser }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Chrome; WebKit, Safari's engine and the desktop window's on a Mac; and Firefox.
+        browser: [chrome, webkit, firefox]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,11 +67,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chrome
-      - run: npm run test:browser
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npx playwright test --project=${{ matrix.browser }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.browser }}
           path: test-results/
           retention-days: 7

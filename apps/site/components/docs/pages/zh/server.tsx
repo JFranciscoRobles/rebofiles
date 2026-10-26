@@ -5,6 +5,8 @@ import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
 import { AUTHORIZE, CORS, ENV, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { GROUPS_CODE } from '../team';
+import { SCALE_NUMBERS_ZH } from '../team';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/server.tsx';
@@ -141,6 +143,22 @@ export const authorize: DocPage = {
         <Trouble says="Sign in first. · You may not do that here.">
           401 表示 <C>identify</C> 返回了 null；403 表示 <C>authorize</C> 返回了 false。
         </Trouble>
+      ),
+    },
+    {
+      id: 'groups',
+      title: '群组',
+      badge: '团队',
+      color: 'green',
+      body: (
+        <>
+          <Code code={GROUPS_CODE} />
+          <P>
+            共享可以按 id 指定某人，用 <C>*</C> 指定所有已登录用户，或用 <C>group:&lt;id&gt;</C> 指定群组。群组成员由你的应用决定，由 <C>identify</C>{' '}
+            随每个人一起给出：网盘不保存成员列表，因此在你的应用中加入或离开团队的人，在下一次请求时就会获得或失去相应的权限。在共享对话框中，像输入 id 一样输入 <C>group:sales</C>
+            ；“与我共享”会显示共享给其所在群组的内容。
+          </P>
+        </>
       ),
     },
   ],
@@ -286,6 +304,24 @@ export const metadata: DocPage = {
           <C>MetadataStore</C> 只需实现 <C>load()</C> 和 <C>save(changes)</C>；<C>revision</C>、<C>lock</C>、设置、<C>record</C>/<C>activity</C> 以及 <C>keepText</C>/<C>findText</C>{' '}
           都是可选的，缺少时服务器会把这些信息保存在进程中。<a href={to('schema')}>数据库结构</a>一页列出了所有表。
         </P>
+      ),
+    },
+    {
+      id: 'a-piece-at-a-time',
+      title: '按需读取',
+      badge: '规模',
+      color: 'purple',
+      body: (
+        <>
+          <P>
+            SQLite、Postgres
+            和内存存储只回答每个请求所需的内容：一个条目及其上层文件夹、文件夹中的内容、某个文件夹下的全部内容、按名称搜索、回收站、与某人共享的内容。网盘从不整体加载，每次更改只写入涉及的部分。其他进程的更改从它们保存的动态中读取。
+          </P>
+          <Table label="在 SQLite 上测量，二十万个条目" columns={['一百个人，每人两千个文件', '耗时']} code={[]} rows={SCALE_NUMBERS_ZH} />
+          <P>
+            查询所用的列和表会在首次打开旧数据库时添加，并一次性填充已有的行。自定义存储通过 <C>scoped</C> 实现同样的功能；没有它时，仍像以前一样整体保存在内存中。
+          </P>
+        </>
       ),
     },
   ],

@@ -4,6 +4,7 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
+import { copied, watchClipboard } from './clipboard';
 
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 const details = (page: Page) => page.getByRole('complementary', { name: 'Details' });
@@ -99,15 +100,15 @@ test('dark, as the system is', async ({ browser }) => {
   await context.close();
 });
 
-test('a link, opened signed out', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+test('a link, opened signed out', async ({ page }) => {
+  await watchClipboard(page);
   await page.goto('/?as=axe-link');
   await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'linked.txt', mimeType: 'text/plain', buffer: Buffer.from('Through a link.') }]);
   await item(page, 'linked.txt').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
-  const address = await page.evaluate(() => navigator.clipboard.readText());
+  const address = await copied(page);
   await page.goto(address);
   await expect(page.getByRole('button', { name: 'linked.txt', exact: true })).toBeVisible();
   expect.soft(await axe(page)).toEqual([]);

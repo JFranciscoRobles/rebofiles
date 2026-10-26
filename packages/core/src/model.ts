@@ -23,6 +23,17 @@ export interface Version {
   restoredFrom?: string;
   /** Of a picture: smaller ones made of it when it was uploaded, to show it; the bytes under `key` stay as they came. */
   renditions?: Rendition[];
+  /**
+   * The SHA-256 of each part of its bytes, as they were sent (`partsOf`), when the one who sent it said them: a new
+   * version that has some of the same parts is sent without them, its bytes copied in the storage from this one.
+   */
+  parts?: PartHashes;
+}
+
+/** The parts of a version's bytes, each of `size` bytes but the last, by the SHA-256 of each. */
+export interface PartHashes {
+  size: number;
+  hashes: readonly string[];
 }
 
 /** A picture made smaller, for one size of the drive's: its longest side at most `size` pixels. */
@@ -86,6 +97,18 @@ interface Base {
   /** Who else it is shared with; what is inside it is shared through it (see `accessOf`). */
   shares?: readonly Share[];
   links?: readonly Link[];
+  /**
+   * A legal hold: neither it nor what is inside it may be put in the trash or deleted, by anyone, until it is
+   * released. Its versions stay; new ones may come.
+   */
+  hold?: Hold;
+}
+
+export interface Hold {
+  by: string;
+  at: string;
+  /** Why, as the one who held it said: a case, a request. */
+  reason?: string;
 }
 
 /** The colours a folder may be given, each shown as the theme has it; none is the drive's own. */

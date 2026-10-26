@@ -40,7 +40,7 @@ describe('the settings', () => {
     const handle = drive();
     const ana = client(handle, 'ana');
     const bea = client(handle, 'bea');
-    expect((await bea.ask('GET', '/api/files/settings')).body).toEqual({ drive: DEFAULT_SETTINGS, mine: {}, settings: DEFAULT_SETTINGS, canConfigure: false, saved: false });
+    expect((await bea.ask('GET', '/api/files/settings')).body).toEqual({ drive: DEFAULT_SETTINGS, mine: {}, settings: DEFAULT_SETTINGS, canConfigure: false, saved: false, you: 'bea' });
     expect((await ana.ask('GET', '/api/files/settings')).body.canConfigure).toBe(true);
 
     expect((await bea.ask('PUT', '/api/files/settings', { language: 'es' })).status).toBe(403);
@@ -52,6 +52,7 @@ describe('the settings', () => {
       images: { sizes: [100, 400, 900, 2000], format: 'original', quality: 0.82, enabled: true },
       quota: null,
       trashDays: null,
+      retentionDays: null,
     });
     // A change is over what was there: what is left out stays.
     expect(((await ana.ask('PUT', '/api/files/settings', { theme: 'auto' })).body.drive as { language: string }).language).toBe('es');

@@ -19,7 +19,7 @@ npm install @rebofiles/drive
 
 ```ts
 import { mountDrive } from '@rebofiles/drive';
-import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/editor
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
 
 const drive = mountDrive(document.getElementById('files')!, {
   base: '/api/files',
@@ -56,7 +56,7 @@ what can be done: download, move, the trash, restore, delete for good.
 A file opened, by a double click or Enter, is shown over the drive: pictures,
 PDF, video, audio, Markdown, CSV, JSON, code and text, and Word documents in
 their pages with `viewDocument: viewDocx` (from `@rebofiles/drive/rebodocs`,
-with `@rebodocs/editor` installed); ← and → go to the next. `onOpen` opens
+with `@rebodocs/viewer` installed); ← and → go to the next. `onOpen` opens
 files your own way instead.
 
 ## Uploads

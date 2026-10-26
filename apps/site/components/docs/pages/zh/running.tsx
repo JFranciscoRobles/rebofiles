@@ -314,6 +314,18 @@ export const sync: DocPage = {
         />
       ),
     },
+    {
+      id: 'only-what-changed',
+      title: '只传输更改的部分',
+      badge: '分块',
+      color: 'green',
+      body: (
+        <P>
+          稍有改动的文件只以更改的部分作为新版本上传：每个版本保存其 8 MiB 分块的 SHA-256，相同的分块直接在存储中从上一个版本复制（S3 的 UploadPartCopy，或磁盘上的复制），不再重新发送。一个 1 GB
+          的视频只改了标题，只需发送 8 MiB。任何上传都可以通过 <C>partHashes: true</C> 使用此功能。
+        </P>
+      ),
+    },
   ],
 };
 
@@ -350,6 +362,13 @@ export const production: DocPage = {
               多个进程时使用 Postgres（<a href={hrefOf('metadata')}>元数据</a>），并做好备份。
             </>,
             <>在存储桶中设置生命周期规则，如下所示。</>,
+            <>
+              在代理之后设置 <C>clientIp</C>，多个进程时使用基于 Redis 的 <C>limiter</C>（<a href={hrefOf('observability')}>钩子、日志与限制</a>）。
+            </>,
+            '前端使用 HTTP/2：每个监听的标签页占用一个连接，而在 HTTP/1.1 下浏览器对每个主机只有六个。看不见的标签页会释放自己的连接。',
+            <>
+              安装 sharp 和 pdf.js 并设置 <C>derive: deriveAll()</C>，为页面未生成的内容生成图片和文字（<a href={hrefOf('previews')}>预览</a>）。
+            </>,
           ]}
         />
       ),

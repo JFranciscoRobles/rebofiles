@@ -13,7 +13,17 @@ import { CLIENT_CODE, GROUPS, Milestones, RouteTable, Rows, clientId, packageId 
 const to = (slug: string) => docHref('zh', slug);
 const { CLIENT, HOOKS, PACKAGE_DOCS, PROPS } = referenceIn('zh');
 const SOURCE = 'apps/site/components/docs/pages/zh/reference.tsx';
-const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = { Reading: '读取', Changing: '修改', Uploads: '上传', Sharing: '共享', Files: '文件', Settings: '设置', Live: '实时' };
+const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = {
+  Reading: '读取',
+  Changing: '修改',
+  Uploads: '上传',
+  Sharing: '共享',
+  Files: '文件',
+  Settings: '设置',
+  Live: '实时',
+  Comments: '评论',
+  Keeping: '保留',
+};
 const ROUTE_WORDS: [string, string, string, string] = ['路由', '链接的路由', '路由', '作用'];
 const IN_ENGLISH = <Callout title="英文内容：">实测数据和路线图只用英文编写一次，与 ROADMAP.md 相同。</Callout>;
 

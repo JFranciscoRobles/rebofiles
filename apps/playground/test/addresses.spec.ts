@@ -14,6 +14,18 @@ const picture = (page: Page, colour: string) =>
   }, colour);
 
 test('a grid of pictures asks for their addresses in one request, and a picture that did not load is asked for again', async ({ page }) => {
+  // From the start, before any is shown: a browser keeps what it showed once (Safari, from the list), so each must
+  // fail the first time it is read. The first time each picture is read from the bytes it fails, as an address out of date would.
+  const failedOnce = new Set<string>();
+  await page.route('**/api/files/bytes?**', (route) => {
+    // The bytes sent up go as they go.
+    if (route.request().method() !== 'GET') return route.continue();
+    if (!failedOnce.has(route.request().url())) {
+      failedOnce.add(route.request().url());
+      return route.fulfill({ status: 403, body: 'That address is out of date.' });
+    }
+    return route.continue();
+  });
   await page.goto('/?as=addresses');
   const colours = ['#0b57d0', '#0e7c52', '#c026d3', '#dc2626', '#ea580c', '#334155'];
   await page
@@ -25,15 +37,6 @@ test('a grid of pictures asks for their addresses in one request, and a picture 
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname;
     if (path === '/api/files/urls' || path.endsWith('/download')) asked.push(path.endsWith('/download') ? 'download' : 'urls');
-  });
-  // The first time each picture is read from the bytes it fails, as an address out of date would.
-  const failedOnce = new Set<string>();
-  await page.route('**/api/files/bytes?**', (route) => {
-    if (!failedOnce.has(route.request().url())) {
-      failedOnce.add(route.request().url());
-      return route.fulfill({ status: 403, body: 'That address is out of date.' });
-    }
-    return route.continue();
   });
   await page.getByRole('button', { name: 'Grid' }).click();
   const pictures = page.locator('.rf-thumb img:not(.rf-ph)');

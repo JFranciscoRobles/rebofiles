@@ -138,6 +138,33 @@ they may read). A change of another process on the same store is seen by its
 revision within `live.poll` milliseconds (2000). `live: false` for none. The
 client watches with `client.watch()`, and the drive and the hooks with it.
 
+## A drive of any size
+
+SQLite, Postgres and memory are asked a piece at a time (`scoped`): an entry
+and the folders above it, what is in a folder, a search, the trash. The
+drive is never loaded whole; two hundred thousand entries on SQLite list a
+folder in 22 ms. A store of your own without `scoped` is held whole.
+
+## Made by the server
+
+`derive: deriveAll()` of `@rebofiles/server/derive` makes what no page made:
+pictures and a placeholder with sharp, a PDF's first page and its text with
+pdf.js, the text of Word documents and text files. Each library is optional,
+imported when first needed.
+
+## Comments, groups, retention
+
+`/entries/:id/comments` (threads, replies, resolved; `onComment` with the
+@ names), shares with `group:<id>` reaching `User.groups`, `retentionDays`,
+legal holds (`PUT /entries/:id/hold`) and `GET /export` of a person.
+
+## Hooks, logs and limits
+
+`onChange` for each thing done, `logger`, `onRequest` (`openTelemetry(meter)`),
+and `limits` by person, by link and by address, a `limiter` of yours for
+more than one process. A version whose parts are those of the one before is
+sent without them (`partHashes`, `copyPart`).
+
 ## Addresses
 
 The bytes are read from addresses the server signs. One to download a file

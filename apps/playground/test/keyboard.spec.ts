@@ -7,7 +7,9 @@ const item = (page: Page, name: string) => page.getByRole('option', { name: new 
 const said = (page: Page) => page.locator('.rf-sr[aria-live]');
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.textContent?.trim() || document.activeElement?.getAttribute('aria-label'));
 
-test('makes folders from the menu, goes into one, uploads, renames, moves and trashes, by keys', async ({ page }) => {
+test('makes folders from the menu, goes into one, uploads, renames, moves and trashes, by keys', async ({ page, browserName }) => {
+  // Safari's Tab, as a Mac has it, goes only to fields and lists; Option+Tab goes to buttons too.
+  const TAB = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
   // A person of its own each time, so it starts from an empty drive however often it runs.
   await page.goto(`/?as=keys-${Date.now()}`);
   await expect(said(page)).toHaveText('My files · 0 items');
@@ -59,14 +61,14 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
   await page.getByRole('listbox').focus();
   await page.keyboard.press('Home');
   const move = page.getByRole('complementary', { name: 'Details' }).getByRole('button', { name: 'Move', exact: true });
-  for (let i = 0; i < 12 && !(await move.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab');
+  for (let i = 0; i < 12 && !(await move.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press(TAB);
   await expect(move).toBeFocused();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   // The folders come once the dialog has asked for them: tabbing before would go round what is there without them.
   await expect(dialog.getByRole('button', { name: 'Archive' })).toBeVisible();
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Archive'; i++) await page.keyboard.press('Tab');
+  for (let i = 0; i < 8 && (await focused(page)) !== 'Archive'; i++) await page.keyboard.press(TAB);
   expect(await focused(page)).toBe('Archive');
   await page.keyboard.press('Enter');
   // Inside Archive, which has no folders, the focus is on what is left to do.

@@ -16,10 +16,12 @@ export {
   type LinkClient,
   type LinkListing,
   type DriveEvent,
+  type Exported,
   RequestError,
   createDriveClient,
   createLinkClient,
   hashOf,
+  hashesOfParts,
   HASH_UP_TO,
 } from './client';
 export { type MemoryOptions, type MemoryClient, createMemoryClient } from './memory';

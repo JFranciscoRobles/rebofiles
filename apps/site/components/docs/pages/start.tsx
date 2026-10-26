@@ -70,7 +70,13 @@ export const index: DocPage = {
               <strong>AI assistants.</strong> Tools for Claude over MCP, with the user’s own rights; Word documents edited through Rebodocs, each change a version.
             </>,
             <>
-              <strong>Keyboard and screen readers</strong>, light and dark, English, Spanish and Mandarin, a screen of settings, and a desktop application.
+              <strong>As it happens.</strong> What someone else changes shows at once; comments with replies and @ names; folders of thousands; the drive read a piece at a time.
+            </>,
+            <>
+              <strong>Kept safe.</strong> Files checked by their bytes and by ClamAV, limits on who asks too often, a minimum of days, legal holds, everything of a person exported.
+            </>,
+            <>
+              <strong>Keyboard and screen readers</strong>, light and dark, English, Spanish and Mandarin, a screen of settings, and a desktop application that keeps a folder in sync.
             </>,
           ]}
         />
@@ -353,7 +359,8 @@ export const demos: DocPage = {
       body: (
         <P>
           Copy <C>apps/storage/.env.example</C> to <C>.env</C>, fill it in, give the bucket the rule of origins in <C>apps/storage/cors.json</C>, then <C>npm run storage:check</C> goes the whole way a
-          file goes from Node before the page tries it. <a href={hrefOf('storage')}>Storage</a> says how.
+          file goes from Node before the page tries it. <a href={hrefOf('storage')}>Storage</a> says how. Everything is on there: <C>?as=bea</C> to share with Bea (in <C>group:team</C>
+          with Carl), links with a password, comments, a PDF’s first page made by the server, files checked, the assistant at <C>/api/mcp</C>.
         </P>
       ),
     },
@@ -365,7 +372,8 @@ export const demos: DocPage = {
       lead: 'The drive in a window of its own, with Tauri, against the playground or any server.',
       body: (
         <P>
-          Rust and Xcode’s command-line tools on a Mac. <C>npm run build:desktop</C> makes ReboFiles.app. <a href={hrefOf('desktop')}>Desktop and other origins</a> says what the server needs.
+          Rust and Xcode’s command-line tools on a Mac. <C>npm run build:desktop</C> makes ReboFiles.app; <strong>Server → Sync a Folder…</strong> keeps a folder of the computer as the drive (
+          <a href={hrefOf('sync')}>Sync a folder</a>). <a href={hrefOf('desktop')}>Desktop and other origins</a> says what the server needs.
         </P>
       ),
     },

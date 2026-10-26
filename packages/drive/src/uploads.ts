@@ -60,7 +60,7 @@ export interface UploadsOptions {
   /** How many files go at once; each goes in parts, a few at once too. 3 unless said. */
   parallel?: number;
   /** What every upload is given besides: the drive's settings of pictures, what makes them, what reads its text. */
-  extra?: () => Pick<UploadOptions, 'images' | 'renditions' | 'text'>;
+  extra?: (file: File) => Pick<UploadOptions, 'images' | 'renditions' | 'text' | 'madeHere'>;
   /** Called after every change, for what shows them to draw again. */
   onChange: () => void;
   /** Called with each file once it is up. */
@@ -163,7 +163,7 @@ export function createUploads(client: DriveClient, options: UploadsOptions): Upl
         file: replacing,
         sha256: hashes.get(id),
         signal: stop.signal,
-        ...options.extra?.(),
+        ...options.extra?.(file),
         onProgress: ({ sent, size }) => {
           const last = pace.get(id)!;
           const at = now();

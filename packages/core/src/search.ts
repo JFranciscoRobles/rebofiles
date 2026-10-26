@@ -13,7 +13,9 @@ export interface SearchOptions {
   limit?: number;
 }
 
-const fold = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+/** A text as names are compared in a search: without case or accents. */
+export const foldText = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const fold = foldText;
 
 export function search(drive: Drive, query: string, options: SearchOptions = {}): Entry[] {
   const words = fold(query).split(/\s+/).filter(Boolean);

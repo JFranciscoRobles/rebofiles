@@ -87,6 +87,18 @@ export const CSS = `
 .rf-nav { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 0; border-radius: 999px; background: none; text-align: left; color: var(--rf-ink-soft); }
 .rf-nav:hover { background: var(--rf-hover); }
 .rf-nav[aria-current='true'] { background: var(--rf-brand-light); color: var(--rf-brand); font-weight: 600; }
+.rf-comments { display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+.rf-comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rf-comment { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--rf-surface); }
+.rf-comment p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--rf-ink); }
+.rf-comment.rf-reply { margin-left: 18px; }
+.rf-comment.rf-resolved p { color: var(--rf-ink-soft); }
+.rf-comment-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rf-comment-head small { color: var(--rf-ink-soft); }
+.rf-comment-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.rf-comment-new, .rf-comment-edit { display: flex; flex-direction: column; gap: 8px; }
+.rf-comments textarea { font: inherit; resize: vertical; min-height: 64px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--rf-border); background: var(--rf-bg); color: var(--rf-ink); }
+.rf-comments textarea:focus-visible { outline: 3px solid var(--rf-focus); outline-offset: 1px; }
 .rf-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
 .rf-activity li { display: flex; flex-direction: column; gap: 2px; }
 .rf-activity small { color: var(--rf-ink-soft); }
@@ -391,8 +403,6 @@ ${Object.keys(FOLDERS)
 .rf-view-cut { text-align: center; color: #a9a69f; font-size: 13px; margin: 14px 0 0; }
 .rf-view-pages { position: relative; padding: 0; background: #2a2926; }
 /* Rebodocs' bar of the zoom, floating at the foot of the pages. */
-.rf-doc-zoom { position: sticky; bottom: 14px; z-index: 3; display: flex; justify-content: center; pointer-events: none; margin-top: -52px; height: 52px; align-items: center; }
-.rf-doc-zoom .dx-sb { background: none; border: 0; box-shadow: none; }
 /* Only read: no caret, though the bar gives the editor the keyboard back. */
 .rf-view-pages .dx-caret { display: none !important; }
 @media (max-width: 700px) {

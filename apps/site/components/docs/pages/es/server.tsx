@@ -6,6 +6,8 @@ import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
 import { AUTHORIZE, CORS, ENV, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { GROUPS_CODE } from '../team';
+import { SCALE_NUMBERS_ES } from '../team';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/server.tsx';
@@ -145,6 +147,22 @@ export const authorize: DocPage = {
         <Trouble says="Sign in first. · You may not do that here.">
           401 es <C>identify</C> devolviendo null; 403 es <C>authorize</C> devolviendo false.
         </Trouble>
+      ),
+    },
+    {
+      id: 'groups',
+      title: 'Grupos',
+      badge: 'Equipos',
+      color: 'green',
+      body: (
+        <>
+          <Code code={GROUPS_CODE} />
+          <P>
+            Una compartición nombra a alguien por su id, a todos los que inician sesión como <C>*</C>, o a un grupo como <C>group:&lt;id&gt;</C>. Quién está en un grupo es cosa de tu aplicación, dicho
+            por <C>identify</C> con cada persona: el drive no guarda listas de miembros, así que quien entra o sale de un equipo en tu aplicación tiene, o deja de tener, lo que se le dio en su
+            siguiente petición. En el diálogo de compartir, <C>group:sales</C> se escribe como un id; Compartido conmigo muestra lo que se le dio a un grupo suyo.
+          </P>
+        </>
       ),
     },
   ],
@@ -295,6 +313,26 @@ export const metadata: DocPage = {
           <C>MetadataStore</C> es <C>load()</C> y <C>save(changes)</C>; <C>revision</C>, <C>lock</C>, los ajustes, <C>record</C>/<C>activity</C> y <C>keepText</C>/<C>findText</C> son opcionales, y sin
           ellos el servidor guarda eso en el proceso. <a href={to('schema')}>Esquema de la base de datos</a> tiene todas las tablas.
         </P>
+      ),
+    },
+    {
+      id: 'a-piece-at-a-time',
+      title: 'Por partes',
+      badge: 'Escala',
+      color: 'purple',
+      body: (
+        <>
+          <P>
+            SQLite, Postgres y el store en memoria responden lo que cada petición necesita, y nada más: una entrada y las carpetas sobre ella, lo que hay en una carpeta, lo que hay bajo otra, una
+            búsqueda por nombre, la papelera, lo compartido con alguien. El drive nunca se carga entero, y un cambio escribe solo lo que tocó. Lo que cambió otro proceso se lee de la actividad que
+            guardan.
+          </P>
+          <Table label="Medido en SQLite, doscientas mil entradas" columns={['Cien personas, dos mil archivos cada una', 'Tardó']} code={[]} rows={SCALE_NUMBERS_ES} />
+          <P>
+            Las columnas y tablas por las que se pregunta se añaden a una base hecha antes de ellas la primera vez que se abre, y las filas se rellenan una vez. Un store propio hace lo mismo con{' '}
+            <C>scoped</C>; sin él, se guarda entero en memoria, como antes.
+          </P>
+        </>
       ),
     },
   ],

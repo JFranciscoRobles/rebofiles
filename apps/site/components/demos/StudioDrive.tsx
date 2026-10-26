@@ -1820,8 +1820,6 @@ const CSS = `
 .st-viewer-body iframe{width:min(920px,100%);height:100%;border:0;border-radius:6px;background:#fff}
 .st-docx{width:min(960px,100%);height:100%;overflow:auto;border-radius:6px;background:#2a2a2a;position:relative}
 /* Rebodocs' bar of the zoom, floating over the pages, as the included drive has it. */
-.rf-doc-zoom { position: sticky; bottom: 14px; z-index: 3; display: flex; justify-content: center; pointer-events: none; margin-top: -52px; height: 52px; align-items: center; }
-.rf-doc-zoom .dx-sb { background: none; border: 0; box-shadow: none; }
 .st-docx .dx-caret { display: none !important; }
 .st-code{width:min(980px,100%);height:100%;overflow:auto;padding:18px 22px;border:1px solid #333;border-radius:10px;background:#1f1f1f;color:#ececec}
 .st-code pre{margin:0;font:13px/1.65 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}

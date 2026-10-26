@@ -157,6 +157,25 @@ export function s3Storage(options: S3Options): Storage {
       });
     },
 
+    async copyPart(from, to, state, part) {
+      const [uploadId] = state.split('\n');
+      if (!uploadId) throw new Error('A file of one part is not copied a part at a time.');
+      const source = `/${options.bucket}/${encodeURI((options.prefix ?? '') + from)}`;
+      const answer = await ask('PUT', at(to, { partNumber: String(part.number), uploadId }), undefined, {
+        'x-amz-copy-source': source,
+        'x-amz-copy-source-range': `bytes=${part.from}-${part.to - 1}`,
+      });
+      // As finishing, it can answer 200 and say in the body that it failed.
+      const text = await answer.text();
+      if (answer.status === 404 || /<Error>/.test(text)) throw new Error(`The bucket did not copy part ${part.number}: ${text.slice(0, 300)}`);
+    },
+
+    async write(key, bytes, type) {
+      const url = presign(credentials, { method: 'PUT', url: at(key), expires: 60, headers: { 'content-type': type, 'content-length': String(bytes.length) } });
+      const answer = await send(url, { method: 'PUT', body: bytes as Uint8Array<ArrayBuffer>, headers: { 'content-type': type } });
+      if (!answer.ok) throw new Error(`The bucket answered ${answer.status} to a PUT: ${(await answer.text()).slice(0, 300)}`);
+    },
+
     async read(key, range) {
       const answer = await ask('GET', at(key), undefined, range ? { range: `bytes=${range.from}-${range.to - 1}` } : {});
       if (answer.status === 404) throw new Error(`The bucket has nothing at ${key}.`);

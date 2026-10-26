@@ -3,16 +3,9 @@
 // finishes and deletes. A storage that cannot be reached from a browser, as
 // a folder of the disk, serves those addresses itself (`serve`).
 
-const MiB = 1024 * 1024;
+import { MAX_PARTS, PART_SIZE, partSizeOf, partsOf } from '@rebofiles/core';
 
-/** How many bytes go in each part of an upload: S3 takes parts of 5 MiB at least, but for the last. */
-export const PART_SIZE = 8 * MiB;
-
-/** The most parts S3 puts together into one object. */
-export const MAX_PARTS = 10_000;
-
-/** The bytes of each part of a file of `size`: PART_SIZE, or more, in whole MiB, for a file that would need more than MAX_PARTS. */
-export const partSizeOf = (size: number): number => Math.max(PART_SIZE, Math.ceil(size / MAX_PARTS / MiB) * MiB);
+export { MAX_PARTS, PART_SIZE, partSizeOf, partsOf };
 
 export interface UploadPart {
   number: number;
@@ -85,21 +78,21 @@ export interface Storage {
    * a file once it arrived. Without it, there is no `inspect`.
    */
   read?(key: string, range?: { from: number; to: number }): Promise<Uint8Array>;
+  /** Bytes put under `key` by the server itself: the pictures and what it makes of a file (`derive`). Without it, nothing is made. */
+  write?(key: string, bytes: Uint8Array, type: string): Promise<void>;
   /**
    * Uploads started before `before` and neither finished nor given up, taken away: a page closed halfway leaves its
    * parts, which cost space and are listed nowhere. How many there were. The server calls it now and then.
    */
   sweepUploads?(before: Date): Promise<number>;
+  /**
+   * A part of an upload in parts made of the same bytes of what is kept under `from`, in the storage, without them
+   * passing through the server or the page: S3's UploadPartCopy, a copy on the disk. For a new version whose parts are
+   * those of the one before but some. Without it, every part is sent.
+   */
+  copyPart?(from: string, to: string, state: string, part: { number: number; from: number; to: number }): Promise<void>;
   /** The requests to addresses of its own, for a storage the browser cannot reach; undefined for any other. */
   serve?(request: Request, path: string): Promise<Response | undefined>;
-}
-
-/** The parts of a file of `size` bytes: one for a small file, as a part of its own costs a request. */
-export function partsOf(size: number): { number: number; from: number; to: number }[] {
-  const parts = [];
-  const each = partSizeOf(size);
-  for (let from = 0, number = 1; from < size || number === 1; from += each, number++) parts.push({ number, from, to: Math.min(size, from + each) });
-  return parts;
 }
 
 /** `Content-Disposition` for a download, with a name in any language; `inline` for a preview. */

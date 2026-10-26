@@ -30,6 +30,8 @@ export interface DriveSettings {
   quota: number | null;
   /** After how many days what is in the trash is deleted for good; null for never. */
   trashDays: number | null;
+  /** How many days since a file or folder was made before it may be deleted for good, by anyone or by the trash; null for no minimum. */
+  retentionDays: number | null;
 }
 
 /** What a person changes for themselves; what they leave out is the drive's. */
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: DriveSettings = {
   images: { sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.82, enabled: true },
   quota: null,
   trashDays: null,
+  retentionDays: null,
 };
 
 const refuse = (message: string): never => {
@@ -81,6 +84,9 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
   if (quota !== null && !(Number.isSafeInteger(quota) && quota >= 1024 * 1024)) refuse('"quota" must be a number of bytes, a megabyte or more, or null for no limit.');
   const trashDays = given.trashDays === undefined ? over.trashDays : given.trashDays === null ? null : Number(given.trashDays);
   if (trashDays !== null && !(Number.isInteger(trashDays) && trashDays >= 1 && trashDays <= 3650)) refuse('"trashDays" must be a number of days from 1 to 3650, or null for never.');
+  const retentionDays = given.retentionDays === undefined ? (over.retentionDays ?? null) : given.retentionDays === null ? null : Number(given.retentionDays);
+  if (retentionDays !== null && !(Number.isInteger(retentionDays) && retentionDays >= 1 && retentionDays <= 36500))
+    refuse('"retentionDays" must be a number of days from 1 to 36500, or null for no minimum.');
   return {
     language: oneOf(given.language, LANGUAGES, '"language"') ?? over.language,
     theme: oneOf(given.theme, THEMES, '"theme"') ?? over.theme,
@@ -93,6 +99,7 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
     },
     quota,
     trashDays,
+    retentionDays,
   };
 }
 

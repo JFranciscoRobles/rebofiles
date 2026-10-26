@@ -5,7 +5,23 @@
 
 import type { Drive, Entry, EntryId, Role } from './model';
 
-export type ActivityAction = 'created' | 'uploaded' | 'version' | 'renamed' | 'moved' | 'trashed' | 'restored' | 'deleted' | 'shared' | 'unshared' | 'linked' | 'unlinked' | 'colored';
+export type ActivityAction =
+  | 'created'
+  | 'uploaded'
+  | 'version'
+  | 'renamed'
+  | 'moved'
+  | 'trashed'
+  | 'restored'
+  | 'deleted'
+  | 'shared'
+  | 'unshared'
+  | 'linked'
+  | 'unlinked'
+  | 'colored'
+  | 'commented'
+  | 'held'
+  | 'released';
 
 export interface Activity {
   /** ISO 8601. */
@@ -43,6 +59,8 @@ export function activityOf(before: Drive, after: Drive, by: string, at: string):
     if (was.name !== now.name) line(now, 'renamed', { was: was.name });
     if (was.parent !== now.parent) line(now, 'moved', { from: was.parent });
     if (was.kind === 'folder' && now.kind === 'folder' && was.color !== now.color) line(now, 'colored');
+    if (!was.hold && now.hold) line(now, 'held');
+    if (was.hold && !now.hold) line(now, 'released');
     if (!was.trashed && now.trashed) line(now, 'trashed');
     if (was.trashed && !now.trashed) line(now, 'restored');
     if (was.kind === 'file' && now.kind === 'file' && now.versions[0].id !== was.versions[0].id) line(now, 'version');

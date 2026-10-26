@@ -71,6 +71,7 @@ export const HOOKS: Hook[] = [
     gives: '`uploads`, `summary`, `upload`, `retry`, `stop`, `stopAll`, `decide`, `dismiss`, `clear`; `{ check: true }` to ask about what is there already.',
   },
   { name: 'useSettings', short: 'The drive’s settings and the person’s own.', gives: '`settings`, `drive`, `mine`, `canConfigure`, `save`, `saveMine`.' },
+  { name: 'useComments', short: 'What is said of an entry, and saying more.', gives: '`comments`, `loading`, `error`, `add`, `edit`, `resolve`, `remove`.' },
   { name: 'useDrive', short: 'The provider itself.', gives: '`client`, `t`, `locale`, `changed()`: every route as a function, and the drive’s words.' },
 ];
 
@@ -78,7 +79,7 @@ export interface Method {
   name: string;
   signature: string;
   does: string;
-  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live';
+  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live' | 'Comments' | 'Keeping';
 }
 
 /** The client of the routes, `createDriveClient({ base })`, and what `createMemoryClient` answers the same way. */
@@ -120,6 +121,14 @@ export const CLIENT: Method[] = [
   { group: 'Settings', name: 'settings', signature: 'settings()', does: 'The drive’s settings, one’s own, and whether one may change the drive’s.' },
   { group: 'Settings', name: 'saveSettings', signature: 'saveSettings(settings)', does: 'The drive’s, for whoever may configure it.' },
   { group: 'Settings', name: 'saveMySettings', signature: 'saveMySettings(mine)', does: 'One’s own language and theme.' },
+  { group: 'Comments', name: 'comments', signature: 'comments(id)', does: 'What is said of an entry, each thread with its replies under it.' },
+  { group: 'Comments', name: 'addComment', signature: 'addComment(id, text, replyTo?)', does: 'A comment, or a reply under one; whom it names with @ are told.' },
+  { group: 'Comments', name: 'editComment', signature: 'editComment(id, comment, text)', does: 'What one’s own comment says.' },
+  { group: 'Comments', name: 'resolveComment', signature: 'resolveComment(id, comment, resolved?)', does: 'A thread dealt with, or open again.' },
+  { group: 'Comments', name: 'removeComment', signature: 'removeComment(id, comment)', does: 'Taken back, with its replies: by its author, or the owner.' },
+  { group: 'Keeping', name: 'hold', signature: 'hold(id, reason?)', does: 'A legal hold: neither it nor what is in it trashed or deleted until released. For who may configure.' },
+  { group: 'Keeping', name: 'release', signature: 'release(id)', does: 'The hold taken off.' },
+  { group: 'Keeping', name: 'exportPerson', signature: 'exportPerson(user?)', does: 'Everything of a person, for a .zip: what they own, said and did.' },
   {
     group: 'Live',
     name: 'watch',
@@ -157,6 +166,14 @@ export const SERVER_OPTIONS: ServerOption[] = [
     does: 'Asked once the bytes arrived, before the file is listed, with a `read` of them: `checkType()`, `clamav()`, or yours. A refusal takes the bytes away.',
   },
   { name: 'live', type: 'false | { poll }', does: 'Changes told at `/events` as they happen; those of another process on the same store within `poll` ms (2000). `false` for none.' },
+  { name: 'derive', type: 'Derive', does: 'What the server makes of a file once kept, for what the page did not: pictures, a placeholder, its text. `deriveAll()` of `@rebofiles/server/derive`.' },
+  { name: 'onChange', type: '({ activity, entry }) => void', does: 'Each thing done to the drive, as its activity says it: for webhooks, an audit, another index, counting space.' },
+  { name: 'onComment', type: '({ comment, entry, mentions, by }) => void', does: 'Each comment made, with whom it names with an @: to tell them.' },
+  { name: 'logger', type: 'Logger', does: 'Where what went wrong and was not answered for is written: `pino()`, `console` unless given.' },
+  { name: 'onRequest', type: '(done) => void', does: 'After every request, its route, status, time and who: for metrics, as `openTelemetry(meter)`.' },
+  { name: 'limits', type: 'Limits | false', does: 'How many uploads, archives, text searches, wrong passwords of a link and requests each may make; a 429 past them.' },
+  { name: 'limiter', type: 'Limiter', does: 'Where the counts of `limits` are kept: in the process unless given; Redis for more than one.' },
+  { name: 'clientIp', type: '(request) => string', does: 'The address of who asks, to count wrong passwords of a link by it too.' },
   { name: 'now', type: '() => Date', does: 'The clock, for tests.' },
   { name: 'newId', type: '() => string', does: 'The ids of new entries; random UUIDs unless given.' },
 ];
@@ -221,6 +238,8 @@ export const PACKAGE_DOCS: PackageDoc[] = [
       'checkType',
       'clamav',
       'Refused',
+      'openTelemetry',
+      'deriveAll',
     ],
   },
   {

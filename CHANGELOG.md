@@ -8,6 +8,39 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Added
 
+- **The drive a piece at a time.** SQLite, Postgres and the store in memory
+  answer what each request needs (`scoped` of a store: an entry and the
+  folders above it, what is in a folder, a search, the trash…), and the drive
+  is never loaded whole: two hundred thousand entries listed in milliseconds.
+  The columns and tables they are asked by are added to a database made before
+  them, and filled once. What another process changed is told from the
+  activity the store keeps (`activityAfter`).
+- **Pictures and text made by the server** (`derive`, and `deriveAll()` of
+  `@rebofiles/server/derive`): the smaller pictures and placeholder of a
+  picture with sharp, a PDF's first page and its text with pdf.js, the text of
+  a Word document and of a text, for what the page did not make (it says what
+  it made, `madeHere`). PDFs now show their first page in the grid and the
+  list, and are found by their words. A storage may `write`.
+- **Only what changed is sent.** A version keeps the SHA-256 of its parts
+  (`partHashes`), and the parts a new one shares with it are copied in the
+  storage (`copyPart`: S3's UploadPartCopy, a copy on the disk). The sync
+  sends so.
+- **Comments.** Threads with replies, resolved, edited and taken back, in the
+  details of the drive, with `useComments`, the client, and the assistant's
+  `list_comments` and `add_comment`; `onComment` with whom a comment names
+  with an @. The role of commenter now has something to do.
+- **Groups.** What is shared with `group:<id>` is shared with whoever
+  `identify` says is in it (`User.groups`).
+- **Retention, holds and export.** `retentionDays` keeps everything made a
+  minimum of days; a legal hold (`PUT /entries/:id/hold`) keeps a folder from
+  the trash and from being deleted; `GET /export` and **Download my data**
+  give a person everything of theirs.
+- **The server says of itself**: `onChange` for each thing done, a `logger`,
+  `onRequest` and `openTelemetry(meter)`, and `limits` of requests by person,
+  by link and by address, with a `limiter` of one's own for many processes.
+- **WebKit and Firefox** in the tests and the workflow; in WebKit, Escape and
+  the focus as Safari leaves them, after a click.
+
 - **Changes as they happen.** `GET /events` of the server, a stream of
   server-sent events: each change told to each one watching as far as they
   may see it, the folders they may list and the entries they may read; one of
@@ -396,6 +429,12 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Changed
 
+- **Word documents in Rebodocs' viewer.** `viewDocx`, `thumbDocx` and
+  `pictureOfDocx` are those of `@rebodocs/viewer` (0.12), which grew out of
+  them: the optional peer of `@rebofiles/drive/rebodocs` is now
+  `@rebodocs/viewer` in the place of `@rebodocs/editor`, and every peer on
+  Rebodocs asks for 0.12.0 or later. `pageWidthToFit` is no longer exported:
+  it is the viewer's. The bar over the pages has the class `dx-viewer-bar`.
 - `nodeHandler` takes the path from `originalUrl` when there is one, so
   `app.use('/api/files', …)` of Express works as it reads; and ends an
   answer that goes on (the events) when the page is gone.

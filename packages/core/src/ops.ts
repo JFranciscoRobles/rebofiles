@@ -6,7 +6,7 @@
 // upload, a restore from the trash) is made free with "(2)".
 
 import { DriveError } from './errors';
-import { type Context, type Drive, type Entry, type EntryId, FOLDER_COLORS, type FileEntry, type FolderColor, type FolderEntry, type Version } from './model';
+import { type Context, type Drive, type Entry, type EntryId, FOLDER_COLORS, type FileEntry, type FolderColor, type FolderEntry, type PartHashes, type Version } from './model';
 import { checkName, takenBy, uniqueName } from './names';
 import { getEntry, getFolder, isTrashed, isWithin, subtree, trash } from './tree';
 
@@ -65,7 +65,7 @@ export function createFolder(drive: Drive, folder: NewFolder, context: Context):
 export interface NewFile extends NewFolder {
   type: string;
   /** Its first version: where the bytes were put, and how many. */
-  version: { id: string; key: string; size: number; sha256?: string };
+  version: { id: string; key: string; size: number; sha256?: string; parts?: PartHashes };
 }
 
 /** A file uploaded. Its name is made free with "(2)", as a second upload of the same file should not replace the first. */
@@ -116,6 +116,7 @@ export function move(drive: Drive, id: EntryId, to: EntryId | null, context: Con
 export function moveToTrash(drive: Drive, id: EntryId, context: Context): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is already in the trash`);
+  refuseHeld(drive, id);
   return put(drive, { ...entry, trashed: { at: context.at, by: context.by } });
 }
 
@@ -141,18 +142,60 @@ export interface Removed {
 }
 
 /** Gone for good, with what is inside it. Only from the trash: deleting is putting there first. */
-export function deleteForever(drive: Drive, id: EntryId): Removed {
+export function deleteForever(drive: Drive, id: EntryId, keep: Keep = {}): Removed {
   const entry = getEntry(drive, id);
   if (!entry.trashed) throw new DriveError('not-in-trash', `${entry.name} is not in the trash`);
+  refuseHeld(drive, id);
+  const kept = subtree(drive, id).find((inside) => retained(inside, keep));
+  if (kept) throw new DriveError('retained', `${kept.name} is kept until ${retainedUntil(kept, keep.days!)}`);
   return remove(drive, subtree(drive, id));
 }
 
-/** What has been in the trash since before `before` (ISO 8601) gone for good, with what is in it: the trash emptying itself. */
-export function purgeTrash(drive: Drive, before: string): Removed {
+/** What the rules of keeping ask: no entry deleted for good before `days` since it was made, as of `now`. */
+export interface Keep {
+  days?: number | null;
+  now?: string;
+}
+/** Until when an entry is kept by a rule of `days`: that many days after it was made. */
+export const retainedUntil = (entry: Entry, days: number) => new Date(Date.parse(entry.created) + days * 86_400_000).toISOString();
+const retained = (entry: Entry, keep: Keep) => Boolean(keep.days && keep.now && retainedUntil(entry, keep.days) > keep.now);
+
+/** Whether an entry, or a folder it is in, or anything inside it, is on hold: neither trashed nor deleted then. */
+export function heldBy(drive: Drive, id: EntryId): Entry | null {
+  for (let at: EntryId | null = id; at !== null; ) {
+    const entry = getEntry(drive, at);
+    if (entry.hold) return entry;
+    at = entry.parent;
+  }
+  return subtree(drive, id).find((inside) => inside.hold) ?? null;
+}
+const refuseHeld = (drive: Drive, id: EntryId) => {
+  const held = heldBy(drive, id);
+  if (held) throw new DriveError('on-hold', `${held.name} is on hold`);
+};
+
+/** An entry put on hold, or released from it with null: what it is and what is inside it may not be trashed or deleted meanwhile. */
+export function setHold(drive: Drive, id: EntryId, hold: { reason?: string } | null, context: Context): Drive {
+  const entry = getEntry(drive, id);
+  if (!hold) {
+    if (!entry.hold) return drive;
+    const { hold: _, ...rest } = entry;
+    return put(drive, rest as Entry);
+  }
+  const reason = typeof hold.reason === 'string' && hold.reason.trim() ? hold.reason.trim().slice(0, 500) : undefined;
+  return put(drive, { ...entry, hold: { by: context.by, at: context.at, ...(reason ? { reason } : {}) } });
+}
+
+/** Each entry in the trash that may go for good: neither on hold nor kept by the rule of days, nor with anything inside it that is. */
+const goes = (drive: Drive, keep: Keep) => (entry: Entry) => !heldBy(drive, entry.id) && !subtree(drive, entry.id).some((inside) => retained(inside, keep));
+
+/** What has been in the trash since before `before` (ISO 8601) gone for good, with what is in it: the trash emptying itself. What is kept stays. */
+export function purgeTrash(drive: Drive, before: string, keep: Keep = {}): Removed {
   return remove(
     drive,
     trash(drive)
       .filter((entry) => entry.trashed!.at < before)
+      .filter(goes(drive, keep))
       .flatMap((entry) => subtree(drive, entry.id)),
   );
 }
@@ -175,10 +218,12 @@ export function usageOf(drive: Drive, owner: string): number {
 }
 
 /** Everything in the trash gone for good; with `user`, what is in their trash (see `trash`). */
-export function emptyTrash(drive: Drive, user?: string): Removed {
+export function emptyTrash(drive: Drive, user?: string, keep: Keep = {}): Removed {
   return remove(
     drive,
-    trash(drive, user).flatMap((entry) => subtree(drive, entry.id)),
+    trash(drive, user)
+      .filter(goes(drive, keep))
+      .flatMap((entry) => subtree(drive, entry.id)),
   );
 }
 

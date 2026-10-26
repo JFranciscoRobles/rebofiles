@@ -27,7 +27,7 @@ describe('pages of other origins', () => {
     expect(listed.status).toBe(200);
     expect(listed.headers.get('access-control-allow-origin')).toBe('tauri://localhost');
     expect(listed.headers.get('access-control-allow-credentials')).toBe('true');
-    expect(listed.headers.get('access-control-expose-headers')).toBe('ETag');
+    expect(listed.headers.get('access-control-expose-headers')).toBe('ETag, Retry-After');
     expect(await listed.json()).toMatchObject({ entries: [] });
   });
 

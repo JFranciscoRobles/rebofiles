@@ -15,7 +15,7 @@ async function axe(page: Page) {
   return violations.map((v) => `${v.id} (${v.impact}): ${v.help} · ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
 
-test('each kind shown in the viewer, the arrows going through them, no tab opened', async ({ page }) => {
+test('each kind shown in the viewer, the arrows going through them, no tab opened', async ({ page, browserName }) => {
   await page.goto('/?as=viewer');
   // Popups of the drive's page: axe opens a page of its own, which is not one.
   const tabs: string[] = [];
@@ -45,8 +45,8 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
       const found = (await (await page.request.get('/api/files/search?q=agreement', { headers: { 'x-user': 'viewer' } })).json()).entries[0];
       return found.versions[0].renditions?.map((r: { type: string }) => r.type);
     })
-    // WebP, which keeps the text of a page sharper and lighter than JPEG.
-    .toEqual(['image/webp', 'image/webp']);
+    // WebP, which keeps the text of a page sharper and lighter than JPEG; JPEG where the browser makes no WebP, as Safari.
+    .toEqual(browserName === 'webkit' ? ['image/jpeg', 'image/jpeg'] : ['image/webp', 'image/webp']);
   await item(page, 'a-agreement.docx').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).locator('img.rf-doc-pic')).toBeVisible();
   await page.getByRole('button', { name: 'Grid' }).click();
@@ -93,7 +93,7 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   expect(await page.evaluate(() => (window as unknown as { printed: number }).printed)).toBe(1);
   await expect(page.locator('body > .dx-print .dx-print-page')).toHaveCount(1);
   // One page under another at first; Rebodocs' bar floating over them sets all of them out, and zooms.
-  const bar = docx.locator('.rf-doc-zoom');
+  const bar = docx.locator('.dx-viewer-bar');
   await expect(bar.locator('[data-name="column"]')).toHaveClass(/dx-on/);
   await expect(bar.getByText('Page 1 of 1')).toBeVisible();
   await expect(bar.locator('[data-name="notes"], [data-name="flow"]')).toHaveCount(0);

@@ -47,6 +47,9 @@ const STATUS: Record<DriveErrorCode, number> = {
   'invalid-share': 400,
   'invalid-settings': 400,
   'invalid-color': 400,
+  'invalid-comment': 400,
+  'on-hold': 409,
+  retained: 409,
 };
 
 export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
@@ -68,6 +71,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     }
   };
   const lines: core.Activity[] = [];
+  const said = new Map<string, core.Comment>();
   // Those watching, told of every change as the server tells them: where it was, and what changed.
   const watchers = new Set<(event: DriveEvent) => void>();
   const tell = (before: Drive, after: Drive, by: string) => {
@@ -116,7 +120,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       how.onState?.(true);
       return () => watchers.delete(onChange);
     },
-    settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved }),
+    settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved, you: user }),
     saveSettings: (given) =>
       run(() => {
         saved = true;
@@ -167,7 +171,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     restore: (entryId) => change((current) => one(core.restore(current, entryId, context()), entryId)),
     deleteForever: async (entryId) => {
       const removed = await change((current) => {
-        const gone = core.deleteForever(current, entryId);
+        const gone = core.deleteForever(current, entryId, { days: settings.retentionDays, now: context().at });
         return { drive: gone.drive, answer: gone };
       });
       forget(removed.keys);
@@ -175,12 +179,64 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     },
     emptyTrash: async () => {
       const removed = await change((current) => {
-        const gone = core.emptyTrash(current, options.top === 'everyone' ? undefined : user);
+        const gone = core.emptyTrash(current, options.top === 'everyone' ? undefined : user, { days: settings.retentionDays, now: context().at });
         return { drive: gone.drive, answer: gone };
       });
       forget(removed.keys);
       return removed.removed;
     },
+    comments: async (entryId) => run(() => (core.getEntry(drive, entryId), core.threads([...said.values()].filter((c) => c.entry === entryId)))),
+    addComment: (entryId, text, replyTo) =>
+      run(() => {
+        const entry = core.getEntry(drive, entryId);
+        const to = replyTo ? said.get(replyTo) : undefined;
+        if (replyTo && to?.entry !== entryId) throw new RequestError(404, 'no-comment', 'There is no such comment here.');
+        const comment: core.Comment = { id: id(), entry: entryId, by: user, at: context().at, text: core.commentText(text), ...(to ? { replyTo: to.replyTo ?? to.id } : {}) };
+        said.set(comment.id, comment);
+        lines.push({ at: comment.at, by: user, action: 'commented', entry: entry.id, name: entry.name, kind: entry.kind, parent: entry.parent });
+        return comment;
+      }),
+    editComment: (_entryId, commentId, text) =>
+      run(() => {
+        const comment = said.get(commentId);
+        if (!comment) throw new RequestError(404, 'no-comment', 'There is no such comment here.');
+        const next = { ...comment, text: core.commentText(text), edited: context().at };
+        said.set(commentId, next);
+        return next;
+      }),
+    resolveComment: (_entryId, commentId, resolved = true) =>
+      run(() => {
+        const comment = said.get(commentId);
+        if (!comment) throw new RequestError(404, 'no-comment', 'There is no such comment here.');
+        const { resolved: _, ...rest } = comment;
+        const next: core.Comment = resolved ? { ...rest, resolved: { by: user, at: context().at } } : rest;
+        said.set(commentId, next);
+        return next;
+      }),
+    removeComment: async (_entryId, commentId) => {
+      for (const comment of [...said.values()]) if (comment.id === commentId || comment.replyTo === commentId) said.delete(comment.id);
+    },
+    hold: (entryId, reason) => change((current) => one(core.setHold(current, entryId, { reason }, context()), entryId)),
+    release: (entryId) => change((current) => one(core.setHold(current, entryId, null, context()), entryId)),
+    exportPerson: async () =>
+      run(() => {
+        const owned = [...drive.entries.values()].filter((entry) => entry.owner === user);
+        const tops = owned.filter((entry) => entry.parent === null || drive.entries.get(entry.parent)?.owner !== user);
+        return {
+          person: user,
+          at: context().at,
+          pack: core.packOf(
+            drive,
+            tops.map((entry) => entry.id),
+            (entry) => entry.owner === user,
+          ),
+          entries: owned,
+          shared: core.sharedWith(drive, user).map((entry) => entry.id),
+          comments: [...said.values()].filter((c) => c.by === user),
+          activity: lines.filter((a) => a.by === user).reverse(),
+          settings: mine,
+        };
+      }),
     share: (entryId, who, role) => change((current) => one(core.share(current, entryId, who, role, context()), entryId)),
     unshare: (entryId, who) => change((current) => one(core.unshare(current, entryId, who), entryId)),
     // No server to sign it: a link's token is its id, and nothing outside the page reads it.

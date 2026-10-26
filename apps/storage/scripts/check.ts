@@ -1,14 +1,17 @@
 // `npm run storage:check`: the whole way a file goes, against the bucket of
 // `.env`, from Node, so a bucket that refuses something says so here and not
 // in a page. A small file in one PUT, a large one in parts, each read back
-// and compared byte for byte, a new version, an upload given up, and
-// everything deleted again, in one request.
+// and compared byte for byte, a new version, an upload given up; a version
+// sent with only its part that changed, a PDF made a picture by the server, a
+// program refused, the uploads left halfway swept; and everything deleted
+// again, in one request.
 //
 // A page asks more of the bucket than this: its rule of origins (`cors.json`).
 // Node sends no origin, so that is tried in the page, with `npm run storage`.
 
 import { createDriveClient } from '@rebofiles/react';
 import { PART_SIZE } from '@rebofiles/server';
+import type { FileEntry } from '@rebofiles/core';
 import { handle, storage } from '../server/bucket';
 
 const origin = 'http://storage.check';
@@ -17,6 +20,28 @@ const drive = createDriveClient({
   // The routes answered here, in this process; the bucket over the network, as a browser would reach it.
   fetch: (input, init) => (String(input).startsWith(origin) ? handle(new Request(String(input), init)) : fetch(input, init)),
 });
+
+/** A PDF of one page with a line of text, written by hand. */
+function onePagePdf(line: string): Uint8Array {
+  const stream = `BT /F1 24 Tf 72 720 Td (${line}) Tj ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((object, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return new TextEncoder().encode(out);
+}
 
 const bytesOf = (size: number, seed: number) => Uint8Array.from({ length: size }, (_, i) => (i * 31 + seed) % 251);
 const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -101,6 +126,52 @@ await step('an upload in parts cut, gone on with from what the bucket lists, and
   }
   const { entry } = (await route('/uploads/finish', { token: started.token, parts })) as { entry: { id: string } };
   await readBack(entry.id, bytes);
+});
+
+await step('a new version of a file in parts, only its part that changed sent, the rest copied in the bucket', async () => {
+  const sent: number[] = [];
+  const counting = createDriveClient({
+    base: `${origin}/api/files`,
+    fetch: (input, init) => {
+      if (init?.method === 'PUT' && init.body) sent.push((init.body as Blob).size);
+      return String(input).startsWith(origin) ? handle(new Request(String(input), init)) : fetch(input, init);
+    },
+  });
+  const first = bytesOf(3 * PART_SIZE + 99, 7);
+  const file = await counting.upload(new File([first], 'delta.bin'), { parent: folder.id, partHashes: true });
+  const second = first.slice();
+  second.fill(9, PART_SIZE + 10, PART_SIZE + 500);
+  sent.length = 0;
+  await counting.upload(new File([second], 'delta.bin'), { file: file.id, partHashes: true });
+  if (sent.join() !== String(PART_SIZE)) throw new Error(`Sent ${sent.join(', ')} bytes, not one part of ${PART_SIZE}.`);
+  await readBack(file.id, second);
+});
+
+await step('a PDF, its first page made a picture in the bucket and its text kept, by the server', async () => {
+  const pdf = onePagePdf('Checked against the bucket');
+  const file = await drive.upload(new File([pdf as BlobPart], 'check.pdf', { type: 'application/pdf' }), { parent: folder.id });
+  await handle.idle();
+  const now = ((await drive.entry(file.id)).entry as FileEntry).versions[0];
+  if (!now.renditions?.length) throw new Error('No picture was made of it.');
+  const picture = await fetch(await drive.url(file.id, { inline: true, size: now.renditions[0].size }));
+  if (!picture.ok || !picture.headers.get('content-type')?.startsWith('image/')) throw new Error(`Its picture answered ${picture.status} ${picture.headers.get('content-type')}.`);
+  await picture.body?.cancel();
+  const found = await drive.searchText('checked against bucket');
+  if (!found.some((f) => f.entry.id === file.id)) throw new Error('Its text is not found by a search.');
+});
+
+await step('a program called a picture refused, and taken out of the bucket', async () => {
+  const program = Uint8Array.from([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0]);
+  const refused = await drive.upload(new File([program], 'photo.png', { type: 'image/png' }), { parent: folder.id }).then(
+    () => null,
+    (error: { code?: string }) => error.code,
+  );
+  if (refused !== 'program-refused') throw new Error(`It was ${refused === null ? 'kept' : `refused as ${refused}`}.`);
+});
+
+await step('uploads left halfway listed and swept, under the prefix only', async () => {
+  // Nothing of a minute ago is swept: the sweep lists the bucket's uploads and leaves what is younger.
+  await storage.sweepUploads!(new Date(Date.now() - 60_000));
 });
 
 const urls = await Promise.all([drive.url(one.id), drive.url(one.id, { version: versioned.versions[1].id }), drive.url(parts.id)]);

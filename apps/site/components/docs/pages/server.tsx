@@ -4,6 +4,8 @@
 import { hrefOf } from '@/lib/site';
 import { SERVER_OPTIONS } from '../reference';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../ui';
+import { GROUPS_CODE } from './team';
+import { SCALE_NUMBERS } from './team';
 
 export const optionId = (name: string) => `option-${name}`;
 
@@ -180,6 +182,22 @@ export const authorize: DocPage = {
         </Trouble>
       ),
     },
+    {
+      id: 'groups',
+      title: 'Groups',
+      badge: 'Teams',
+      color: 'green',
+      body: (
+        <>
+          <Code code={GROUPS_CODE} />
+          <P>
+            A share names someone by their id, everyone signed in as <C>*</C>, or a group as <C>group:&lt;id&gt;</C>. Who is in a group is your application’s, given by <C>identify</C> with each
+            person: the drive keeps no list of members, so a person who joins or leaves a team in your application has, or no longer has, what it was given at their next request. In the dialog of
+            sharing, <C>group:sales</C> is typed as an id is; Shared with me shows what a group of theirs was given.
+          </P>
+        </>
+      ),
+    },
   ],
 };
 
@@ -354,6 +372,25 @@ export const metadata: DocPage = {
           <C>MetadataStore</C> is <C>load()</C> and <C>save(changes)</C>; <C>revision</C>, <C>lock</C>, settings, <C>record</C>/<C>activity</C> and <C>keepText</C>/<C>findText</C> are optional, and
           without them the server keeps those in the process. <a href={hrefOf('schema')}>Database schema</a> has every table.
         </P>
+      ),
+    },
+    {
+      id: 'a-piece-at-a-time',
+      title: 'A piece at a time',
+      badge: 'Scale',
+      color: 'purple',
+      body: (
+        <>
+          <P>
+            SQLite, Postgres and the store in memory answer what each request needs, and no more: an entry and the folders above it, what is in a folder, what is under one, a search by name, the
+            trash, what is shared with someone. The drive is never loaded whole, and a change writes only what it touched. What another process changed is read from the activity they keep.
+          </P>
+          <Table label="Measured on SQLite, two hundred thousand entries" columns={['A hundred people, two thousand files each', 'Took']} code={[]} rows={SCALE_NUMBERS} />
+          <P>
+            The columns and tables it is asked by are added to a database made before them the first time it is opened, and the rows filled once. A store of your own does the same with <C>scoped</C>,
+            and without it, it is held whole, as before.
+          </P>
+        </>
       ),
     },
   ],

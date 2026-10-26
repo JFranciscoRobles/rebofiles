@@ -68,6 +68,7 @@ The playground of the repository serves it at `http://localhost:5180/api/mcp`.
 | `get_activity` | Who did what to an entry, and in a folder to what is right inside it, the newest first. |
 | `read_file` | The text of a text file, or of a Word document with `@rebodocs/core` installed; of a version too. Up to a megabyte. |
 | `list_recent`, `list_shared` | Recent, and Shared with me. |
+| `list_comments`, `add_comment` | What is said of an entry, and a comment or a reply in the name of the one it works for. |
 | `create_folder`, `create_text_file` | Something new, with "(2)" when the name is taken. |
 | `update_text_file` | A new version of a text file; the old one stays. |
 | `restore_version` | An earlier version back, as a new one: that too can be undone. |

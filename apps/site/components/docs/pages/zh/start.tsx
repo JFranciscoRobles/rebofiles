@@ -73,7 +73,13 @@ export const index: DocPage = {
               <strong>AI 助手。</strong>通过 MCP 为 Claude 提供工具，权限与用户本人一致；借助 Rebodocs 编辑 Word 文档，每次修改都是一个版本。
             </>,
             <>
-              <strong>键盘与屏幕阅读器</strong>、浅色与深色、英文、西班牙文和中文、设置界面，以及桌面应用。
+              <strong>实时。</strong>他人的更改立即显示；带回复和 @ 提及的评论；上千个文件的文件夹；按需读取网盘。
+            </>,
+            <>
+              <strong>安全可靠。</strong>按字节和 ClamAV 检查文件，限制请求过于频繁的人，最少保留天数，法律保留，导出某人的全部数据。
+            </>,
+            <>
+              <strong>键盘与屏幕阅读器</strong>、浅色与深色、英文、西班牙文和中文、设置界面，以及可同步文件夹的桌面应用。
             </>,
           ]}
         />
@@ -318,7 +324,8 @@ export const demos: DocPage = {
       body: (
         <P>
           把 <C>apps/storage/.env.example</C> 复制为 <C>.env</C> 并填写，为存储桶设置 <C>apps/storage/cors.json</C> 中的跨域规则，然后运行 <C>npm run storage:check</C>，在页面尝试之前先从 Node
-          走一遍文件的完整流程。<a href={to('storage')}>存储</a>一页介绍具体做法。
+          走一遍文件的完整流程。<a href={to('storage')}>存储</a>一页介绍具体做法。这里启用了全部功能：用 <C>?as=bea</C> 与 Bea 共享（她与 Carl 同在 <C>group:team</C>
+          ）、带密码的链接、评论、由服务器生成的 PDF 第一页、文件检查，以及 <C>/api/mcp</C> 上的助手。
         </P>
       ),
     },
@@ -330,7 +337,8 @@ export const demos: DocPage = {
       lead: '基于 Tauri 的独立窗口网盘，可连接 playground 或任意服务器。',
       body: (
         <P>
-          需要在 Mac 上安装 Rust 和 Xcode 命令行工具。<C>npm run build:desktop</C> 会生成 ReboFiles.app。<a href={to('desktop')}>桌面端与其他来源</a>一页介绍服务器需要什么。
+          需要在 Mac 上安装 Rust 和 Xcode 命令行工具。<C>npm run build:desktop</C> 会生成 ReboFiles.app；<strong>Server → Sync a Folder…</strong> 让电脑上的文件夹与网盘保持一致（
+          <a href={to('sync')}>同步文件夹</a>）。<a href={to('desktop')}>桌面端与其他来源</a>一页介绍服务器需要什么。
         </P>
       ),
     },

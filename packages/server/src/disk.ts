@@ -99,6 +99,26 @@ export function diskStorage(options: DiskOptions): Storage {
       for (const key of keys) await rm(pathOf(key), { force: true });
     },
 
+    async copyPart(from, to, _state, part) {
+      const source = await open(pathOf(from), 'r');
+      try {
+        const bytes = new Uint8Array(part.to - part.from);
+        await source.read(bytes, 0, bytes.length, part.from);
+        const target = partPath(to, part.number);
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, bytes);
+      } finally {
+        await source.close();
+      }
+    },
+
+    async write(key, bytes) {
+      const target = pathOf(key);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(`${target}.uploading`, bytes);
+      await rename(`${target}.uploading`, target);
+    },
+
     async read(key, range) {
       const file = await open(pathOf(key), 'r');
       try {

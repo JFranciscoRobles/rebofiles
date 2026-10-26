@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as core from '@rebofiles/core';
 import { createMemoryClient } from '@rebofiles/drive';
-import { DriveProvider, FileDrive, useActions, useDrive, useEntries, useEntry, useSettings, useUploads } from '../src';
+import { DriveProvider, FileDrive, useActions, useComments, useDrive, useEntries, useEntry, useSettings, useUploads } from '../src';
 
 afterEach(cleanup);
 
@@ -152,5 +152,22 @@ describe('<FileDrive>', () => {
     await act(() => result.current.createFolder('Archive', null));
     await waitFor(() => expect(screen.getByLabelText('count').textContent).toBe('2'), { timeout: 2000 });
     await waitFor(() => expect(screen.getByRole('option', { name: /^Archive/ })).toBeTruthy(), { timeout: 2000 });
+  });
+});
+
+describe('useComments', () => {
+  it('reads what is said of an entry, says more, a reply under it, resolves and takes back', async () => {
+    const client = made();
+    const plan = await client.createFolder('Plan', null);
+    const { result } = renderHook(() => useComments(plan.id), { wrapper: within(client) });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.comments).toEqual([]);
+    const first = await act(() => result.current.add('Looks good'));
+    await act(() => result.current.add('Agreed', first.id));
+    await waitFor(() => expect(result.current.comments.map((c) => c.text)).toEqual(['Looks good', 'Agreed']));
+    await act(() => result.current.resolve(first.id));
+    await waitFor(() => expect(result.current.comments[0].resolved?.by).toBe('ana'));
+    await act(() => result.current.remove(first.id));
+    await waitFor(() => expect(result.current.comments).toEqual([]));
   });
 });

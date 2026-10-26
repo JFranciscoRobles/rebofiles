@@ -3,6 +3,7 @@
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
 import { DOCX, QUEUE, RESUME, SAVE, SIZES, SPACE } from '../files';
+import { DERIVE_CODE } from '../team';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/files.tsx';
@@ -180,6 +181,32 @@ export const previews: DocPage = {
         </P>
       ),
     },
+    {
+      id: 'made-by-the-server',
+      title: '由服务器生成',
+      badge: 'derive',
+      color: 'orange',
+      lead: '不是来自页面的内容（助手、同步、脚本），以及页面不会生成的内容（PDF 的第一页）：在保存后片刻由服务器生成。',
+      body: (
+        <>
+          <Code code={DERIVE_CODE} />
+          <List
+            items={[
+              <>
+                <C>pictures()</C>：用 <C>sharp</C> 生成网盘各尺寸的图片（不会大于原图）及其占位图。
+              </>,
+              <>
+                <C>pdf()</C>：用 <C>pdfjs-dist</C> 和 <C>@napi-rs/canvas</C> 绘制 PDF 第一页，并提取前五十页的文字用于搜索。
+              </>,
+              <>
+                <C>docx()</C> 和 <C>text()</C>：用 Rebodocs 读取 Word 文档的文字，以及文本文件的文字。
+              </>,
+            ]}
+          />
+          <P>页面会说明自己生成了什么，服务器只生成其余部分；每个库在首次需要时才加载，因此只需安装用到的库。页面会根据事件显示新生成的内容。</P>
+        </>
+      ),
+    },
   ],
 };
 
@@ -324,7 +351,7 @@ export const word: DocPage = {
   source: SOURCE,
   lead: (
     <>
-      Rebodocs 是可选的对等依赖：安装 <C>@rebodocs/editor</C> 后，.docx 会由它的引擎读取。没有它时，网盘会像对待其他文件一样显示 .docx。
+      Rebodocs 是可选的对等依赖：安装 <C>@rebodocs/core</C> 和 <C>@rebodocs/viewer</C> 后，.docx 会由它的引擎读取，并在 Rebodocs 的查看器中显示。没有它时，网盘会像对待其他文件一样显示 .docx。
     </>
   ),
   sections: [

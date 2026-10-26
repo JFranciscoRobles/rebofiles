@@ -410,6 +410,18 @@ export const sync: DocPage = {
         />
       ),
     },
+    {
+      id: 'only-what-changed',
+      title: 'Only what changed is sent',
+      badge: 'Parts',
+      color: 'green',
+      body: (
+        <P>
+          A file changed a little goes as a new version of only the parts that changed: each version keeps the SHA-256 of its parts of 8 MiB, and the parts that are the same are copied in the storage
+          from the version before (S3’s UploadPartCopy, a copy on the disk), never sent again. A video of a gigabyte with its title changed sends 8 MiB. Any upload can, with <C>partHashes: true</C>.
+        </P>
+      ),
+    },
   ],
 };
 
@@ -460,6 +472,13 @@ export const production: DocPage = {
               Postgres for more than one process (<a href={hrefOf('metadata')}>Metadata</a>), with its backups.
             </>,
             <>A lifecycle rule in the bucket, as below.</>,
+            <>
+              <C>clientIp</C> behind your proxy, and a <C>limiter</C> of Redis for more than one process (<a href={hrefOf('observability')}>Hooks, logs and limits</a>).
+            </>,
+            'HTTP/2 in front of it: each tab watching holds a connection, and over HTTP/1.1 a browser has six for a host. A tab not seen lets go of its own.',
+            <>
+              <C>derive: deriveAll()</C> with sharp and pdf.js installed, for the pictures and the text of what no page made (<a href={hrefOf('previews')}>Previews</a>).
+            </>,
           ]}
         />
       ),

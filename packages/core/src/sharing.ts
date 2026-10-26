@@ -10,6 +10,22 @@ import { getEntry, isTrashed } from './tree';
 /** Shared with this, an entry is shared with everyone signed in. */
 export const EVERYONE = '*';
 
+/**
+ * Shared with `group:<id>`, an entry is shared with everyone the application says is in that group: who is in each
+ * is the application's, given with each person (`User.groups` of the server), not kept in the drive.
+ */
+export const GROUP = 'group:';
+export const groupOf = (id: string) => `${GROUP}${id}`;
+export const isGroup = (who: string) => who.startsWith(GROUP);
+
+/** Someone, and the groups they are in: a plain id is someone in none. */
+export type Who = string | { id: string; groups?: readonly string[] };
+const idOf = (who: Who) => (typeof who === 'string' ? who : who.id);
+/** What a share may name to reach `who`: their id, everyone, and each of their groups. */
+/** The names a share may give to reach someone: their id, everyone, and each of their groups. */
+export const shareNamesOf = (who: Who): string[] => [...namesOf(who)];
+const namesOf = (who: Who): Set<string> => new Set([idOf(who), EVERYONE, ...(typeof who === 'string' ? [] : (who.groups ?? []).map(groupOf))]);
+
 /** What may be done to an entry, as a server asks it. */
 /** What may be done: to an entry, or for `configure`, to the settings of the whole drive, asked with no entry. */
 export type Action = 'list' | 'read' | 'download' | 'comment' | 'create' | 'upload' | 'rename' | 'move' | 'trash' | 'restore' | 'delete' | 'share' | 'configure';
@@ -38,19 +54,21 @@ const NEEDS: Record<Action, Access> = {
 
 export const allows = (access: Access | null, action: Action): boolean => access !== null && RANK[access] >= RANK[NEEDS[action]];
 
-const shareFor = (entry: Entry, user: string): Share | undefined => {
+const shareFor = (entry: Entry, names: Set<string>): Share | undefined => {
   let best: Share | undefined;
-  for (const share of entry.shares ?? []) if ((share.with === user || share.with === EVERYONE) && (!best || RANK[share.role] > RANK[best.role])) best = share;
+  for (const share of entry.shares ?? []) if (names.has(share.with) && (!best || RANK[share.role] > RANK[best.role])) best = share;
   return best;
 };
 
-/** What `user` has of an entry, from it and the folders it is in; null for nothing. */
-export function accessOf(drive: Drive, id: EntryId, user: string): Access | null {
+/** What someone has of an entry, from it and the folders it is in, as themselves or through their groups; null for nothing. */
+export function accessOf(drive: Drive, id: EntryId, who: Who): Access | null {
+  const user = idOf(who);
+  const names = namesOf(who);
   let found: Access | null = null;
   for (let at: EntryId | null = id; at !== null; ) {
     const entry = getEntry(drive, at);
     if (entry.owner === user) return 'owner';
-    const share = shareFor(entry, user);
+    const share = shareFor(entry, names);
     if (share && (!found || RANK[share.role] > RANK[found])) found = share.role;
     at = entry.parent;
   }
@@ -81,20 +99,22 @@ export function unshare(drive: Drive, id: EntryId, user: string): Drive {
  * What is shared with `user` and is not theirs, outside the trash, the latest shared first: each entry where it was
  * shared with them, not what is inside it, nor what they reach already through a folder above.
  */
-export function sharedWith(drive: Drive, user: string): Entry[] {
+export function sharedWith(drive: Drive, who: Who): Entry[] {
+  const names = namesOf(who);
   const found: { entry: Entry; at: string }[] = [];
   for (const entry of drive.entries.values()) {
-    const share = shareFor(entry, user);
-    if (!share || accessOf(drive, entry.id, user) === 'owner' || isTrashed(drive, entry.id)) continue;
-    if (entry.parent !== null && accessOf(drive, entry.parent, user) !== null) continue;
+    const share = shareFor(entry, names);
+    if (!share || accessOf(drive, entry.id, who) === 'owner' || isTrashed(drive, entry.id)) continue;
+    if (entry.parent !== null && accessOf(drive, entry.parent, who) !== null) continue;
     found.push({ entry, at: share.at });
   }
   return found.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).map(({ entry }) => entry);
 }
 
 /** Of what is shared with `user`, what was shared with them after `since`, or all of it when never looked at: news to show them. */
-export function sharedSince(drive: Drive, user: string, since: string | undefined): Entry[] {
-  return sharedWith(drive, user).filter((entry) => (entry.shares ?? []).some((s) => (s.with === user || s.with === EVERYONE) && s.by !== user && (since === undefined || s.at > since)));
+export function sharedSince(drive: Drive, who: Who, since: string | undefined): Entry[] {
+  const names = namesOf(who);
+  return sharedWith(drive, who).filter((entry) => (entry.shares ?? []).some((s) => names.has(s.with) && s.by !== idOf(who) && (since === undefined || s.at > since)));
 }
 
 /** A link to read an entry, and what is inside it, until `expires`. */

@@ -65,6 +65,15 @@ export function memoryS3({ listPage = 1000 } = {}) {
         .join('');
       return new Response(`<ListMultipartUploadsResult><IsTruncated>false</IsTruncated>${listed}</ListMultipartUploadsResult>`);
     }
+    if (method === 'PUT' && q.has('uploadId') && sent.has('x-amz-copy-source')) {
+      // A part copied from what the bucket keeps, as UploadPartCopy does: none of its bytes in the request.
+      const from = decodeURIComponent(sent.get('x-amz-copy-source')!.replace(/^\/bucket\//, ''));
+      const range = /^bytes=(\d+)-(\d+)$/.exec(sent.get('x-amz-copy-source-range') ?? '');
+      const source = objects.get(from);
+      if (!source || !range) return new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 });
+      uploads.get(q.get('uploadId')!)!.set(Number(q.get('partNumber')), source.slice(Number(range[1]), Number(range[2]) + 1));
+      return new Response(`<CopyPartResult><ETag>&quot;c${q.get('partNumber')}&quot;</ETag></CopyPartResult>`);
+    }
     if (method === 'PUT' && q.has('uploadId')) {
       uploads.get(q.get('uploadId')!)!.set(Number(q.get('partNumber')), body);
       return new Response(null, { headers: { etag: `"p${q.get('partNumber')}"` } });

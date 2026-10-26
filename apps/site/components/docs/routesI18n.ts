@@ -109,6 +109,9 @@ const TOOL_WORDS: Record<'es' | 'zh', Record<string, string>> = {
     list_recent: 'Los últimos archivos cambiados que puede leer la persona para quien trabaja el asistente, el más reciente primero.',
     list_shared: 'Lo que otros compartieron con la persona para quien trabaja el asistente.',
     get_activity: 'Quién hizo qué a un archivo o carpeta, y, de una carpeta, a lo que tiene dentro: creado, subido, renombrado, movido, a la papelera, compartido. Lo más nuevo primero.',
+    list_comments: 'Lo que dijo la gente de un archivo o carpeta, cada hilo con sus respuestas debajo, y si se resolvió.',
+    add_comment:
+      'Un comentario en un archivo o carpeta, en nombre de la persona para quien trabaja el asistente, visible para todos los que pueden leerlo; o una respuesta bajo otro, con su id. Se avisa a los nombrados con @.',
     create_folder: 'Una carpeta nueva; con "(2)" tras su nombre si ya está ocupado ahí.',
     create_text_file: 'Un archivo nuevo con el texto dado, su tipo por su nombre (.md, .csv, .json, .txt…); con "(2)" tras su nombre si ya está ocupado ahí.',
     update_text_file: 'El texto dado pasa a ser el archivo; lo que era queda como su versión anterior, para restaurarla.',
@@ -128,6 +131,8 @@ const TOOL_WORDS: Record<'es' | 'zh', Record<string, string>> = {
     list_recent: '助手所服务的人可读取的、最近更改的文件，最新的在前。',
     list_shared: '他人与助手所服务的人共享的内容。',
     get_activity: '谁对某个文件或文件夹做了什么，若是文件夹还包括其中的内容：创建、上传、重命名、移动、移入回收站、共享。最新的在前。',
+    list_comments: '人们对某个文件或文件夹的评论，每个讨论串及其回复，以及是否已解决。',
+    add_comment: '以助手所服务的人的名义，对文件或文件夹发表评论，所有可读取它的人都能看到；或带上 id 回复另一条评论。会通知用 @ 提到的人。',
     create_folder: '新文件夹；名称已被占用时在后面加 "(2)"。',
     create_text_file: '包含给定文字的新文件，类型取自名称（.md、.csv、.json、.txt…）；名称已被占用时在后面加 "(2)"。',
     update_text_file: '给定的文字成为文件的当前内容；原内容保留为上一个版本，可以恢复。',

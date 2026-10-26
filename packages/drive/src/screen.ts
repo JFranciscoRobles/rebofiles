@@ -9,8 +9,11 @@
 
 import {
   type Activity,
+  type Comment,
+  type Packed,
   type DriveSettings,
   EVERYONE,
+  isGroup,
   FOLDER_COLORS,
   type FolderColor,
   type Entry,
@@ -28,7 +31,7 @@ import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
 import { type IconName, icon, logo as mark } from './icons';
-import { type DocumentPreview, type Kind, badgeOf, kindOf } from './kinds';
+import { type DocumentPreview, type Kind, TEXT_EXTENSIONS, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
 import { downloadZip } from './download';
 import { type Picked, readChosen, readDropped } from './folders';
@@ -252,7 +255,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let storage = '';
   let dropping = false;
   let menuOpen = false;
-  let tab: 'details' | 'versions' | 'activity' = 'details';
+  let tab: 'details' | 'versions' | 'activity' | 'comments' = 'details';
+  /** What is being written in the comments of the entry shown, and the comment it answers. */
+  let draft = '';
+  let replyingTo: Comment | null = null;
+  let editing: { id: string; text: string } | null = null;
   let revision = 0;
   let alive = true;
   /** Whether the drive is mounted inside the main of a page of its own, as on a landing. */
@@ -309,6 +316,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const detail = resource((id) => client.entry(id));
   // What was done to the entry shown: asked when its tab is, again after each change.
   const happened = resource((id) => client.activity(id).catch(() => [] as Activity[]));
+  const remarks = resource((id) => client.comments(id));
   // The space one keeps: asked again after each change, as uploads and the trash change it.
   const usage = resource(() => client.usage());
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
@@ -394,6 +402,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   /** The sizes a thumbnail is shown at, in the grid and in the details, in pixels: twice as many as it covers. */
   const THUMB_SIZES = [320, 640];
   /** The pictures made of a file when it goes up: of an image, in the drive's sizes; of a Word document, its first page in those the drive shows. */
+  /** What this page makes of a file it uploads, which the server need not: pictures of pictures, and of Word documents with Rebodocs; the text of text, and of those. */
+  const madeHere = (file: File): ('pictures' | 'text')[] => {
+    const isDocx = /\.docx$/i.test(file.name) || file.type.includes('wordprocessingml');
+    const picture = /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(file.type);
+    const textual = /^text\/|^application\/(json|xml|csv)/.test(file.type) || TEXT_EXTENSIONS.includes(splitName(file.name).ext.slice(1).toLowerCase());
+    return [...(picture || (isDocx && options.pictureDocument) ? (['pictures'] as const) : []), ...(textual || (isDocx && options.textDocument) ? (['text'] as const) : [])];
+  };
   const picturesOf = async (file: Blob & { name?: string }, images: DriveSettings['images']): Promise<MadeRendition[]> => {
     const document = options.pictureDocument;
     const isDocx = /\.docx$/i.test(file.name ?? '') || file.type.includes('wordprocessingml');
@@ -767,7 +782,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // The same bytes anywhere in the drive, and else a file of the same name where it goes: asked about before it goes.
   const lookIn = lookInDrive(client);
   const uploader = createUploads(client, {
-    extra: () => ({ images: settings?.settings.images, renditions: picturesOf, text: (file, name) => textOf(file, name, options.textDocument) }),
+    extra: (file) => ({ images: settings?.settings.images, renditions: picturesOf, text: (blob, name) => textOf(blob, name, options.textDocument), madeHere: madeHere(file) }),
     check: (file, parent) => (options.checkUploads === false ? Promise.resolve({}) : lookIn(file, parent)),
     onChange: render,
     onDone: (entry, item) => {
@@ -848,10 +863,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry),
     );
   /** A file's own thumbnail made small, for a row of the list: its picture, its first page, its first lines; a folder's tile. */
+  /** Whether a file is shown by a picture: a picture, or one with smaller pictures of it, as the server makes of a PDF. */
+  const pictured = (file: FileEntry, kind: Kind) => kind === 'image' || (kind !== 'docx' && Boolean(file.versions[0].renditions?.length));
   const rowThumb = (entry: Entry) => {
     if (entry.kind === 'folder') return tile(entry);
     const kind = kindOf(entry);
-    const url = kind === 'image' ? urlOf(entry, 160) : null;
+    const url = pictured(entry, kind) ? urlOf(entry, 160) : null;
     return h(
       'span',
       { class: `rf-tile rf-mini rf-k-${kind}`, 'aria-hidden': 'true' },
@@ -889,6 +906,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       ),
     );
   };
+  /** Who a share names, as a person reads it: everyone, a group by its name, or someone by their id. */
+  const whoName = (who: string) => (who === EVERYONE ? t('everyone') : isGroup(who) ? t('groupNamed', { name: who.slice(6) }) : who);
   const roleName = (role: Role) => t(role === 'viewer' ? 'roleViewer' : role === 'commenter' ? 'roleCommenter' : 'roleEditor');
   /** A kind as a person reads it, for putting entries of one kind together. */
   const typeLabel = (entry: Entry) => (entry.kind === 'folder' ? t('folder') : typeName(entry));
@@ -1170,7 +1189,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             { class: 'rf-grid', style: many ? `padding-top:${shown.before + 4}px;padding-bottom:${shown.after + 12}px` : undefined },
             visible.map((entry) => {
               const kind = kindOf(entry);
-              const url = kind === 'image' ? urlOf(entry as FileEntry, 320) : null;
+              const url = entry.kind === 'file' && pictured(entry, kind) ? urlOf(entry, 320) : null;
               return item(
                 entry,
                 'rf-card',
@@ -1321,7 +1340,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   /** A .zip being made, of what was picked: how far it is, and what stops it. */
   let zipping: { name: string; read: number; size: number; stop: AbortController } | null = null;
-  const zipDownload = async (entries: Pick<Entry, 'id' | 'name'>[], named?: string) => {
+  const zipDownload = async (entries: Pick<Entry, 'id' | 'name'>[], named?: string, of?: { pack: () => Promise<Packed>; extra?: { path: string; text: string }[] }) => {
     if (zipping) return;
     // Named after the one, or after where they are.
     const name = named ?? (entries.length === 1 ? entries[0].name : `${t('filesZip')} ${new Date().toISOString().slice(0, 10)}`);
@@ -1330,10 +1349,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     render();
     try {
       const done = await downloadZip(
-        client,
+        of ? { pack: of.pack, urls: client.urls } : client,
         entries.map((entry) => entry.id),
         {
           name,
+          extra: of?.extra,
           signal: job.stop.signal,
           onProgress: ({ read, size }) => {
             job.read = read;
@@ -1359,6 +1379,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       zipping = null;
       render();
     }
+  };
+
+  /** Everything of one's own in a .zip: the files at their places, and what one said and did in a file of JSON beside them. */
+  const exportMine = async () => {
+    const exported = await client.exportPerson();
+    const { pack, ...rest } = exported;
+    await zipDownload([], `${t('exportMine')} ${exported.at.slice(0, 10)}`, { pack: async () => pack, extra: [{ path: 'rebofiles-export.json', text: JSON.stringify(rest, null, 2) }] });
   };
 
   /** What can be done to all that is picked at once. */
@@ -1467,6 +1494,16 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 button(withIcon('trash', t('moveToTrash')), () => void each([entry], (one) => client.moveToTrash(one.id), 'trashedMany'), {
                   class: 'rf-btn rf-text rf-danger',
                 }),
+                // A legal hold, for who may configure the drive.
+                settings?.canConfigure &&
+                  button(
+                    entry.hold ? t('releaseHold') : t('putOnHold'),
+                    () =>
+                      void attempt(() => (entry.hold ? client.release(entry.id) : client.hold(entry.id)), entry.hold ? t('nowReleased', { name: entry.name }) : t('nowOnHold', { name: entry.name })),
+                    {
+                      class: 'rf-btn rf-text',
+                    },
+                  ),
               ],
         ),
         h(
@@ -1475,49 +1512,167 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           button(t('details'), () => ((tab = 'details'), render()), { role: 'tab', 'aria-selected': shown === 'details' }),
           file && button(`${t('versions')} · ${file.versions.length}`, () => ((tab = 'versions'), render()), { role: 'tab', 'aria-selected': shown === 'versions' }),
           button(t('activity'), () => ((tab = 'activity'), render()), { role: 'tab', 'aria-selected': shown === 'activity' }),
+          button(t('comments'), () => ((tab = 'comments'), render()), { role: 'tab', 'aria-selected': shown === 'comments' }),
         ),
-        shown === 'activity'
-          ? activityList(entry)
-          : shown === 'versions' && file
-            ? h(
-                'ul',
-                { class: 'rf-versions' },
-                file.versions.map((version, i) =>
-                  h(
-                    'li',
-                    { key: version.id, class: i === 0 ? 'rf-now' : undefined },
+        shown === 'comments'
+          ? commentsOf(entry, inTrash)
+          : shown === 'activity'
+            ? activityList(entry)
+            : shown === 'versions' && file
+              ? h(
+                  'ul',
+                  { class: 'rf-versions' },
+                  file.versions.map((version, i) =>
                     h(
-                      'span',
-                      { class: 'rf-v' },
-                      t('version', { n: versionNumber(file, version.id) }),
+                      'li',
+                      { key: version.id, class: i === 0 ? 'rf-now' : undefined },
                       h(
-                        'small',
-                        null,
-                        `${formatDate(version.at, locale)} · ${version.by} · ${formatSize(version.size, locale)}${version.restoredFrom ? ` · ${t('restoredFrom', { n: versionNumber(file, version.restoredFrom) })}` : ''}`,
+                        'span',
+                        { class: 'rf-v' },
+                        t('version', { n: versionNumber(file, version.id) }),
+                        h(
+                          'small',
+                          null,
+                          `${formatDate(version.at, locale)} · ${version.by} · ${formatSize(version.size, locale)}${version.restoredFrom ? ` · ${t('restoredFrom', { n: versionNumber(file, version.restoredFrom) })}` : ''}`,
+                        ),
                       ),
+                      i === 0
+                        ? h('span', { class: 'rf-chip' }, t('current'))
+                        : !inTrash &&
+                            button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), {
+                              class: 'rf-link',
+                            }),
                     ),
-                    i === 0
-                      ? h('span', { class: 'rf-chip' }, t('current'))
-                      : !inTrash &&
-                          button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), {
-                            class: 'rf-link',
-                          }),
                   ),
+                )
+              : h(
+                  'dl',
+                  { class: 'rf-props' },
+                  row(t('type'), file ? typeName(file) : t('folder'), file?.type),
+                  file && row(t('size'), formatSize(file.versions[0].size, locale)),
+                  !file && !inTrash && row(t('folderColor'), swatches([entry as FolderEntry], 'radio')),
+                  row(t('owner'), entry.owner),
+                  entry.hold ? row(t('onHold'), t('onHoldHint', { by: entry.hold.by }), entry.hold.reason) : null,
+                  entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${whoName(s.with)} · ${roleName(s.role)}`).join(', ')) : null,
+                  row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
+                  where && row(t('location'), where),
+                  file && row(t('key'), h('code', null, file.versions[0].key)),
                 ),
-              )
-            : h(
-                'dl',
-                { class: 'rf-props' },
-                row(t('type'), file ? typeName(file) : t('folder'), file?.type),
-                file && row(t('size'), formatSize(file.versions[0].size, locale)),
-                !file && !inTrash && row(t('folderColor'), swatches([entry as FolderEntry], 'radio')),
-                row(t('owner'), entry.owner),
-                entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${s.with === EVERYONE ? t('everyone') : s.with} · ${roleName(s.role)}`).join(', ')) : null,
-                row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
-                where && row(t('location'), where),
-                file && row(t('key'), h('code', null, file.versions[0].key)),
-              ),
       ),
+    );
+  }
+
+  /** What is said of an entry, a thread at a time, and a box to say more: a reply under one, one's own changed. */
+  function commentsOf(entry: Entry, inTrash: boolean) {
+    const found = remarks(entry.id);
+    if (found.error) return h('p', { class: 'rf-hint', role: 'alert' }, said(found.error));
+    if (!found.current || !found.value) return h('p', { class: 'rf-hint' }, t('loading'));
+    const all = found.value;
+    const send = () => {
+      const text = draft.trim();
+      if (!text) return;
+      const to = replyingTo?.id;
+      void attempt(async () => {
+        await client.addComment(entry.id, text, to);
+        draft = '';
+        replyingTo = null;
+      });
+    };
+    const one = (comment: Comment) => {
+      const mine = comment.by === settings?.you;
+      const top = !comment.replyTo;
+      const isEditing = editing?.id === comment.id;
+      return h(
+        'li',
+        { key: comment.id, class: `rf-comment${top ? '' : ' rf-reply'}${comment.resolved ? ' rf-resolved' : ''}` },
+        h('div', { class: 'rf-comment-head' }, h('strong', null, comment.by), h('small', null, `${formatDate(comment.at, locale)}${comment.edited ? ` · ${t('edited')}` : ''}`)),
+        isEditing
+          ? h(
+              'form',
+              {
+                class: 'rf-comment-edit',
+                onSubmit: (event: Event) => {
+                  event.preventDefault();
+                  const text = editing!.text;
+                  void attempt(async () => {
+                    await client.editComment(entry.id, comment.id, text);
+                    editing = null;
+                  });
+                },
+              },
+              h('textarea', {
+                'aria-label': t('editComment'),
+                value: editing!.text,
+                mount: (field: HTMLElement) => (field as HTMLTextAreaElement).focus(),
+                onInput: (event: Event) => (editing = { id: comment.id, text: (event.target as HTMLTextAreaElement).value }),
+                onKeydown: (event: KeyboardEvent) => {
+                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    (event.target as HTMLTextAreaElement).form?.requestSubmit();
+                  } else if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    editing = null;
+                    render();
+                  }
+                },
+              }),
+              actionsRow(
+                button(t('cancel'), () => ((editing = null), render()), { class: 'rf-btn' }),
+                h('button', { type: 'submit', class: 'rf-btn rf-primary' }, t('save')),
+              ),
+            )
+          : h('p', null, comment.text),
+        top && comment.resolved && h('small', { class: 'rf-hint' }, t('resolvedBy', { by: comment.resolved.by })),
+        !inTrash &&
+          !isEditing &&
+          h(
+            'div',
+            { class: 'rf-comment-actions' },
+            button(t('reply'), () => ((replyingTo = comment), render()), { class: 'rf-link', 'aria-label': `${t('reply')} · ${comment.by}` }),
+            top && button(comment.resolved ? t('reopen') : t('resolve'), () => void attempt(() => client.resolveComment(entry.id, comment.id, !comment.resolved)), { class: 'rf-link' }),
+            mine && button(t('editComment'), () => ((editing = { id: comment.id, text: comment.text }), render()), { class: 'rf-link' }),
+            mine && button(t('deleteComment'), () => void attempt(() => client.removeComment(entry.id, comment.id)), { class: 'rf-link rf-danger' }),
+          ),
+      );
+    };
+    return h(
+      'div',
+      { class: 'rf-comments' },
+      all.length ? h('ol', { class: 'rf-comment-list', 'aria-label': t('comments') }, all.map(one)) : h('p', { class: 'rf-hint' }, t('noComments')),
+      !inTrash &&
+        h(
+          'form',
+          {
+            class: 'rf-comment-new',
+            onSubmit: (event: Event) => {
+              event.preventDefault();
+              send();
+            },
+          },
+          replyingTo &&
+            h(
+              'p',
+              { class: 'rf-hint' },
+              t('replyTo', { who: replyingTo.by }),
+              ' ',
+              button(t('cancel'), () => ((replyingTo = null), render()), { class: 'rf-link' }),
+            ),
+          h('textarea', {
+            'aria-label': replyingTo ? t('replyTo', { who: replyingTo.by }) : t('addComment'),
+            placeholder: t('addComment'),
+            value: draft,
+            rows: 3,
+            onInput: (event: Event) => (draft = (event.target as HTMLTextAreaElement).value),
+            // ⌘Enter or Ctrl+Enter sends it, as in a chat.
+            onKeydown: (event: KeyboardEvent) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                send();
+              }
+            },
+          }),
+          h('div', { class: 'rf-row-end' }, h('button', { type: 'submit', class: 'rf-btn rf-primary' }, t('commentButton'))),
+        ),
     );
   }
 
@@ -1535,7 +1690,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
   const activityText = (a: Activity) => {
     const by = a.by === 'trash' ? t('theTrash') : a.by;
-    const values = { by, name: a.name, was: a.was ?? '', with: a.with === EVERYONE ? t('everyone') : (a.with ?? ''), role: a.role ? roleName(a.role) : '' };
+    const values = { by, name: a.name, was: a.was ?? '', with: a.with ? whoName(a.with) : '', role: a.role ? roleName(a.role) : '' };
     const key = (
       {
         colored: 'didColor',
@@ -1551,6 +1706,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         unshared: 'didUnshare',
         linked: 'didLink',
         unlinked: 'didUnlink',
+        commented: 'didComment',
+        held: 'didHold',
+        released: 'didRelease',
       } as const
     )[a.action];
     return t(key, values);
@@ -1707,10 +1865,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     };
     // Emptied once shared, unless the next one was typed meanwhile.
     const add = (user: string) =>
-      attempt(
-        () => client.share(of.id, user, role).then(() => dialog?.kind === 'share' && dialog.who.trim() === user && setShare({ who: '' })),
-        t('shared', { who: user === EVERYONE ? t('everyone') : user }),
-      );
+      attempt(() => client.share(of.id, user, role).then(() => dialog?.kind === 'share' && dialog.who.trim() === user && setShare({ who: '' })), t('shared', { who: whoName(user) }));
     const roles = (value: Role, onChange: (role: Role) => void, labelled: string) =>
       h(
         'select',
@@ -1734,7 +1889,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               'ul',
               { class: 'rf-shares' },
               entry.shares.map((s) => {
-                const person = s.with === EVERYONE ? t('everyone') : s.with;
+                const person = whoName(s.with);
                 return h(
                   'li',
                   { key: s.with },
@@ -1748,10 +1903,18 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         h(
           'div',
           { class: 'rf-share-add' },
-          h('input', { type: 'text', 'aria-label': t('addPerson'), placeholder: t('addPerson'), value: who, onInput: (event: Event) => setShare({ who: (event.target as HTMLInputElement).value }) }),
+          h('input', {
+            type: 'text',
+            'aria-label': t('addPerson'),
+            'aria-describedby': `${prefix}-who-hint`,
+            placeholder: t('addPerson'),
+            value: who,
+            onInput: (event: Event) => setShare({ who: (event.target as HTMLInputElement).value }),
+          }),
           roles(role, (next) => setShare({ role: next }), t('role')),
           h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: !who.trim() }, t('share')),
         ),
+        h('p', { class: 'rf-hint', id: `${prefix}-who-hint` }, t('addPersonHint')),
         !entry.shares?.some((s) => s.with === EVERYONE) && button(`+ ${t('everyone')} · ${roleName(role)}`, () => void add(EVERYONE), { class: 'rf-link' }),
         h('h3', { class: 'rf-sub' }, t('links')),
         entry.links?.length
@@ -2078,7 +2241,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   };
   const closeSettings = () => {
     settingsPart = null;
-    afterRender.push(() => gear?.focus());
+    // Back to the button, once what was inert behind the settings is not: Safari takes the focus only a frame after.
+    afterRender.push(() => {
+      gear?.focus();
+      if (document.activeElement !== gear) requestAnimationFrame(() => gear?.focus());
+    });
     render();
   };
   /** A change saved at once, as it is made: what the server says of it is said in the screen. */
@@ -2166,6 +2333,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             t('language'),
             null,
             segmented(t('language'), mine.language ?? '', [['', t('driveDefault')], ...languages], (v) => saveMine({ language: v || undefined })),
+          ),
+          // What is one's own, taken away whole: the files, and what one said and did.
+          field(
+            t('exportMine'),
+            t('exportHint'),
+            button(withIcon('download', t('exportMine')), () => void attempt(exportMine), { class: 'rf-btn' }),
           ),
         ),
         forEveryone(
@@ -2259,6 +2432,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           '0.1',
         ),
         number(t('trashDaysLabel'), t('trashDaysHint'), drive.trashDays, t('days'), (days) => saveDrive({ trashDays: days }), '1'),
+        number(t('retentionLabel'), t('retentionHint'), drive.retentionDays ?? null, t('days'), (days) => saveDrive({ retentionDays: days }), '1'),
       ];
     } else {
       intro = t('picturesIntro');
@@ -2840,6 +3014,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     }
   };
   document.addEventListener('mousedown', closeMenu);
+  // Safari leaves the focus on the page, not on a button clicked: Escape still closes what is open over the drive.
+  const onLooseKey = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || (event.target !== document.body && event.target !== document.documentElement)) return;
+    if (viewing) closeView();
+    else if (settingsPart) closeSettings();
+  };
+  document.addEventListener('keydown', onLooseKey);
   // ⌘Z or Ctrl+Z undoes the last change while its toast is up, unless it is a field's own.
   element.addEventListener('keydown', (event) => {
     const field = (event.target as HTMLElement).closest('input, textarea, select, [contenteditable], .rf-view-pages');
@@ -2879,6 +3060,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       unwatch();
       document.removeEventListener('visibilitychange', onSeen);
       document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', onLooseKey);
       element.replaceChildren();
     },
   };

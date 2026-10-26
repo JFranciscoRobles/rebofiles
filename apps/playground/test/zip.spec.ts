@@ -4,6 +4,7 @@
 import { unzipSync } from 'fflate';
 import { readFileSync } from 'node:fs';
 import { type Page, expect, test } from '@playwright/test';
+import { copied, watchClipboard } from './clipboard';
 
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 
@@ -47,7 +48,7 @@ test('picked files and a folder go in one .zip, the folder with what is in it', 
 });
 
 test('a link to a folder downloads it whole as a .zip, without signing in', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await watchClipboard(page);
   await page.goto('/?as=linkzip');
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
@@ -64,7 +65,7 @@ test('a link to a folder downloads it whole as a .zip, without signing in', asyn
   await page.getByRole('complementary', { name: 'Details' }).getByRole('button', { name: 'Share' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
-  const address = await page.evaluate(() => navigator.clipboard.readText());
+  const address = await copied(page);
 
   // Someone with the link, in a window of their own, signed in as no one.
   const someone = await (await context.browser()!.newContext()).newPage();

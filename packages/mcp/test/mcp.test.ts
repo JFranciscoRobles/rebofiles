@@ -30,6 +30,8 @@ describe('the protocol', () => {
       'list_recent',
       'list_shared',
       'get_activity',
+      'list_comments',
+      'add_comment',
       'create_folder',
       'create_text_file',
       'update_text_file',
@@ -103,6 +105,12 @@ describe('the tools', () => {
     const done = ((await ana.call('get_activity', { id: file.id, limit: 3 })).structuredContent as unknown as { activity: { action: string }[] }).activity;
     expect(done.map((a) => a.action)).toEqual(['restored', 'trashed', 'moved']);
     expect((await ana.call('get_activity', { id: file.id })).content[0].text).toMatch(/ ana renamed file "minutes.txt" \(id .*\) from "notes.txt"/);
+
+    // A comment in the name of the one it works for, and a reply under it.
+    const first = ((await ana.call('add_comment', { id: file.id, text: 'Checked, @bea.' })).structuredContent as unknown as { comment: { id: string; by: string } }).comment;
+    expect(first.by).toBe('ana');
+    await ana.call('add_comment', { id: file.id, text: 'And signed.', replyTo: first.id });
+    expect((await ana.call('list_comments', { id: file.id })).content[0].text).toMatch(/ana: Checked, @bea\. \[comment .*\]\n {2}↳ .* ana: And signed\./);
   });
 
   it('read a Word document with Rebodocs, and say what they do not read', async () => {

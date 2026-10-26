@@ -5,6 +5,7 @@ import * as app from './app';
 import * as files from './files';
 import * as reference from './reference';
 import * as running from './running';
+import * as team from './team';
 import * as schema from './schema';
 import * as server from './server';
 import * as together from './together';
@@ -24,6 +25,7 @@ export const DOC_PAGES_ES: Partial<Record<string, DocPage>> = {
   previews: files.previews,
   search: files.search,
   live: running.live,
+  comments: team.comments,
   versions: files.versions,
   zip: files.zip,
   word: files.word,
@@ -35,6 +37,8 @@ export const DOC_PAGES_ES: Partial<Record<string, DocPage>> = {
   metadata: server.metadata,
   sharing: server.sharing,
   activity: server.activity,
+  observability: team.observe,
+  retention: team.keeping,
   schema: schema.schema,
   desktop: server.desktop,
   sync: running.sync,

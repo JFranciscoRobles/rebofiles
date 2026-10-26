@@ -19,7 +19,12 @@ whole folders, three at a time with the time each has left; the same file
 asked about before it goes; search by name and by what is written; a viewer;
 .zip downloads; links with a password or for one download; activity; quotas
 and a trash that empties itself; folder colours; settings; tools for an
-assistant; and a desktop application. [ROADMAP.md](ROADMAP.md) says what is next and what is checked.
+assistant; changes shown as they happen and folders of thousands, the drive
+read a piece at a time; comments; groups; pictures and text of PDFs made by
+the server; files checked by their bytes and by ClamAV; limits; retention,
+legal holds and a person's data exported; only the changed parts of a file
+sent; and a desktop application that keeps a folder in sync.
+[ROADMAP.md](ROADMAP.md) says what is next and what is checked.
 
 ## Quick start
 

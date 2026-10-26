@@ -19,10 +19,10 @@ afterAll(async () => {
   await rm(folder, { recursive: true, force: true });
 });
 
-/** A store that counts how often the drive is read whole from it. */
+/** A store that counts how often the drive is read whole from it, held whole: without the queries that answer a piece at a time. */
 function counted(store: MetadataStore) {
   const seen = { loads: 0 };
-  return { seen, store: { ...store, load: () => (seen.loads++, store.load()) } as MetadataStore };
+  return { seen, store: { ...store, scoped: undefined, load: () => (seen.loads++, store.load()) } as MetadataStore };
 }
 const handler = (metadata: MetadataStore) =>
   createDriveHandler({ storage: diskStorage({ folder: join(folder, 'files'), secret: 's' }), metadata, ...everyone('ana'), secret: 'u', base: '/api/files' });
@@ -62,6 +62,17 @@ describe('the drive held in memory', () => {
     await two.ask('PATCH', `/api/files/entries/${made.id}`, { name: 'Renamed' });
     expect(names((await one.ask('GET', '/api/files/entries')).body.entries)).toEqual(['Renamed']);
     expect((await db.query<{ n: number }>('SELECT n FROM rebofiles_entries_revision')).rows[0].n).toBe(2);
+  });
+
+  it('is never read whole from a store that answers a piece at a time', async () => {
+    const memory = memoryMetadata();
+    let loads = 0;
+    const ana = client(handler({ ...memory, load: () => (loads++, memory.load()) }));
+    const made = (await ana.ask('POST', '/api/files/folders', { name: 'Contracts', parent: null })).body.entry;
+    await ana.ask('GET', '/api/files/entries');
+    await ana.ask('PATCH', `/api/files/entries/${made.id}`, { name: 'Contracts 2026' });
+    await ana.ask('GET', '/api/files/search?q=2026');
+    expect(loads).toBe(0);
   });
 
   it('is read on every request from a store with no revision, as before', async () => {

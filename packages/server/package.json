@@ -6,12 +6,33 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./derive": "./src/derive.ts"
   },
   "dependencies": {
     "@rebofiles/core": "0.1.0"
   },
   "scripts": {
     "build": "node scripts/build.mjs"
+  },
+  "peerDependencies": {
+    "sharp": ">=0.33",
+    "pdfjs-dist": ">=4",
+    "@napi-rs/canvas": ">=0.1",
+    "@rebodocs/core": ">=0.12.0"
+  },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    },
+    "pdfjs-dist": {
+      "optional": true
+    },
+    "@napi-rs/canvas": {
+      "optional": true
+    },
+    "@rebodocs/core": {
+      "optional": true
+    }
   }
 }

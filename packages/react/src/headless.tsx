@@ -2,7 +2,7 @@
 // hooks for what a screen of your own needs. The whole <FileDrive> is built
 // from these and nothing else.
 
-import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
+import type { Comment, DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, lookInDrive, textOf, translator } from '@rebofiles/drive';
 
@@ -151,6 +151,42 @@ export function useEntry(id: EntryId | null) {
   }, [client, id, revision]);
   // Not the last entry's while this one is asked for: null until it comes.
   return state && state.entry.id === id ? state : null;
+}
+
+/** What is said of an entry, each thread with its replies under it, asked again after every change, and saying more. */
+export function useComments(id: EntryId | null) {
+  const { client, revision, changed } = useDrive();
+  const [state, setState] = useState<{ of: EntryId | null; comments: Comment[]; error: Error | null }>({ of: null, comments: [], error: null });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked again after every change, which `revision` counts
+  useEffect(() => {
+    if (!id) return setState({ of: null, comments: [], error: null });
+    let live = true;
+    client.comments(id).then(
+      (comments) => live && setState({ of: id, comments, error: null }),
+      (error: Error) => live && setState({ of: id, comments: [], error }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [client, id, revision]);
+  const then =
+    <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      try {
+        return await fn(...args);
+      } finally {
+        changed();
+      }
+    };
+  return {
+    comments: state.of === id ? state.comments : [],
+    loading: state.of !== id,
+    error: state.of === id ? state.error : null,
+    add: then((text: string, replyTo?: string) => client.addComment(id!, text, replyTo)),
+    edit: then((comment: string, text: string) => client.editComment(id!, comment, text)),
+    resolve: then((comment: string, resolved: boolean = true) => client.resolveComment(id!, comment, resolved)),
+    remove: then((comment: string) => client.removeComment(id!, comment)),
+  };
 }
 
 /** The changes, each telling the provider when it is done so that every hook asks again. */

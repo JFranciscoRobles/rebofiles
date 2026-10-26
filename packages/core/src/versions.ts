@@ -2,7 +2,7 @@
 // a new version, so that nothing is lost by restoring.
 
 import { DriveError } from './errors';
-import type { Context, Drive, EntryId, FileEntry, Rendition, Version } from './model';
+import type { Context, Drive, EntryId, FileEntry, PartHashes, Rendition, Version } from './model';
 import { getFile, isTrashed } from './tree';
 
 function live(drive: Drive, id: EntryId): FileEntry {
@@ -14,7 +14,7 @@ function live(drive: Drive, id: EntryId): FileEntry {
 const withFile = (drive: Drive, file: FileEntry): Drive => ({ entries: new Map(drive.entries).set(file.id, file) });
 
 /** The file saved again: its new bytes become the version it is now. */
-export function addVersion(drive: Drive, id: EntryId, version: { id: string; key: string; size: number; note?: string; sha256?: string }, context: Context): Drive {
+export function addVersion(drive: Drive, id: EntryId, version: { id: string; key: string; size: number; note?: string; sha256?: string; parts?: PartHashes }, context: Context): Drive {
   const file = live(drive, id);
   if (file.versions.some((v) => v.id === version.id)) throw new DriveError('duplicate-id', `There is already a version ${version.id}`);
   const next: Version = { ...version, at: context.at, by: context.by };
@@ -36,6 +36,7 @@ export function restoreVersion(drive: Drive, id: EntryId, versionId: string, new
     by: context.by,
     restoredFrom: old.id,
     ...(old.sha256 ? { sha256: old.sha256 } : {}),
+    ...(old.parts ? { parts: old.parts } : {}),
     ...(old.placeholder ? { placeholder: old.placeholder } : {}),
     ...(old.renditions ? { renditions: old.renditions } : {}),
   };

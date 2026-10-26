@@ -5,7 +5,8 @@
 // server what arrived; and an upload left halfway is remembered, so the same
 // file uploaded again goes on from where it was.
 
-import type { Activity, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
+import { partsOf } from '@rebofiles/core';
+import type { Activity, Comment, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
 import { type MadeRendition, placeholderOf, renditionsOf } from './images';
 
 export interface ClientOptions {
@@ -93,6 +94,17 @@ export interface UploadOptions {
   rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
   /** The SHA-256 of its bytes, in hex (`hashOf`): kept with the version, to tell the same file uploaded again. */
   sha256?: string;
+  /**
+   * The SHA-256 of each part, made here and sent first: a new version whose parts are those of the one before but
+   * some has only those sent, the rest copied in the storage; and the next one can be sent so too. For large files
+   * changed a little, as a sync sends them. Off unless said: it reads the whole file once more.
+   */
+  partHashes?: boolean;
+  /**
+   * What the page makes of it itself, after it is up: its pictures, what is written in it. The server makes the rest
+   * (`derive`), and only that: what an assistant or a sync sends, it makes all of.
+   */
+  madeHere?: ('pictures' | 'text')[];
   /** What is written in it, read in the page (`textOf`), sent after it to find it by; undefined for a file with none. */
   text?: (file: Blob, name: string) => Promise<string | undefined>;
 }
@@ -101,6 +113,30 @@ export interface UploadOptions {
 export interface TextFound {
   entry: FileEntry;
   snippet: string;
+}
+
+/** What is exported of a person: what they own, as an archive holds it, and what they said and did. */
+export interface Exported {
+  person: string;
+  at: string;
+  pack: Packed;
+  entries: Entry[];
+  /** The ids of what others shared with them. */
+  shared: EntryId[];
+  comments: Comment[];
+  activity: Activity[];
+  settings: PersonalSettings;
+}
+
+/** The SHA-256 of each part of a file, as the server cuts it (`partsOf`), in hex. */
+export async function hashesOfParts(file: Blob, signal?: AbortSignal): Promise<string[]> {
+  const hashes: string[] = [];
+  for (const part of partsOf(file.size)) {
+    signal?.throwIfAborted();
+    const digest = await crypto.subtle.digest('SHA-256', await file.slice(part.from, part.to).arrayBuffer());
+    hashes.push([...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join(''));
+  }
+  return hashes;
 }
 
 /** What a page watching is told of a change, as the server says it at `/events`. */
@@ -135,6 +171,8 @@ export interface SettingsAnswer {
   canConfigure: boolean;
   /** Whether the drive's were ever saved: until they are, they are the defaults, and an application's options come before them. */
   saved: boolean;
+  /** Who is asking, as the server identified them: whose comments are their own. */
+  you?: string;
 }
 
 interface Part {
@@ -250,13 +288,28 @@ export function createDriveClient(options: ClientOptions) {
      */
     watch(onChange: (event: DriveEvent) => void, how: { onState?: (watching: boolean) => void } = {}): () => void {
       const stopped = new AbortController();
+      // A tab not seen lets go of its connection, which a browser has six of for a host over HTTP/1.1, and takes it
+      // again when it is seen, asking again what it shows, as what changed meanwhile was not told to it.
+      let away: AbortController | undefined;
+      let back: (() => void) | undefined;
+      const seen = () => typeof document === 'undefined' || document.visibilityState !== 'hidden';
+      const onVisibility = () => {
+        if (!seen()) away?.abort();
+        else if (back) back(), (back = undefined), onChange({ by: null, at: new Date().toISOString(), folders: [], entries: [] });
+      };
+      if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+      stopped.signal.addEventListener('abort', () => typeof document !== 'undefined' && document.removeEventListener('visibilitychange', onVisibility));
       void (async () => {
         let wait = 1000;
         while (!stopped.signal.aborted) {
+          if (!seen()) await new Promise<void>((done) => ((back = done), stopped.signal.addEventListener('abort', () => done())));
+          if (stopped.signal.aborted) return;
+          away = new AbortController();
+          const signal = AbortSignal.any([stopped.signal, away.signal]);
           let status = 0;
           try {
             status = await readEvents(
-              stopped.signal,
+              signal,
               (name, data) => {
                 if (name !== 'change') return;
                 try {
@@ -268,6 +321,11 @@ export function createDriveClient(options: ClientOptions) {
           } catch {}
           if (stopped.signal.aborted) return;
           how.onState?.(false);
+          // Let go of while not seen: taken again when it is, not after a wait.
+          if (away.signal.aborted) {
+            wait = 1000;
+            continue;
+          }
           if (status === 404 || status === 501) return;
           await pause(wait, stopped.signal).catch(() => undefined);
           // Signed out: asked again, but seldom.
@@ -283,6 +341,23 @@ export function createDriveClient(options: ClientOptions) {
     search: async (query: string, options: { within?: EntryId; trashed?: boolean } = {}) =>
       (await ask<{ entries: Entry[] }>('GET', `/search${q({ q: query, within: options.within, trashed: options.trashed ? '1' : undefined })}`)).entries,
     info: () => ask<{ storage: string; maxSize: number }>('GET', '/info'),
+    /** What is said of an entry, each thread with its replies under it. */
+    comments: async (id: EntryId) => (await ask<{ comments: Comment[] }>('GET', `/entries/${encodeURIComponent(id)}/comments`)).comments,
+    /** A comment on an entry, or a reply under one. */
+    addComment: async (id: EntryId, text: string, replyTo?: string) => (await ask<{ comment: Comment }>('POST', `/entries/${encodeURIComponent(id)}/comments`, { text, replyTo })).comment,
+    /** What one's own comment says, changed. */
+    editComment: async (id: EntryId, comment: string, text: string) =>
+      (await ask<{ comment: Comment }>('PATCH', `/entries/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}`, { text })).comment,
+    /** A thread dealt with, or open again. */
+    resolveComment: async (id: EntryId, comment: string, resolved = true) =>
+      (await ask<{ comment: Comment }>('PATCH', `/entries/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}`, { resolved })).comment,
+    /** A comment taken back, with its replies. */
+    removeComment: async (id: EntryId, comment: string) => void (await ask('DELETE', `/entries/${encodeURIComponent(id)}/comments/${encodeURIComponent(comment)}`)),
+    /** On hold, for who may configure the drive: neither it nor what is inside it trashed or deleted until released. */
+    hold: (id: EntryId, reason?: string) => one('PUT', `/entries/${encodeURIComponent(id)}/hold`, { reason }),
+    release: (id: EntryId) => one('DELETE', `/entries/${encodeURIComponent(id)}/hold`),
+    /** Everything of a person: oneself, or anyone for who may configure the drive. `downloadZip` with `pack` makes the archive. */
+    exportPerson: (user?: string) => ask<Exported>('GET', `/export${q({ user })}`),
     /** What others shared with the one asking. */
     shared: async () => (await ask<{ entries: Entry[] }>('GET', '/shared')).entries,
     /** What was done to an entry, and, of a folder, to what is right inside it: the newest first. */
@@ -369,9 +444,10 @@ export function createDriveClient(options: ClientOptions) {
       const remembered = memory.get(key);
       if (remembered) plan = await resume(remembered).catch(() => (memory.delete(key), null));
       if (!plan) {
+        const partHashes = options.partHashes && !options.rendition ? await hashesOfParts(file, signal) : undefined;
         const asked = options.rendition
           ? { rendition: options.rendition, type, size: file.size }
-          : { name, parent: options.parent ?? null, file: options.file, type, size: file.size, sha256: options.sha256 };
+          : { name, parent: options.parent ?? null, file: options.file, type, size: file.size, sha256: options.sha256, partHashes, madeHere: options.madeHere };
         const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', asked, signal);
         plan = { ...start, done: [] };
         memory.set(key, plan.token);

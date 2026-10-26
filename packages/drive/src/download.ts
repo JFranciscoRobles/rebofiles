@@ -30,6 +30,8 @@ export interface ZipDownloadOptions {
   signal?: AbortSignal;
   /** From how many bytes it is written to a file the person chooses, where the browser can; 500 MB unless said. */
   streamFrom?: number;
+  /** Files of text put in it besides, at their paths: what is exported of a person, beside their files. */
+  extra?: { path: string; text: string }[];
 }
 
 export interface ZipDownload {
@@ -75,6 +77,10 @@ export async function downloadZip(client: ZipSource, ids: EntryId[], options: Zi
   }
 
   async function* items(): AsyncGenerator<ZipItem> {
+    for (const { path, text } of options.extra ?? []) {
+      const bytes = new TextEncoder().encode(text);
+      yield { path, modified: new Date(), size: bytes.length, compress: true, open: async () => new Blob([bytes]).stream() };
+    }
     for (const path of packed.folders) yield { path, modified: new Date() };
     for (let from = 0; from < packed.files.length; from += AT_ONCE) {
       const batch = packed.files.slice(from, from + AT_ONCE);

@@ -22,6 +22,9 @@ const en = {
     linked: 'made a link to it',
     unlinked: 'removed a link to it',
     colored: 'changed its colour',
+    commented: 'commented on it',
+    held: 'put it on hold',
+    released: 'released its hold',
   } as Record<Activity['action'], string>,
   shortcuts: [
     ['Tab', 'Into the cards, and on to the panel'],
@@ -199,6 +202,9 @@ const es: StudioTexts = {
     linked: 'creó un enlace',
     unlinked: 'quitó un enlace',
     colored: 'le cambió el color',
+    commented: 'lo comentó',
+    held: 'lo puso en retención',
+    released: 'le quitó la retención',
   },
   shortcuts: [
     ['Tab', 'A las tarjetas, y luego al panel'],
@@ -374,6 +380,9 @@ const zh: StudioTexts = {
     linked: '为它创建了链接',
     unlinked: '移除了它的链接',
     colored: '更改了它的颜色',
+    commented: '评论了它',
+    held: '对它设置了保留',
+    released: '解除了它的保留',
   },
   shortcuts: [
     ['Tab', '进入卡片区，再到面板'],

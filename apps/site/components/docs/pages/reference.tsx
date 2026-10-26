@@ -139,7 +139,7 @@ const client = createDriveClient({
 const { entries } = await client.list(null);
 const file = await client.upload(input.files[0], { parent: entries[0].id, onProgress: ({ sent, size }) => draw(sent / size) });`;
 
-export const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings', 'Live'] as const;
+export const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings', 'Live', 'Comments', 'Keeping'] as const;
 
 export const client: DocPage = {
   title: 'Client API',

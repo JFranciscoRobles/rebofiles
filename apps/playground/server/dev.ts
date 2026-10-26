@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMcpHandler } from '@rebofiles/mcp';
 import { byRoles, createDriveHandler, diskStorage, sqliteMetadata } from '@rebofiles/server';
+import { deriveAll } from '@rebofiles/server/derive';
 
 // `REBOFILES_STORAGE` puts it elsewhere, as the tests in Chrome do, to start from nothing.
 const STORAGE = resolve(process.env.REBOFILES_STORAGE || resolve(import.meta.dirname, '../../../storage'));
@@ -33,6 +34,8 @@ export const handle = createDriveHandler({
   // The desktop application, as `npm run desktop` opens it: its page while it is made, and its window built.
   cors: { origins: ['http://localhost:5190', 'tauri://localhost', 'http://tauri.localhost'] },
   // Where an application would send a mail.
+  // Pictures and text of what the page does not make itself: the first page of a PDF, and what is written in it.
+  derive: deriveAll(),
   onShare: ({ entry, with: who, role, by, first }) => console.log(`${by.id} ${first ? 'shared' : 'changed'} “${entry.name}” with ${who} as ${role}`),
 });
 

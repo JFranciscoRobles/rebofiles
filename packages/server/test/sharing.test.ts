@@ -311,3 +311,29 @@ describe('byRoles', () => {
     expect(byRoles({ id: 'bea' }, 'delete', null, empty)).toBe(false);
   });
 });
+
+describe('sharing with a group', () => {
+  it('reaches whoever identify says is in it: in Shared with me, to read and, as an editor, to upload', async () => {
+    const handle = createDriveHandler({
+      storage: diskStorage({ folder: join(folder, String(Math.random())), secret: 's' }),
+      metadata: memoryMetadata(),
+      identify: (request) => {
+        const id = request.headers.get('x-user');
+        return id ? { id, groups: id === 'bea' ? ['ventas'] : [] } : null;
+      },
+      authorize: byRoles,
+      secret: 'u',
+      base: '/api/files',
+    });
+    const send = (url: string, init: RequestInit) => handle(new Request(url, init));
+    const ana = client(handle, 'ana');
+    const sales = (await ana.ask('POST', '/api/files/folders', { name: 'Sales', parent: null })).body.entry;
+    expect((await ana.ask('POST', `/api/files/entries/${sales.id}/shares`, { with: 'group:ventas', role: 'editor' })).status).toBe(200);
+    const bea = client(handle, 'bea');
+    expect(names((await bea.ask('GET', '/api/files/shared')).body.entries)).toEqual(['Sales']);
+    expect((await bea.upload(bytesOf(4), { name: 'q4.txt', parent: sales.id }, send)).status).toBe(200);
+    const carl = client(handle, 'carl');
+    expect((await carl.ask('GET', '/api/files/shared')).body.entries).toEqual([]);
+    expect((await carl.ask('GET', `/api/files/entries?folder=${sales.id}`)).status).toBe(403);
+  });
+});

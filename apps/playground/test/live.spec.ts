@@ -7,8 +7,10 @@ import { type Page, expect, test } from '@playwright/test';
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 
 test('a folder made in one window is there in the other, and its new name too', async ({ browser }) => {
-  const one = await (await browser.newContext()).newPage();
-  const two = await (await browser.newContext()).newPage();
+  const oneContext = await browser.newContext();
+  const one = await oneContext.newPage();
+  const twoContext = await browser.newContext();
+  const two = await twoContext.newPage();
   await one.goto('/?as=live');
   await two.goto('/?as=live');
   await expect(one.getByText('This folder is empty.')).toBeVisible();
@@ -27,6 +29,9 @@ test('a folder made in one window is there in the other, and its new name too', 
   await rename.getByRole('button', { name: 'Save' }).click();
   await expect(item(two, 'Renamed live')).toBeVisible({ timeout: 5000 });
   await expect(item(two, 'Arrived live')).toBeHidden();
+  // Each window watching holds a connection: let go of, for the tests after.
+  await oneContext.close();
+  await twoContext.close();
 });
 
 test('a folder of four hundred: only what is in sight is in the page, the keyboard goes through all', async ({ page }) => {

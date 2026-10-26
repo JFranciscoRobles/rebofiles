@@ -175,7 +175,7 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
                   h(
                     'ul',
                     { class: 'rf-items rf-link-rows', 'aria-label': t('name') },
-                    listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('emptyFolder')),
+                    listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('linkEmpty')),
                     rows.map((entry) =>
                       h(
                         'li',

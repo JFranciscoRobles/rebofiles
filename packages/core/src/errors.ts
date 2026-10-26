@@ -13,7 +13,10 @@ export type DriveErrorCode =
   | 'no-version'
   | 'invalid-share'
   | 'invalid-settings'
-  | 'invalid-color';
+  | 'invalid-color'
+  | 'invalid-comment'
+  | 'on-hold'
+  | 'retained';
 
 export class DriveError extends Error {
   readonly code: DriveErrorCode;

@@ -184,3 +184,25 @@ describe('links', () => {
     expect(() => addLink(demoDrive(), 'clients', { id: 'l', expires: ana.at }, ana)).toThrow('expire after');
   });
 });
+
+describe('groups', () => {
+  it('gives what is shared with a group to everyone the application says is in it, down the tree, and in Shared with me', async () => {
+    const { createFolder, share, accessOf, sharedWith, sharedSince, groupOf, emptyDrive } = await import('../src');
+    const at = (by: string) => ({ by, at: '2026-10-26T10:00:00.000Z' });
+    let drive = createFolder(emptyDrive(), { id: 'sales', name: 'Sales', parent: null }, at('ana'));
+    drive = createFolder(drive, { id: 'q4', name: 'Q4', parent: 'sales' }, at('ana'));
+    drive = share(drive, 'sales', groupOf('ventas'), 'editor', at('ana'));
+    const bea = { id: 'bea', groups: ['ventas'] };
+    const carl = { id: 'carl', groups: ['support'] };
+    expect(accessOf(drive, 'q4', bea)).toBe('editor');
+    expect(accessOf(drive, 'q4', carl)).toBeNull();
+    // A plain id is someone in no group.
+    expect(accessOf(drive, 'q4', 'bea')).toBeNull();
+    expect(sharedWith(drive, bea).map((e) => e.id)).toEqual(['sales']);
+    expect(sharedSince(drive, bea, undefined).map((e) => e.id)).toEqual(['sales']);
+    expect(sharedWith(drive, carl)).toEqual([]);
+    // A share of their own over the group's: the higher of the two.
+    drive = share(drive, 'q4', 'carl', 'viewer', at('ana'));
+    expect(accessOf(drive, 'q4', carl)).toBe('viewer');
+  });
+});

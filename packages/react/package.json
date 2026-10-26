@@ -15,12 +15,16 @@
     "@rebofiles/drive": "0.1.0"
   },
   "peerDependencies": {
-    "@rebodocs/core": ">=0.11.0",
+    "@rebodocs/core": ">=0.12.0",
+    "@rebodocs/viewer": ">=0.12.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {
+      "optional": true
+    },
+    "@rebodocs/viewer": {
       "optional": true
     }
   },

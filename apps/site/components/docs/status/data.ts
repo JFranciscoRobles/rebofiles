@@ -8,13 +8,13 @@ export const MEASURED = 'October 26, 2026';
 export const TESTS: { where: string; count: number; what: string }[] = [
   {
     where: 'packages/core',
-    count: 63,
-    what: 'Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity, text found in a file, folder colours and placeholders.',
+    count: 64,
+    what: 'Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity, text found in a file, folder colours and placeholders; groups of the application, reached down the tree and in Shared with me.',
   },
   {
     where: 'packages/server',
-    count: 89,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example. Uploads refused before and after they arrive: by beforeUpload, by the type their bytes are, by a ClamAV that knows EICAR, and while it is down; uploads left halfway swept from a bucket and the disk. The events: each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut.',
+    count: 114,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example. Uploads refused before and after they arrive: by beforeUpload, by the type their bytes are, by a ClamAV that knows EICAR, and while it is down; uploads left halfway swept from a bucket and the disk. The events: each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut. The drive a piece at a time: what SQLite and Postgres answer to each query is what the drive held whole answers; rows of before filled once; two hundred thousand entries listed in milliseconds, never read whole. Comments, threads, resolved, taken back; a legal hold and a minimum of days; everything of a person exported. onChange, the logger, OpenTelemetry, limits by person, by link and by address. Only the parts of a version that changed sent, the rest copied in the bucket and on the disk. Pictures, placeholders and text made by the server with sharp and pdf.js, a PDF’s first page among them.',
   },
   {
     where: 'packages/drive',
@@ -23,8 +23,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/react',
-    count: 9,
-    what: 'The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change through useActions; a view loading as itself, not as the last; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and <FileDrive> beside the hooks.',
+    count: 10,
+    what: 'The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change through useActions; a view loading as itself, not as the last; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and <FileDrive> beside the hooks; and useComments.',
   },
   {
     where: 'packages/sync',
@@ -48,8 +48,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 50,
-    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools; a folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard and the grid.',
+    count: 53,
+    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools; a folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard and the grid; comments said, answered, edited and resolved, axe on them, seen in another window; a legal hold; a PDF’s first page made by the server and shown as it comes. All of it in WebKit too.',
   },
 ];
 
@@ -87,10 +87,10 @@ export const CHECKED: [string, string][] = [
 
 export const NOT_CHECKED: [string, string][] = [
   ['Other buckets', 'Cloudflare R2 only. Not AWS, MinIO or Backblaze yet.'],
-  ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone. The desktop window, Safari’s engine, started but not driven by tests.'],
+  ['Other browsers', 'Chrome and WebKit (Safari’s engine) by the tests, all of them in each. Firefox in the workflow only: Playwright’s Firefox does not start on this Mac. Not on a real phone.'],
   ['Two processes on SQLite', 'Opened by two handlers one after the other for changes; the events of one seen by the other. For more than one process that writes, Postgres.'],
   ['Windows and Linux', 'The Desktop workflow builds and tests the application on both; it has not run yet, and nobody has used it there.'],
-  ['The workflows', 'CI, Desktop and Release are written; none has run on GitHub yet.'],
+  ['The workflows', 'CI, Desktop and Release are written; the first CI was pushed, and has not been looked at.'],
 ];
 
 export const LIMITS: { area: string; items: string[] }[] = [
@@ -101,7 +101,7 @@ export const LIMITS: { area: string; items: string[] }[] = [
   {
     area: 'Metadata',
     items: [
-      'The drive is held in memory and read again when the store says it changed: fine for a team and well beyond, not for millions of entries.',
+      'SQLite, Postgres and memory are asked a piece at a time; a store of one’s own without `scoped` is held whole in memory, fine for a team and well beyond, not for millions of entries.',
       'Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.',
       'The changes of another process are seen by the events within two seconds, from the revision of the store.',
     ],
@@ -119,14 +119,14 @@ export const LIMITS: { area: string; items: string[] }[] = [
     items: [
       'Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.',
       'The same file is told by a SHA-256 made in the page, up to 64 MiB; a larger one only by its name.',
-      'PDFs get no picture of their first page, and their text is not read for a search.',
+      'A PDF’s first page and its text are made by the server, with `derive` and pdf.js; without it, a PDF has no picture and is not found by its words.',
     ],
   },
   {
     area: 'Sharing',
     items: [
-      'People are named by the id the application gives them; no groups but everyone signed in.',
-      'Links are for viewers only; a commenter has nothing to comment on yet.',
+      'People and groups are named by the ids the application gives them; who is in a group is the application’s, asked as it identifies.',
+      'Links are for viewers only.',
       'An editor who moves something of someone else’s to the top puts it in its owner’s My files.',
     ],
   },

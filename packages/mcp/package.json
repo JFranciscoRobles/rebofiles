@@ -15,8 +15,8 @@
     "@rebofiles/core": "0.1.0"
   },
   "peerDependencies": {
-    "@rebodocs/core": ">=0.11.0",
-    "@rebodocs/mcp": ">=0.11.0"
+    "@rebodocs/core": ">=0.12.0",
+    "@rebodocs/mcp": ">=0.12.0"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {

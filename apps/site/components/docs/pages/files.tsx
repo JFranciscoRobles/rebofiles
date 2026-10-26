@@ -3,6 +3,7 @@
 
 import { hrefOf } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../ui';
+import { DERIVE_CODE } from './team';
 
 export const RESUME = `// A file cut halfway, or left when the page closed, is uploaded again:
 await client.upload(file, { parent });  // asks the server what arrived, sends the rest`;
@@ -197,6 +198,35 @@ export const previews: DocPage = {
         </P>
       ),
     },
+    {
+      id: 'made-by-the-server',
+      title: 'Made by the server',
+      badge: 'derive',
+      color: 'orange',
+      lead: 'What comes from no page (an assistant, a sync, a script), and what no page makes (a PDF’s first page): made by the server a moment after it is kept.',
+      body: (
+        <>
+          <Code code={DERIVE_CODE} />
+          <List
+            items={[
+              <>
+                <C>pictures()</C>: a picture in the drive’s sizes, never larger than it, and its placeholder, with <C>sharp</C>.
+              </>,
+              <>
+                <C>pdf()</C>: a PDF’s first page drawn, and the text of its first fifty pages for a search, with <C>pdfjs-dist</C> and <C>@napi-rs/canvas</C>.
+              </>,
+              <>
+                <C>docx()</C> and <C>text()</C>: what is written in a Word document, with Rebodocs, and in a file of text.
+              </>,
+            ]}
+          />
+          <P>
+            The page says what it makes itself, and the server makes only the rest; each library is asked for when first needed, so only what is used is installed. The page shows what comes, as the
+            events tell it.
+          </P>
+        </>
+      ),
+    },
   ],
 };
 
@@ -354,7 +384,7 @@ export const zip: DocPage = {
 };
 
 export const DOCX = `import { FileDrive } from '@rebofiles/react';
-import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs'; // needs @rebodocs/editor
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
 
 <FileDrive
   base="/api/files"
@@ -378,7 +408,8 @@ export const word: DocPage = {
   source: 'apps/site/components/docs/pages/files.tsx',
   lead: (
     <>
-      Rebodocs is an optional peer: with <C>@rebodocs/editor</C> installed, a .docx is read by its engine. Without it, the drive shows a .docx as any other file.
+      Rebodocs is an optional peer: with <C>@rebodocs/core</C> and <C>@rebodocs/viewer</C> installed, a .docx is read by its engine and shown in Rebodocs' viewer. Without it, the drive shows a .docx
+      as any other file.
     </>
   ),
   sections: [

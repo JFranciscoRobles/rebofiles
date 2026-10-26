@@ -43,6 +43,11 @@ const es: Said = {
   'bad-days': 'Un enlace dura de un día a noventa.',
   'bad-password': 'Una contraseña de cuatro caracteres o más.',
   'too-many': 'Son demasiados a la vez.',
+  'rate-limited': 'Demasiadas a la vez: inténtalo de nuevo en un momento.',
+  'invalid-comment': 'Un comentario dice algo, de 5000 caracteres como mucho.',
+  'no-comment': 'Ese comentario ya no está.',
+  'on-hold': 'Está en retención: no se puede mandar a la papelera ni borrar.',
+  retained: 'Aún no se puede borrar para siempre: se conserva unos días más.',
   server: 'Algo salió mal en el servidor.',
 };
 
@@ -81,6 +86,11 @@ const zh: Said = {
   'bad-days': '链接有效期为一到九十天。',
   'bad-password': '密码至少四个字符。',
   'too-many': '一次太多了。',
+  'rate-limited': '请求过于频繁，请稍后再试。',
+  'invalid-comment': '评论需要有内容，最多 5000 个字符。',
+  'no-comment': '该评论已不存在。',
+  'on-hold': '处于保留状态：不能移入回收站或删除。',
+  retained: '暂时不能永久删除：还需保留一段时间。',
   server: '服务器出错了。',
 };
 

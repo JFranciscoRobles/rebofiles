@@ -168,15 +168,12 @@ export function clamav(options: ClamavOptions = {}): Inspect {
     try {
       answer = await scan(upload, options);
     } catch (error) {
-      console.error('ClamAV could not scan a file:', error);
-      throw new Refused(503, 'not-scanned', `${upload.name} could not be scanned for viruses. Try again in a moment.`);
+      throw new Refused(503, 'not-scanned', `${upload.name} could not be scanned for viruses. Try again in a moment.`, { cause: error });
     }
     const found = /^stream: (.+) FOUND$/.exec(answer);
     if (found) throw new Refused(422, 'virus-found', `${upload.name} has a virus (${found[1]}), and was not kept.`);
-    if (!/^stream: OK$/.test(answer)) {
-      console.error('ClamAV answered:', answer);
-      throw new Refused(503, 'not-scanned', `${upload.name} could not be scanned for viruses. Try again in a moment.`);
-    }
+    if (!/^stream: OK$/.test(answer))
+      throw new Refused(503, 'not-scanned', `${upload.name} could not be scanned for viruses. Try again in a moment.`, { cause: new Error(`ClamAV answered: ${answer}`) });
   };
 }
 

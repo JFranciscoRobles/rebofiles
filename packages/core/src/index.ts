@@ -6,7 +6,9 @@ export {
   type EntryId,
   type Version,
   type Rendition,
+  type PartHashes,
   type Trashed,
+  type Hold,
   type Role,
   type Share,
   type Link,
@@ -29,6 +31,7 @@ export {
   type NewFolder,
   type NewFile,
   type Removed,
+  type Keep,
   createFolder,
   addFile,
   rename,
@@ -40,6 +43,9 @@ export {
   purgeTrash,
   usageOf,
   setColor,
+  setHold,
+  heldBy,
+  retainedUntil,
 } from './ops';
 export { addVersion, restoreVersion, versionNumber, addRendition, renditionFor, filesByHash, setPlaceholder, PLACEHOLDER, PLACEHOLDER_MOST } from './versions';
 export {
@@ -57,7 +63,31 @@ export {
   settingsFor,
 } from './settings';
 export { type PackedFile, type Packed, packOf } from './pack';
-export { type SearchOptions, search, textMatch, wordsOf } from './search';
+export { type SearchOptions, search, textMatch, wordsOf, foldText } from './search';
 export { type Changes, changes } from './changes';
 export { type Activity, type ActivityAction, activityOf, activityFor } from './activity';
-export { type Action, type Access, EVERYONE, allows, accessOf, share, unshare, sharedWith, sharedSince, addLink, removeLink, linked, linkOf, useLink, linkSpent, LINK_GRACE } from './sharing';
+export { type Comment, COMMENT_LENGTH, commentText, mentionsOf, threads } from './comments';
+export {
+  type Action,
+  type Access,
+  type Who,
+  EVERYONE,
+  GROUP,
+  groupOf,
+  isGroup,
+  shareNamesOf,
+  allows,
+  accessOf,
+  share,
+  unshare,
+  sharedWith,
+  sharedSince,
+  addLink,
+  removeLink,
+  linked,
+  linkOf,
+  useLink,
+  linkSpent,
+  LINK_GRACE,
+} from './sharing';
+export { PART_SIZE, MAX_PARTS, partSizeOf, partsOf } from './parts';

@@ -2,6 +2,7 @@
 // `?as=bea`. And a link, opened by someone who is neither.
 
 import { type Page, expect, test } from '@playwright/test';
+import { copied, watchClipboard } from './clipboard';
 
 // A row is read with its owner, date and size after its name: found by what it starts with.
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
@@ -41,14 +42,14 @@ test('Ana shares a folder with Bea as an editor, and Bea finds it and puts a fil
 });
 
 test('a link reads the folder without signing in, until it is taken back', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await watchClipboard(page);
   await page.goto('/?as=ana');
   await item(page, 'Team').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
   const dialog = page.getByRole('dialog', { name: 'Share “Team”' });
   await dialog.getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
-  const address = await page.evaluate(() => navigator.clipboard.readText());
+  const address = await copied(page);
   expect(address).toMatch(/\?link=/);
 
   const someone = await context.browser()!.newPage();
@@ -65,7 +66,7 @@ test('a link reads the folder without signing in, until it is taken back', async
 });
 
 test('a link with a password asks for it before showing anything', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await watchClipboard(page);
   await page.goto('/?as=ana');
   await item(page, 'Team').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
@@ -78,7 +79,7 @@ test('a link with a password asks for it before showing anything', async ({ page
   await dialog.getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
   await expect(dialog.getByRole('listitem').filter({ hasText: 'Password' }).filter({ hasText: 'One download' })).toBeVisible();
-  const address = await page.evaluate(() => navigator.clipboard.readText());
+  const address = await copied(page);
 
   const someone = await context.browser()!.newPage();
   await someone.goto(address);

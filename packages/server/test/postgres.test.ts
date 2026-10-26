@@ -52,8 +52,8 @@ describe('metadata on Postgres', () => {
 
   it('reads an entry that comes as text, as some drivers give jsonb', async () => {
     const db = new PGlite();
-    const store = await postgresMetadata({ query: async (text, values) => (text.startsWith('SELECT entry') ? { rows: [{ entry: JSON.stringify(folder) }] } : db.query(text, values)) });
     const folder = { kind: 'folder', id: 'f', name: 'As text', parent: null, owner: 'ana', created: '2026-10-25T00:00:00Z', modified: '2026-10-25T00:00:00Z', modifiedBy: 'ana' };
+    const store = await postgresMetadata({ query: async (text, values) => (text.startsWith('SELECT entry') ? { rows: [{ entry: JSON.stringify(folder) }] } : db.query(text, values)) });
     expect((await store.load()).entries.get('f')?.name).toBe('As text');
   });
 });
