@@ -27,7 +27,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "sample": "vite-node tools/sample.ts --",
-    "build:packages": "npm run build -w @rebofiles/core -w @rebofiles/server -w @rebofiles/react -w @rebofiles/mcp",
+    "build:packages": "npm run build -w @rebofiles/core -w @rebofiles/server -w @rebofiles/drive -w @rebofiles/react -w @rebofiles/mcp",
     "test:browser": "playwright test"
   },
   "devDependencies": {

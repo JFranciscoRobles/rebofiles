@@ -11,7 +11,8 @@
     "./rebodocs": "./src/rebodocs.ts"
   },
   "dependencies": {
-    "@rebofiles/core": "0.1.0"
+    "@rebofiles/core": "0.1.0",
+    "@rebofiles/drive": "0.1.0"
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.10.0",

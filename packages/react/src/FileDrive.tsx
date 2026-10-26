@@ -5,12 +5,9 @@
 
 import { EVERYONE, type Entry, type EntryId, type FileEntry, type FolderEntry, type Role, versionNumber } from '@rebofiles/core';
 import { type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { RequestError } from './client';
+import { type DocumentPreview, RequestError, CSS, badgeOf, formatDate, formatSize, kindOf } from '@rebofiles/drive';
 import { DriveProvider, type DriveProviderProps, type View, useActions, useDrive, useEntries, useEntry, useOuterDrive, useUploads } from './headless';
-import { formatDate, formatSize } from './i18n';
 import { Icon, Logo } from './icons';
-import { badgeOf, kindOf } from './kinds';
-import { CSS } from './styles';
 
 export interface FileDriveProps extends Omit<DriveProviderProps, 'children'> {
   /** The name over the drive: the application's, or "Files". */
@@ -29,12 +26,6 @@ export interface FileDriveProps extends Omit<DriveProviderProps, 'children'> {
   /** The address a link of the drive is given: where your page that reads it with `<SharedLink>` is. This page with `?link=` unless given. */
   linkAddress?: (token: string) => string;
   className?: string;
-}
-
-/** What the preview of a document shows: its title and its first paragraphs. */
-export interface DocumentPreview {
-  title: string;
-  paragraphs: string[];
 }
 
 /** Larger documents are not read for a preview: they would cost more than a glance is worth. */

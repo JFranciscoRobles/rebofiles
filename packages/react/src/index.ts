@@ -2,9 +2,10 @@
 // from, and the client of the server's routes. Each name is here on purpose;
 // a change to this list is a change of the API.
 
-export { type FileDriveProps, type DocumentPreview, FileDrive } from './FileDrive';
+export { type FileDriveProps, FileDrive } from './FileDrive';
 export { type SharedLinkProps, SharedLink } from './SharedLink';
 export { type DriveProviderProps, type View, type Entries, type Upload, DriveProvider, useDrive, useOuterDrive, useEntries, useEntry, useActions, useUploads } from './headless';
+// What the drive is made of, from @rebofiles/drive, so that an application of React needs only this package.
 export {
   type ClientOptions,
   type DriveClient,
@@ -13,10 +14,17 @@ export {
   type UploadProgress,
   type LinkClient,
   type LinkListing,
+  type MemoryOptions,
+  type MemoryClient,
+  type Texts,
+  type Kind,
+  type DocumentPreview,
   RequestError,
   createDriveClient,
   createLinkClient,
-} from './client';
-export { type MemoryOptions, type MemoryClient, createMemoryClient } from './memory';
-export { type Texts, TEXTS, formatSize, formatDate } from './i18n';
-export { type Kind, kindOf } from './kinds';
+  createMemoryClient,
+  TEXTS,
+  formatSize,
+  formatDate,
+  kindOf,
+} from '@rebofiles/drive';

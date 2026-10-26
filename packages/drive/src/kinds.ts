@@ -3,6 +3,12 @@
 
 import { type Entry, splitName } from '@rebofiles/core';
 
+/** What the preview of a document shows: its title and its first paragraphs. */
+export interface DocumentPreview {
+  title: string;
+  paragraphs: string[];
+}
+
 export type Kind = 'folder' | 'docx' | 'pdf' | 'sheet' | 'image' | 'text' | 'other';
 
 export function kindOf(entry: Entry): Kind {

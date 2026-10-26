@@ -5,11 +5,8 @@
 
 import type { Entry, EntryId } from '@rebofiles/core';
 import { useEffect, useMemo, useState } from 'react';
-import { type LinkListing, RequestError, createLinkClient } from './client';
-import { TEXTS, type Texts, formatDate, formatSize, translator } from './i18n';
+import { CSS, type LinkListing, RequestError, TEXTS, type Texts, badgeOf, createLinkClient, formatDate, formatSize, kindOf, translator } from '@rebofiles/drive';
 import { Icon, Logo } from './icons';
-import { badgeOf, kindOf } from './kinds';
-import { CSS } from './styles';
 
 export interface SharedLinkProps {
   /** Where the routes of @rebofiles/server are: `/api/files`. */

@@ -1,0 +1,27 @@
+{
+  "name": "@rebofiles/drive",
+  "version": "0.1.0",
+  "description": "A file drive for the browser without a framework: the whole interface mounted on an element, and the client of @rebofiles/server it is built on. No dependencies but core.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./rebodocs": "./src/rebodocs.ts"
+  },
+  "dependencies": {
+    "@rebofiles/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "@rebodocs/core": ">=0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@rebodocs/core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

@@ -4,8 +4,7 @@
 
 import type { Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, createDriveClient } from './client';
-import { TEXTS, type Texts, type Translate, translator } from './i18n';
+import { type DriveClient, TEXTS, type Texts, type Translate, createDriveClient, translator } from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@rebofiles/core": "0.1.0",
+    "@rebofiles/drive": "0.1.0",
     "@rebofiles/react": "0.1.0",
     "@rebodocs/core": "^0.10.0",
     "@rebodocs/react": "^0.10.0",
