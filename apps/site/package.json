@@ -11,11 +11,13 @@
     "start": "npx serve out -l 5182"
   },
   "dependencies": {
+    "@rebodocs/core": "^0.11.0",
+    "@rebodocs/mcp": "^0.11.0",
+    "@rebodocs/react": "^0.11.0",
     "@rebofiles/core": "0.1.0",
     "@rebofiles/drive": "0.1.0",
+    "@rebofiles/mcp": "0.1.0",
     "@rebofiles/react": "0.1.0",
-    "@rebodocs/core": "^0.11.0",
-    "@rebodocs/react": "^0.11.0",
     "next": "^16.4.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

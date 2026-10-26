@@ -1,7 +1,7 @@
 {
   "name": "@rebofiles/demo",
   "version": "0.1.0",
-  "description": "The drive entirely in the browser, on memory, with the files of Acme: the one on the landing.",
+  "description": "The drive entirely in the browser, on memory, with the files of Acme, and Claude at work in it through the MCP tools: the one on the landing.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -10,9 +10,11 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@rebofiles/core": "0.1.0",
-    "@rebofiles/react": "0.1.0",
     "@rebodocs/core": "^0.11.0",
-    "@rebodocs/react": "^0.11.0"
+    "@rebodocs/mcp": "^0.11.0",
+    "@rebodocs/react": "^0.11.0",
+    "@rebofiles/core": "0.1.0",
+    "@rebofiles/mcp": "0.1.0",
+    "@rebofiles/react": "0.1.0"
   }
 }

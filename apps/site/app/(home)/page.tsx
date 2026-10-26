@@ -175,7 +175,7 @@ export default async function Home() {
             <LiveDemo />
           </div>
           <p className="mt-8 text-center text-[15px] text-muted">
-            Claude’s rename is what the MCP tools of @rebofiles/mcp do, with your rights. Same drive, your own UI →{' '}
+            Claude’s rename goes through the MCP tools of @rebofiles/mcp and Rebodocs, here in the page. Same drive, your own UI →{' '}
             <a href="/docs/hooks/" className="font-medium text-brand hover:text-brand-hover">
               see it built with headless hooks
             </a>

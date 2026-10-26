@@ -159,7 +159,7 @@ server, the preview of a Word document, a strict typecheck.
 
 13. ✅ **`mcp`:** the tools, with `authorize()` asked for the assistant too,
     over HTTP and stdio.
-14. Claude in the demo, as on the landing: a rename it makes, and seen.
+14. ✅ Claude in the demo, as on the landing: a rename it makes, and seen.
 15. ✅ Rebodocs' MCP and ReboFiles' together: find a contract, open it, change
     it, save it as a new version.
 

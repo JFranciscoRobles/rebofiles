@@ -129,6 +129,12 @@ minor version (0.x.0) may change the API; such changes are listed under
   `authorize` decides for it as for them. `createMcpHandler` serves them over
   HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
   The playground serves them at `/api/mcp`.
+- **Claude in the demo, through the MCP tools.** Its rename on the landing
+  is the calls an assistant makes (`search`, `read_document`, `rename`),
+  answered by the tools of `@rebofiles/mcp` and Rebodocs over the drive in
+  the page, as Claude; each is shown in its card as it is made. The tools
+  run in a page too now: `serveStdio` asks for Node's readline only when it
+  is called.
 - **Word documents of the drive, edited by an assistant.** With
   `@rebodocs/mcp` installed beside `@rebofiles/mcp`, Rebodocs' tools are
   served on the drive's `.docx` files, each given the id of one as

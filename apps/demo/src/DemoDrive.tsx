@@ -1,14 +1,16 @@
 // The drive of the landing: Acme's files, kept in the page, with Word
 // documents previewed and opened in Rebodocs, and Claude renaming a contract
-// through MCP a few seconds in. The landing puts this in its frame; `main.tsx`
-// shows it alone.
+// through MCP a few seconds in: the calls an assistant makes, answered by the
+// tools of @rebofiles/mcp and Rebodocs' as on a server, over the drive in the
+// page. The landing puts this in its frame; `main.tsx` shows it alone.
 
-import { rename } from '@rebofiles/core';
 import type { FileEntry } from '@rebofiles/core';
+import { answer, driveAt } from '@rebofiles/mcp';
 import { DriveProvider, FileDrive, type MemoryClient, createMemoryClient, useDrive } from '@rebofiles/react';
 import { previewDocx } from '@rebofiles/react/rebodocs';
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { CONTRACT, YOU, seed } from './seed';
+import { BASE, routesOver } from './routes';
+import { YOU, seed } from './seed';
 
 const Editor = lazy(() => import('./Editor'));
 
@@ -52,28 +54,57 @@ function Demo({ client, defaultView, claudeActivity, language }: Required<DemoDr
 }
 
 const SAID = {
-  en: 'Renamed contract-final(2).docx → contract-northwind.docx, per the client on page 1.',
-  es: 'Cambió el nombre de contract-final(2).docx a contract-northwind.docx, por el cliente de la página 1.',
+  en: (to: string) => `Renamed to ${to}, after the client on page 1.`,
+  es: (to: string) => `Le cambió el nombre a ${to}, por el cliente de la página 1.`,
 };
 
-/** What an assistant does through MCP, as the drive sees it: a change by someone else, and a card that says what. */
+type Step = { tool: string; said: string };
+
+/**
+ * An assistant at work, as the drive sees it: the messages Claude would send to the MCP server, each answered by the
+ * real tools over the drive in the page, as Claude. Its thinking is scripted; what it asks and is told is not.
+ */
 function Claude({ client, language }: { client: MemoryClient; language: 'en' | 'es' }) {
   const { changed } = useDrive();
+  const [steps, setSteps] = useState<Step[]>([]);
   const [said, setSaid] = useState('');
   const [closed, setClosed] = useState(false);
   useEffect(() => {
+    let live = true;
+    const drive = driveAt({ base: BASE, fetch: routesOver(client, 'Claude') });
+    let id = 0;
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const answered = await answer({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: args } }, drive);
+      const result = answered?.result as { content: { text: string }[]; structuredContent: Record<string, unknown>; isError: boolean } | undefined;
+      if (!result || result.isError) throw new Error(result?.content[0].text ?? 'No answer.');
+      return result;
+    };
+    const step = (tool: string, text: string) => live && setSteps((all) => [...all, { tool, said: text }]);
+    const work = async () => {
+      const found = (await call('search', { query: 'contract final' })).structuredContent.entries as { id: string; name: string }[];
+      const contract = found.find((entry) => entry.name.endsWith('.docx'));
+      if (!contract || !live) return;
+      step('search', contract.name);
+      const read = (await call('read_document', { document: contract.id })).content[0].text;
+      const party = /between .+? and ([^\s,.]+(?: [A-Z][\w.]*)*)/.exec(read)?.[1];
+      if (!party || !live) return;
+      step('read_document', party);
+      const name = `contract-${party.split(' ')[0].toLowerCase()}.docx`;
+      await call('rename', { id: contract.id, name });
+      changed();
+      step('rename', name);
+      if (live) setSaid(SAID[language](name));
+    };
     const timer = setTimeout(() => {
-      try {
-        client.apply((drive, context) => rename(drive, CONTRACT, 'contract-northwind.docx', context), 'Claude');
-        changed();
-        setSaid(SAID[language]);
-      } catch {
-        // Renamed or moved by the person meanwhile: Claude leaves it as it is.
-      }
+      // Renamed, moved or trashed by the person meanwhile: Claude leaves it as it is.
+      work().catch(() => undefined);
     }, 3000);
-    return () => clearTimeout(timer);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
   }, [client, changed, language]);
-  if (!said || closed) return null;
+  if (!steps.length || closed) return null;
   return (
     <div
       role="status"
@@ -104,6 +135,14 @@ function Claude({ client, language }: { client: MemoryClient; language: 'en' | '
           ×
         </button>
       </div>
+      <ol aria-label={language === 'es' ? 'Herramientas usadas' : 'Tools used'} style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: 3 }}>
+        {steps.map((s) => (
+          <li key={s.tool} style={{ display: 'flex', gap: 8, fontSize: 12, color: '#6b6963' }}>
+            <code style={{ font: '500 11.5px ui-monospace, SFMono-Regular, Menlo, monospace', color: '#a4521c' }}>{s.tool}</code>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.said}</span>
+          </li>
+        ))}
+      </ol>
       <div style={{ marginTop: 6, fontSize: 13, color: '#4a4843' }}>{said}</div>
     </div>
   );

@@ -8,7 +8,7 @@ const config: NextConfig = {
   images: { unoptimized: true },
   // The packages are in the same repository, two folders up, as TypeScript.
   turbopack: { root: path.join(import.meta.dirname, '../..') },
-  transpilePackages: ['@rebofiles/core', '@rebofiles/drive', '@rebofiles/react'],
+  transpilePackages: ['@rebofiles/core', '@rebofiles/drive', '@rebofiles/mcp', '@rebofiles/react'],
 };
 
 export default config;

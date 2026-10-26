@@ -1,13 +1,14 @@
 // The tools over stdio, as an assistant on the same computer starts them
 // (Claude Desktop, Claude Code): one message a line in, one answer a line out.
 // Nothing but answers goes to stdout; what is for a person goes to stderr.
+// Node's readline is asked for only here, so the tools also run in a page.
 
 import type { Readable, Writable } from 'node:stream';
-import { createInterface } from 'node:readline';
 import { type DriveOptions, driveAt } from './drive';
 import { type Message, answer } from './protocol';
 
 export async function serveStdio(options: DriveOptions, streams: { input?: Readable; output?: Writable } = {}): Promise<void> {
+  const { createInterface } = await import('node:readline');
   const drive = driveAt(options);
   const output = streams.output ?? process.stdout;
   const lines = createInterface({ input: streams.input ?? process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
