@@ -20,6 +20,9 @@ export {
   type Texts,
   type Kind,
   type DocumentPreview,
+  type UploadsSummary,
+  type Conflict,
+  type Choice,
   RequestError,
   createDriveClient,
   createLinkClient,
@@ -27,5 +30,6 @@ export {
   TEXTS,
   formatSize,
   formatDate,
+  formatDuration,
   kindOf,
 } from '@rebofiles/drive';

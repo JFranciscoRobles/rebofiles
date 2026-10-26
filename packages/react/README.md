@@ -42,7 +42,9 @@ the arrows, Enter to open, Delete for the trash, F2 to rename.
 | `theme` | `'light'` (the default), `'dark'`, or `'auto'` as the system is. Also on `<SharedLink>`. |
 | `onOpen` | A file opened. Unless given, it opens in a new tab as the browser shows it. |
 | `onOpenDocument` | Gives Word documents an "Open in Rebodocs" button. |
-| `previewDocument` | Reads a Word document for its preview: `previewDocx` of `@rebofiles/react/rebodocs`. |
+| `previewDocument`, `viewDocument`, `thumbDocument`, `pictureDocument`, `textDocument` | Word documents read by Rebodocs, of `@rebofiles/react/rebodocs`: `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`, for the details, the viewer, the grid, the picture made at upload and the search. |
+| `checkUploads` | `false` to upload without looking for the same file, or one of its name, in the drive first. |
+| `settings` | `false` to leave out the screen of settings and its button. |
 | `linkAddress` | Where a link of the drive points: the page of yours with `<SharedLink>`. This page with `?link=` unless given. |
 
 `theme="dark"` shows it dark, and `"auto"` as the system is; light unless
@@ -54,8 +56,10 @@ on a `className` of your own.
 
 **Share**, in the details, gives an entry to someone by their id, as viewer,
 commenter or editor, or to everyone signed in, and makes links that anyone
-may open for seven days without signing in. What others share is in
-**Shared with me**. The server decides with `byRoles` of `@rebofiles/server`.
+may open without signing in, for a day, a week or a month, with a password
+or for one download when asked. What others share is in **Shared with me**,
+with how many are new beside it. The server decides with `byRoles` of
+`@rebofiles/server`, and tells your application of each share (`onShare`).
 
 A link opens in a page of yours, with what it reads and nothing to change:
 
@@ -102,7 +106,8 @@ function Folder({ id }: { id: string | null }) {
 | `useEntries(view)` | A folder, the recent files, the trash or a search, asked again after every change. |
 | `useEntry(id)` | One entry as it is now, and where it is. |
 | `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `upload`, `url`. |
-| `useUploads()` | Files sent one after another, in parts, with what has gone of each. |
+| `useUploads({ check })` | Files sent three at a time, in parts, with what has gone of each, how fast and how long it has left (`uploads`, `summary`); `retry`, `stop`, `stopAll`, `dismiss`, `clear`. With `check: true`, each looked for in the drive first and asked about (`decide`). |
+| `useSettings()` | The drive's settings and the person's own, and `save`, `saveMine`. |
 
 ## Settings of your own
 
@@ -139,8 +144,10 @@ axe; the client is tested in `@rebofiles/drive`. Not on npm yet.
 
 ## Where it can improve
 
-- **Choosing several entries** at once, to move or trash them together.
-- **Uploads that resume** after the page is closed.
+- **Hooks for what is newer:** the activity, a search by what is written, and
+  folder colours are in `<FileDrive>` and in the client (`client.activity`,
+  `client.searchText`, `client.setColor` of `useDrive()`), not yet hooks of
+  their own.
 
 ## License
 

@@ -14,8 +14,12 @@ const CONTENTS: [string, string][] = [
   ['route', 'The route'],
   ['authorize', 'Who may do what'],
   ['page', 'The page'],
+  ['uploads', 'Uploads'],
+  ['space', 'Space and the trash'],
   ['sharing', 'Sharing'],
+  ['activity', 'Activity and search'],
   ['rebodocs', 'Word documents'],
+  ['origins', 'Another origin'],
   ['trouble', 'When something fails'],
   ['next', 'From here'],
 ];
@@ -105,13 +109,35 @@ export default function Files() {
 const HEADERS = `<FileDrive base="/api/files" headers={async () => ({ authorization: \`Bearer \${await token()}\` })} />`;
 
 const DOCX = `import { FileDrive } from '@rebofiles/react';
-import { previewDocx } from '@rebofiles/react/rebodocs'; // needs @rebodocs/core
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs'; // needs @rebodocs/editor
 
 <FileDrive
   base="/api/files"
-  previewDocument={previewDocx}
+  previewDocument={previewDocx}   // the details: its first paragraphs
+  viewDocument={viewDocx}         // the viewer: its pages, with Rebodocs' zoom
+  thumbDocument={thumbDocx}       // the grid, until a picture of it is made
+  pictureDocument={pictureOfDocx} // that picture, of its first page, made at upload
+  textDocument={textOfDocx}       // what is written in it, to find it by
   onOpenDocument={(file, url) => router.push(\`/documents/\${file.id}\`)}
 />`;
+
+const SPACE = `// For whoever authorize() lets 'configure': with byRoles, a user identify() gives as { id, admin: true }.
+// Or from the settings of the drive, under Storage, in the page.
+createDriveHandler({ ...options, settings: { quota: 5 * 1024 ** 3, trashDays: 30 } });`;
+
+const ON_SHARE = `createDriveHandler({
+  ...options,
+  // Once the share is kept; a failure here is not the request's.
+  onShare: async ({ entry, with: who, role, by, first }) => {
+    if (first) await mail(who, \`\${by.id} shared “\${entry.name}” with you as \${role}\`);
+  },
+});`;
+
+const ORIGINS = `createDriveHandler({
+  ...options,
+  // The desktop window on a Mac and on Windows, and a page of another domain.
+  cors: { origins: ['tauri://localhost', 'http://tauri.localhost', 'https://app.example.com'] },
+});`;
 
 const ACTIONS: [string, string][] = [
   ['list', 'What is in a folder; null for the top. Each entry in it is then asked as read.'],
@@ -236,12 +262,37 @@ npm run storage                                   # the drive, at http://localho
       <Section id="page" title="The page">
         <Code lang="tsx" code={PAGE} file="app/files/page.tsx" />
         <p>
-          It takes the height it is given. That is the search, My files, Recent and the Trash, the list and the grid, previews, versions, uploads by button or by dropping files, and moving by
-          dragging. In the list: the arrows, Enter to open, Delete for the trash, F2 to rename. <C>language</C> is <C>&apos;en&apos;</C> or <C>&apos;es&apos;</C>; its colours, radii and fonts are
-          custom properties on <C>.rf-drive</C> (<C>--rf-brand</C>, <C>--rf-radius</C>, <C>--rf-font</C>).
+          It takes the height it is given. That is the search, My files, Shared with me, Recent and the Trash, the list and the grid in an order of one’s choosing, previews and a viewer, versions,
+          activity, uploads by button or by dropping files and folders, moving by dragging, folders in colours, and a screen of settings for the language, the theme, the colour of the brand, the
+          pictures and the space. In the list: the arrows, Enter to open, Delete for the trash, F2 to rename, a menu for each entry by a right click, ⌘Z to undo. <C>language</C> is{' '}
+          <C>&apos;en&apos;</C> or <C>&apos;es&apos;</C>; its colours, radii and fonts are custom properties on <C>.rf-drive</C> (<C>--rf-brand</C>, <C>--rf-radius</C>, <C>--rf-font</C>).
         </p>
         <p>When your session is a token rather than a cookie, give the headers for every request to your server; they are never sent to the bucket:</p>
         <Code lang="tsx" code={HEADERS} />
+      </Section>
+
+      <Section id="uploads" title="Uploads">
+        <p>
+          By the button, by dropping files, or a whole folder of the computer, its folders made as they were. Three files go at once, each in parts, in a panel that says of each how much has gone, how
+          fast and how long it has left; one is stopped, or tried again from what arrived, and one cut, or left when the page closed, goes on from where it was when it is uploaded again.
+        </p>
+        <p>
+          Before each goes it is looked for in the drive: the same bytes anywhere the person may read, by a SHA-256 made in the page for files of up to 64 MiB, are uploaded anyway or skipped; a name
+          already taken where it goes is replaced as a new version, both kept, or skipped, for one or for all. <C>checkUploads=&#123;false&#125;</C> uploads without asking, a taken name made free with
+          “(2)”.
+        </p>
+        <p>
+          A picture goes with copies in the drive’s four sizes, made in the page, and a placeholder of a few pixels shown blurred while it comes; the original stays as it was. Several picked, or a
+          folder, download as one .zip, made in the page as the files come.
+        </p>
+      </Section>
+
+      <Section id="space" title="Space and the trash">
+        <p>
+          A quota gives each person the bytes they may keep, every version counted, and an upload past it is refused before anything goes; the side of the drive shows the space one uses. The trash
+          deletes for good what has been in it a number of days, the bytes with it. Both are in the settings of the drive, under Storage, for whoever may configure it, or given as its defaults:
+        </p>
+        <Code code={SPACE} />
       </Section>
 
       <Section id="sharing" title="Sharing">
@@ -251,9 +302,26 @@ npm run storage                                   # the drive, at http://localho
           <C>top: &apos;everyone&apos;</C>.
         </p>
         <p>
-          A <strong>link</strong> lets anyone who has it look and download, without signing in, for seven days or until it is removed. Its address goes to a page of yours that shows it:
+          A <strong>link</strong> lets anyone who has it look and download, without signing in, for a day, a week or a month, or until it is removed; with a password, asked for before anything is
+          shown and kept only as scrypt makes it; or for one download, which still works a quarter of an hour after, for the files of that download. Its address goes to a page of yours that shows it:
         </p>
         <Code lang="tsx" code={SHARE} />
+        <p>
+          Beside <strong>Shared with me</strong> the drive counts what was shared since one last looked there. To tell the person yourself, by mail or a notice of your application, give the server{' '}
+          <C>onShare</C>:
+        </p>
+        <Code code={ON_SHARE} />
+      </Section>
+
+      <Section id="activity" title="Activity and search">
+        <p>
+          Every change is kept as activity, whatever made it: uploaded, renamed, moved, put in the trash, shared, a colour given. The details of a file have its <strong>Activity</strong>, and of a
+          folder what was done right inside it too. The store keeps it in a table of its own, on SQLite and on Postgres.
+        </p>
+        <p>
+          A search finds by name first, then by what is written in a file, with the words found shown in its row. The page reads the text of a text file as it uploads it, and of a Word document with{' '}
+          <C>textDocument=&#123;textOfDocx&#125;</C>; SQLite keeps it in its full-text search, Postgres as a <C>tsvector</C>. PDFs are not read yet.
+        </p>
       </Section>
 
       <Section id="rebodocs" title="Word documents">
@@ -266,6 +334,14 @@ npm run storage                                   # the drive, at http://localho
           Saving it back as a new version is <C>useActions().upload(file, &#123; file: id &#125;)</C>; the playground of the repository does it with Rebodocs’ editor, in{' '}
           <C>apps/playground/src/Editor.tsx</C>.
         </p>
+      </Section>
+
+      <Section id="origins" title="Another origin">
+        <p>
+          The desktop application of the repository (<C>apps/desktop</C>, Tauri, on a Mac first) shows the drive in a window of its own, against your server; so may a page of another domain. Let their
+          origins in, and put the same in the bucket’s rule of origins, as the bytes go to it from them:
+        </p>
+        <Code code={ORIGINS} />
       </Section>
 
       <Section id="trouble" title="When something fails">
@@ -282,6 +358,15 @@ npm run storage                                   # the drive, at http://localho
           <Trouble says="The bucket answered 403 to …">The key: it may not write in that bucket, or the endpoint, region or bucket name are not the ones it was made for.</Trouble>
           <Trouble says="This link does not work any more.">
             It was removed, it expired, what it read went to the trash, or its address was changed on the way: which one, a link does not say to whoever holds it.
+          </Trouble>
+          <Trouble says="There is no room for it: … are used, and it is ….">
+            The person’s quota (<C>413 over-quota</C>): more room in the settings of the drive, or less in their files and their trash.
+          </Trouble>
+          <Trouble says="This link asks for its password. · That is not the password.">
+            A link made with a password: the page of the link asks for it, and sends it as <C>x-link-password</C> with every request.
+          </Trouble>
+          <Trouble says="The server could not be reached, or does not let this application in.">
+            The desktop window, or a page of another domain: its origin is missing from <C>cors</C> on the server.
           </Trouble>
           <Trouble says="Sign in first. · You may not do that here.">
             401 is <C>identify</C> returning null; 403 is <C>authorize</C> returning false.

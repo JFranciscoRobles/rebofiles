@@ -63,13 +63,16 @@ The playground of the repository serves it at `http://localhost:5180/api/mcp`.
 | --- | --- |
 | `list_folder` | What is in a folder, or at the top of My files, with the id of each. |
 | `search` | By name: every word, any case, with or without accents; in a folder, or the trash. |
+| `search_text` | By what is written in a file, as the page read it when it was uploaded: text files and Word documents, with a piece of the text around what was found. |
 | `get_info` | One entry: type, size, owner, where, who it is shared with, its versions. |
+| `get_activity` | Who did what to an entry, and in a folder to what is right inside it, the newest first. |
 | `read_file` | The text of a text file, or of a Word document with `@rebodocs/core` installed; of a version too. Up to a megabyte. |
 | `list_recent`, `list_shared` | Recent, and Shared with me. |
 | `create_folder`, `create_text_file` | Something new, with "(2)" when the name is taken. |
 | `update_text_file` | A new version of a text file; the old one stays. |
 | `restore_version` | An earlier version back, as a new one: that too can be undone. |
 | `rename`, `move` | Refused when the name is taken there. |
+| `set_folder_color` | A folder in one of the drive's colours, or its own again. |
 | `move_to_trash`, `restore` | Into the trash and out of it. |
 
 Each says whether it only reads (`readOnlyHint`). What the server refuses

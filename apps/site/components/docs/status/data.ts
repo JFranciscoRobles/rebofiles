@@ -3,33 +3,34 @@
 // checked" of ROADMAP.md, which says the same in the same order.
 
 /** When the numbers below were taken. */
-export const MEASURED = 'October 25, 2026';
+export const MEASURED = 'October 26, 2026';
 
 export const TESTS: { where: string; count: number; what: string }[] = [
   {
     where: 'packages/core',
-    count: 49,
-    what: 'Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me, links.',
+    count: 63,
+    what: 'Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity, text found in a file, folder colours and placeholders.',
   },
   {
     where: 'packages/server',
-    count: 50,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS’s example.',
+    count: 77,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example.',
   },
   {
     where: 'packages/drive',
-    count: 24,
-    what: 'The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.',
+    count: 38,
+    what: 'The client against the routes and against a bucket: uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; the drive kept in the page.',
   },
   {
     where: 'packages/mcp',
     count: 19,
-    what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may; Rebodocs’ tools on the drive’s Word documents, each change a version, a viewer reading and an editor writing, a save made meanwhile not written over, and none of them without Rebodocs; and driven by the official SDK as a client.',
+    what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may; activity, a search by what is written, folder colours; Rebodocs’ tools on the drive’s Word documents, each change a version; and driven by the official SDK as a client.',
   },
+  { where: 'apps/desktop', count: 2, what: 'Which server the window is of, kept between starts and tried before it is taken; and in Rust, a name taken in Downloads made free.' },
   {
     where: 'npm run test:browser',
-    count: 29,
-    what: 'The demo of the landing: Claude’s calls to the MCP tools, the rename seen, and left alone when the person renamed first. The playground in Chrome with Playwright: a folder, uploads in parts, the preview, “(2)”, F2, the trash and back, search, moving, emptying the trash, Spanish at the width of a phone; sharing with Bea, and a link opened signed out until it is taken back; the keyboard alone; axe on every state, light and dark; the drive with no framework; a drive from the hooks alone.',
+    count: 48,
+    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools.',
   },
 ];
 
@@ -48,6 +49,11 @@ export const CHECKED: [string, string][] = [
   ['Rebodocs', 'A Word document uploaded, previewed as a page, opened in Rebodocs, changed, saved with ⌘S, and back in the drive as its second version.'],
   ['The demo', 'Acme’s files made in the page, a Word document and a PDF previewed, Claude’s rename and its card, an upload in steps, the trash emptied.'],
   [
+    'Pictures',
+    'Against R2: a picture uploaded in four sizes and its placeholder, the grid reading the small ones from addresses good for an hour; a Word document’s first page made a picture at upload; a .zip of six files.',
+  ],
+  ['The desktop', 'ReboFiles.app built on a Mac with Tauri and started; its page against the playground from another origin, an upload in parts through it.'],
+  [
     'The builds',
     'Each package built as it goes to npm and installed from its tarball in an empty project: a server on node:http, the client uploading and reading back over the network, <FileDrive> rendered on a server, a strict typecheck.',
   ],
@@ -55,25 +61,30 @@ export const CHECKED: [string, string][] = [
 
 export const NOT_CHECKED: [string, string][] = [
   ['Other buckets', 'Cloudflare R2 only. Not AWS, MinIO or Backblaze yet.'],
-  ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone.'],
+  ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone. The desktop window, Safari’s engine, started but not driven by tests.'],
   ['Two processes on SQLite', 'Opened by two handlers one after the other, not at once; for more than one process, Postgres.'],
 ];
 
 export const LIMITS: { area: string; items: string[] }[] = [
   {
     area: 'Storage',
-    items: [
-      'An upload that fails or is stopped is given up, and what of it arrived taken away; one left when the page is closed halfway stays in the bucket until a lifecycle rule of the bucket takes it.',
-    ],
+    items: ['An upload left halfway stays in the bucket as parts for a day, to be gone on with; one never gone on with waits for a lifecycle rule of the bucket.'],
   },
   {
     area: 'Metadata',
     items: [
-      'The whole drive is loaded on each request, and each change copies the map of entries: fine for tens of thousands of entries.',
+      'The drive is held in memory and read again when the store says it changed: fine for a team and well beyond, not for millions of entries.',
       'Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.',
     ],
   },
-  { area: 'Uploads', items: ['Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.', 'No resuming yet after the page is closed.'] },
+  {
+    area: 'Uploads',
+    items: [
+      'Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.',
+      'The same file is told by a SHA-256 made in the page, up to 64 MiB; a larger one only by its name.',
+      'PDFs get no picture of their first page, and their text is not read for a search.',
+    ],
+  },
   {
     area: 'Sharing',
     items: [
@@ -137,6 +148,13 @@ export const ROADMAP: Milestone[] = [
     name: 'Big files and other storage',
     items: [{ what: 'Uploads that resume after a cut, files of several gigabytes', done: true }, { what: 'Google Cloud Storage and Azure Blob' }],
   },
-  { version: '0.6.0', name: 'The desktop', items: [{ what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' }, { what: 'The Tauri application, on a Mac first' }] },
+  {
+    version: '0.6.0',
+    name: 'The desktop',
+    items: [
+      { what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' },
+      { what: 'The Tauri application, on a Mac first: the drive in a window, against a server', done: true },
+    ],
+  },
   { version: '1.0.0', name: 'Settled', items: [{ what: 'Used in a real application, and fixed where that shows' }, { what: 'The API settled, and kept from then on' }] },
 ];

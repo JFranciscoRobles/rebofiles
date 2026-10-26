@@ -118,7 +118,7 @@ function Hero() {
 
       <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface py-1.5 pl-2 pr-3.5 text-sm text-muted">
         <span className="rounded-full border border-border bg-white px-2 py-0.5 text-xs font-semibold text-ink">New</span>
-        Word documents open in Rebodocs, and every save is a version
+        Search inside files, activity, folder colours, and a desktop app
       </p>
       <h1 className="mx-auto mt-7 max-w-[900px] text-balance font-display text-[clamp(44px,6.6vw,84px)] font-extrabold leading-[1.04] tracking-[-0.03em]">
         The file drive you{' '}
@@ -168,7 +168,8 @@ export default async function Home() {
             <Pill color="brand">Live demo</Pill>
             <Title>This is the drive. Click around.</Title>
             <p className="mt-4.5 text-lg leading-[1.6] text-muted">
-              Open folders, search, upload a file, preview it, open a .docx in Rebodocs, restore an old version, send it to the trash and bring it back. Nothing leaves the browser.
+              Open folders, search, upload a few files and watch each go, preview them, open a .docx in Rebodocs, colour a folder, restore an old version, send it to the trash and bring it back.
+              Nothing leaves the browser.
             </p>
           </div>
           <div className="reveal relative mt-11 rounded-3xl border border-border bg-surface p-3.5">
@@ -215,13 +216,13 @@ export default async function Home() {
               <Title small>Take what you need.</Title>
             </div>
             <p className="max-w-[380px] text-base leading-[1.6] text-muted">
-              The core has no DOM, so the same file model runs in your server, your browser and, later, your desktop.{' '}
+              The core has no DOM, so the same file model runs in your server, your browser and your desktop.{' '}
               {PUBLISHED ? (
                 <a href={NPM_ORG} className="font-medium text-brand hover:text-brand-hover">
                   See them on npm →
                 </a>
               ) : (
-                'Three are written; none is on npm yet.'
+                'All are written; none is on npm yet.'
               )}
             </p>
           </div>

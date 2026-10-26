@@ -19,14 +19,18 @@ npm install @rebofiles/drive
 
 ```ts
 import { mountDrive } from '@rebofiles/drive';
-import { previewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core
+import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/editor
 
 const drive = mountDrive(document.getElementById('files')!, {
   base: '/api/files',
   title: 'Acme Files',
   language: 'es',
   theme: 'auto',
-  previewDocument: previewDocx,
+  previewDocument: previewDocx, // the details: its first paragraphs
+  viewDocument: viewDocx, // the viewer: its pages, with Rebodocs' zoom
+  thumbDocument: thumbDocx, // the grid: its first page, until a picture of it is made
+  pictureDocument: pictureOfDocx, // that picture, made at upload
+  textDocument: textOfDocx, // what is written in it, to find it by
   onOpenDocument: (file, url) => openInRebodocs(file, url),
 });
 
@@ -36,8 +40,9 @@ drive.destroy();
 
 The element takes the drive's height: give it one. Everything `<FileDrive>`
 takes, `mountDrive` takes: `client`, `headers`, `texts`, `logo` (a Node),
-`defaultView`, `onOpen`, `linkAddress`, `className`; and `onChange`, called
-after each change made from it, for what else in the page shows the drive.
+`defaultView`, `onOpen`, `linkAddress`, `className`, `settings: false`,
+`checkUploads: false`; and `onChange`, called after each change made from
+it, for what else in the page shows the drive.
 
 `mountSharedLink(element, { token })` is what someone sent a link sees.
 
@@ -53,6 +58,36 @@ PDF, video, audio, Markdown, CSV, JSON, code and text, and Word documents in
 their pages with `viewDocument: viewDocx` (from `@rebofiles/drive/rebodocs`,
 with `@rebodocs/editor` installed); ← and → go to the next. `onOpen` opens
 files your own way instead.
+
+## Uploads
+
+By the button, by dropping files, or a whole folder of the computer, dropped
+or chosen with "Upload a folder", its folders made as they were. Three go at
+once, each in parts, in a panel that says of each how much has gone, how fast
+and how long it has left, and of all of them together; one is stopped, or
+tried again from what arrived. One cut, or left when the page closed, goes on
+from where it was when it is uploaded again. Before each goes it is looked for
+in the drive: the same bytes anywhere (by a SHA-256 made in the page, up to
+64 MiB) are uploaded anyway or skipped, and a name taken where it goes is
+replaced as a new version, both kept, or skipped, for one or for all.
+`createUploads(client, options)` is that queue without the screen, and
+`lookInDrive(client)` what looks.
+
+As a picture goes, its smaller copies (`renditionsOf`) and a placeholder of a
+few pixels (`placeholderOf`) are made in the page and sent after it: the
+grid shows the copies, and the placeholder blurred until they come. What is
+written in a text file or a Word document (`textOf`) is sent too, and found
+by a search.
+
+## The list
+
+In an order of one's choosing: by name, modified, made, size, type, owner or
+a folder's colour, either way, the folders first or among the files, kept
+for the next visit; and only one kind of file, when asked. A right click,
+the menu key or Shift+F10 opens the menu of what is picked. What is done can
+be undone from the toast, or with ⌘Z: the trash, a move, a rename, a colour.
+A folder takes one of nine colours, from its details or its menu. The details
+have its activity: who did what to it, and in it.
 
 ## Download as .zip
 
@@ -72,7 +107,9 @@ its language and theme, the colour of its brand, and the pictures. Each
 change is saved as it is made. When an image is uploaded, `renditionsOf`
 makes copies of it in the drive's four sizes (160, 480, 1024 and 2048 pixels
 unless changed) in the page, as JPEG or as the original's type, and the client
-sends them after it; the grid and the preview show those. A person's own come
+sends them after it; the grid and the preview show those. Storage, for whoever
+may configure it: the space each person may keep, and the days the trash keeps
+what is put in it; the side of the drive shows the space one uses. A person's own come
 first, then the `language` and `theme` the application gives, then the
 drive's. `settings: false` leaves all of it out.
 
@@ -80,10 +117,12 @@ drive's. `settings: false` leaves all of it out.
 
 | Area | What it is |
 | --- | --- |
-| **The screen** | `mountDrive`, `mountSharedLink`: the search, My files, Shared with me, Recent and the Trash, the list and the grid, details, previews and versions, sharing and links, uploads by button or by dropping, moving by dragging or from a dialog. |
-| **The client** | `createDriveClient`, one function per route of @rebofiles/server; `createLinkClient` for a link; `createMemoryClient`, the drive kept in the page, for demos and tests. |
+| **The screen** | `mountDrive`, `mountSharedLink`: the search by name and by what is written, My files, Shared with me with what is new, Recent and the Trash, the list and the grid, details, activity, previews, the viewer and versions, sharing and links (with a password, or for one download), uploads by button, by dropping or of a folder, moving by dragging or from a dialog, the settings. |
+| **The client** | `createDriveClient`, one function per route of @rebofiles/server, uploads in parts that resume; `createLinkClient` for a link, with its password; `createMemoryClient`, the drive kept in the page, for demos and tests. |
+| **Uploads** | `createUploads`, `lookInDrive`, `formatDuration`; `readDropped`, `readChosen` for folders; `hashOf`, `textOf`, `renditionsOf`, `placeholderOf`. |
+| **Archives** | `downloadZip`, `writeZip`, `blobSink`, `streamSink`. |
 | **Words** | `TEXTS` in English and Spanish, `translator`, `formatSize`, `formatDate`. |
-| **Files** | `kindOf`, `badgeOf`; `previewDocx` of `./rebodocs`. |
+| **Files** | `kindOf`, `badgeOf`; of `./rebodocs`, `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`. |
 | **The look** | `CSS`, scoped to `.rf-drive`, its colours, radii and fonts as custom properties, light and dark. |
 
 The screen renders itself again after each change, and changes only what
@@ -100,10 +139,11 @@ by every test there, and on a page with no framework at all
 
 ## Where it can improve
 
-- **Choosing several entries** at once, to move or trash them together.
 - **A long folder** is rendered whole; thousands of entries would want only
   what is seen drawn.
-- **Uploads that resume** after the page is closed.
+- **PDFs**: no picture of their first page, and their text is not read for a
+  search; both would come with pdf.js.
+- **Pictures uploaded before** placeholders are shown without one.
 
 ## License
 

@@ -51,9 +51,13 @@ await actions.share(id, 'bea', 'editor'); await actions.unshare(id, 'bea');
 const { token } = await actions.createLink(id, 7);
 const url = await actions.url(id, { inline: true });`;
 
-const UPLOADS = `const { uploads, upload, dismiss } = useUploads();
+const UPLOADS = `const { uploads, summary, upload, retry, stop, decide, dismiss } = useUploads({ check: true });
 upload(input.files, folder, (entry) => console.log('up', entry.name));
-// uploads: [{ id, name, size, sent, state: 'waiting' | 'sending' | 'done' | 'failed', error? }]`;
+// uploads: [{ id, name, size, sent, speed?, remaining?, state, conflict?, error? }]
+//   state: 'waiting' | 'checking' | 'asking' | 'sending' | 'done' | 'failed' | 'stopped' | 'skipped'
+// summary: { sending, waiting, done, failed, asking, size, sent, speed, remaining? }
+formatDuration(summary.remaining ?? 0, 'en'); // "3 min"
+decide(id, 'replace' | 'keep' | 'skip', all?); // for one 'asking': there already`;
 
 const TOGETHER = `<DriveProvider base="/api/files">
   <FileDrive />          {/* the whole drive */}
@@ -123,7 +127,11 @@ export default function Hooks() {
       </Section>
 
       <Section id="uploads" title="useUploads()">
-        <p>Files sent one after another, each in parts, with how much has gone of each: for a bar of progress, or a list of what is going up.</p>
+        <p>
+          Files sent three at a time, each in parts, with how much has gone of each, how fast and how long it has left, and the same of all of them together: for a bar of progress, or a panel of what
+          is going up. One cut is tried again from what arrived. With <C>check: true</C>, each is looked for in the drive first, and one whose bytes or name are there already waits, <C>asking</C>,
+          until <C>decide</C> says what to do with it.
+        </p>
         <Code lang="tsx" code={UPLOADS} />
       </Section>
 

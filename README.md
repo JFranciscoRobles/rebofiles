@@ -13,8 +13,13 @@ to your bucket and back, at addresses the server signs for a few minutes; the
 server keeps the entries (folders, names, owners, the trash, versions) in a
 store of your choosing, and asks your application who may do what.
 
-It is early: `core`, `server` and `react` are written and tested, nothing
-is on npm yet. [ROADMAP.md](ROADMAP.md) says what is next and what is checked.
+It is early: every package is written and tested, nothing is on npm yet.
+Besides folders, versions and the trash: uploads in parts that resume, of
+whole folders, three at a time with the time each has left; the same file
+asked about before it goes; search by name and by what is written; a viewer;
+.zip downloads; links with a password or for one download; activity; quotas
+and a trash that empties itself; folder colours; settings; tools for an
+assistant; and a desktop application. [ROADMAP.md](ROADMAP.md) says what is next and what is checked.
 
 ## Quick start
 

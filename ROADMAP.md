@@ -64,42 +64,44 @@ The same rules:
 
 ## What is checked
 
-Taken on October 25, 2026, by running `npm test`, every one passing:
+Taken on October 26, 2026, by running `npm test`, every one passing:
 
-- `packages/core` · 44 · Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles inherited down the tree, Shared with me, links.
-- `packages/server` · 39 · The routes on the disk and on an S3 kept in memory, uploads in parts and given up, deleting in one request, who may do what, sharing with two people through the routes and links read without signing in, SQLite across two processes, Postgres on PGlite, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
-- `packages/drive` · 19 · The client against the routes: folders, sharing, links, uploads in parts with progress, the headers a bucket signed, an upload given up, versions, refusals, the trash; sizes, dates and kinds of file; the preview of a Word document; the drive kept in the page.
-- `packages/mcp` · 10 · The protocol and every tool over HTTP and stdio against a drive in the same process: two people's assistants, each seeing and doing only what its person may; Word documents read with Rebodocs. Driven also by the protocol's official SDK as a client, over stdio from the command installed from its tarball and over HTTP from the playground, on October 25, 2026.
+- `packages/core` · 63 · Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles inherited down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity told from two drives, text found in a file, folder colours and placeholders.
+- `packages/server` · 77 · The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, deleting in one request, who may do what, sharing with two people and links read without signing in, with a password or for one download, news of what is shared and `onShare`, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite, Postgres on PGlite and in the process, pages of another origin, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
+- `packages/drive` · 38 · The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals, the trash; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; sizes, dates and kinds of file; the drive kept in the page.
+- `packages/mcp` · 19 · The protocol and every tool over HTTP and stdio against a drive in the same process: two people's assistants, each seeing and doing only what its person may; activity, a search by what is written, folder colours; Word documents read and edited with Rebodocs, each change a version. Driven also by the protocol's official SDK as a client.
+- `apps/desktop` · 2 · Which server the window is of, kept and tried; and, in Rust (`cargo test`), a name taken in Downloads made free.
 
 ### The interface
 
-`npm run test:browser` · 19 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, a text and a file in parts uploaded, the preview, a second upload as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, emptying the trash, the drive in Spanish at the width of a phone with no sideways scroll. Ana sharing a folder with Bea as an editor, Bea finding it in Shared with me and putting a file in it, a link copied and opened by someone signed out, until it is taken back. The drive with the keyboard alone: the menu by its arrows, folders made and opened, an upload, F2, moving from the dialog, the trash, and where one is said at each step. axe, by WCAG 2.2 AA, on every state reached: empty and with files, the list and the grid, each dialog, the trash, Shared with me, a search, Spanish at the width of a phone, a link signed out, and the same in the dark theme, chosen and as the system is. The drive on a page with no framework, with no module of React loaded; and a whole drive built from the hooks alone.
+`npm run test:browser` · 48 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, uploads in parts, the preview and the viewer, "(2)" when asked, renaming with F2, the trash with Delete and back, search by name and by what is written, moving, emptying the trash, the drive in Spanish at the width of a phone. Sharing with Bea, a link opened signed out until it is taken back, one with a password, what is new in Shared with me. The panel of uploads, several at once, stopped, resumed; folders dropped; the same file and the same name asked about; .zip of what is picked and of a link's folder, and what it left out. The list in an order of one's choosing, the menu of an entry, undo; settings, storage and quotas; activity; folder colours and pictures shown blurred while they come. The keyboard alone; axe, by WCAG 2.2 AA, on every state, light and dark; the drive with no framework, and a whole drive built from the hooks alone; the demo's Claude through the MCP tools.
 
 By hand:
 
-Driven in Chrome without a window, with real clicks and keys, on the playground: a folder made, two files uploaded into it, a text previewed, a second upload with the same name as "(2)", renaming with F2, the trash with Delete and back, search, moving from the dialog, the grid with a picture, and the drive in Spanish at the width of a phone. A Word document uploaded, previewed as a page, opened in Rebodocs, changed, saved with ⌘S, and back in the drive as its second version. The demo: Acme's files made in the page, a Word document and a PDF previewed, Claude's rename and its card, the grid with pictures, an upload in steps, the trash emptied. The landing built as plain files and seen at the width of a desktop and of a phone, the demo working in its frame, with no errors in the page and no sideways scroll.
+Driven in Chrome on the playground and against Cloudflare R2: a Word document uploaded, previewed as a page, its first page made a picture, opened in Rebodocs, changed, saved with ⌘S, and back as its second version; pictures in four sizes; a .zip of six files. The demo: Acme's files made in the page, Claude's rename and its card. The landing built as plain files and seen at the width of a desktop and of a phone. The desktop application built as ReboFiles.app on a Mac, its page against the playground from another origin, an upload in parts through it.
 
 ## What is not
 
 - `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
-- `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone.
+- `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone. The desktop window is Safari's engine: started, not driven by tests.
 - `Two processes on SQLite.` SQLite was opened by two handlers one after the other, not at once; for more than one process, Postgres.
 
 ## Known limits
 
 Storage
 
-- An upload that fails or is stopped is given up, and what of it arrived taken away; one left when the page is closed halfway stays in the bucket until a lifecycle rule of the bucket takes it.
+- An upload left halfway stays in the bucket as parts for a day, to be gone on with; one never gone on with waits for a lifecycle rule of the bucket.
 
 Metadata
 
-- The whole drive is loaded on each request, and each change copies the map of entries: fine for tens of thousands of entries.
+- The drive is held in memory and read again when the store says it changed: fine for a team and well beyond, not for millions of entries.
 - Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.
 
 Uploads
 
 - Files of up to 5 GiB unless `maxSize` says otherwise; an upload is good for a day.
-- No resuming yet after the page is closed.
+- The same file is told by a SHA-256 made in the page, up to 64 MiB; a larger one only by its name.
+- PDFs get no picture of their first page, and their text is not read for a search.
 
 Sharing
 

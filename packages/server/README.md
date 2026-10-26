@@ -76,6 +76,37 @@ height } }`; they are kept with the version, the original untouched, and
 `GET /entries/:id/download?size=320` gives the smallest that shows it at
 that size. They come back with a version restored and go with the file.
 
+## Space, the trash, and what comes in twice
+
+`quota` and `trashDays` in the settings give each person the bytes they may
+keep (every version counted) and the days the trash keeps what is put in it.
+An upload past one's quota is refused before anything goes (`413
+over-quota`; `GET /usage` says how much is used, of how much); the trash is
+looked at every ten minutes, as requests come, and what has been in it long
+enough is deleted, its bytes with it. The page may send the SHA-256 of a file
+as it uploads it (`sha256` on `POST /uploads`), kept with the version, and
+`POST /duplicates { hashes }` says which files have those bytes already,
+among what the one asking may read.
+
+## Links, news and activity
+
+`POST /entries/:id/links { days, password, once }` makes a link for a day
+to ninety, opened only with its password when one is given (kept as scrypt
+makes it, apart from the drive, asked as `x-link-password` at every request)
+and good for one download when `once`, which still works a quarter of an
+hour after, for the files of that download. `onShare(event)` is called with
+each share, to tell the person by mail or as yours does; `GET /shared/new`
+counts what is new in Shared with me since `POST /shared/seen`. Every change,
+whatever made it, is kept as activity (`GET /entries/:id/activity`), by the
+store in a table of its own.
+
+## Pages of another origin
+
+The desktop application, or a page of another domain, is let in with `cors:
+{ origins: ['tauri://localhost', 'https://app.example.com'] }`: the browser's
+question answered first, and the `ETag` of a part readable. Only those
+listed; a bucket needs the same in its own rule of origins.
+
 ## Addresses
 
 The bytes are read from addresses the server signs. One to download a file
@@ -97,12 +128,14 @@ what is in them, for the page to make it.
 | **Bytes** | `s3Storage` for AWS S3, Cloudflare R2, MinIO, Backblaze B2; `diskStorage` for a folder. |
 | **Text** | Files found by what is written in them: `PUT /entries/:id/text` with what the page read, `GET /search/text`. SQLite's full-text search, Postgres's `tsvector`. |
 | **Activity** | Who did what, from each change: `GET /entries/:id/activity`, kept by the store in a table of its own. |
+| **Looks** | A folder's colour (`PATCH /entries/:id { color }`), and a picture's placeholder, the tiny one shown blurred while it comes (`PUT /entries/:id/placeholder`). |
 | **Metadata** | `memoryMetadata`, `sqliteMetadata`, `postgresMetadata`. Changes go one at a time and write only what changed; on Postgres with a pool, one at a time across processes too. |
 
 ## Status
 
-Tested through its routes in `test/api.test.ts`, on the disk and on an S3
-kept in memory; the signature against AWS's example. Postgres in
+Tested through its routes in `test/`, on the disk and on an S3 kept in
+memory, the activity and the text on each store; the signature against
+AWS's example. Postgres in
 `test/postgres.test.ts`, on PGlite, and two processes on one Postgres 16 with
 `REBOFILES_TEST_POSTGRES`. Run against Cloudflare
 R2 with `npm run storage:check` and by hand in the page (`apps/storage`); not
