@@ -38,6 +38,13 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   ]);
   await expect(item(page, 'e-config.json')).toBeVisible();
 
+  // A Word document's thumbnail is its first page, drawn: in the details, and in the grid.
+  await item(page, 'a-agreement.docx').click();
+  await expect(page.getByRole('complementary', { name: 'Details' }).locator('.rf-doc-thumb .dx-page')).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Grid' }).click();
+  await expect(item(page, 'a-agreement.docx').locator('.rf-doc-thumb .dx-page')).toBeVisible();
+  await page.getByRole('button', { name: 'List' }).click();
+
   await item(page, 'c-notes.md').dblclick();
   const viewer = page.getByRole('dialog', { name: 'c-notes.md' });
   await expect(viewer).toBeFocused();

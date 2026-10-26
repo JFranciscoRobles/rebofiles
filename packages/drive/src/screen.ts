@@ -42,6 +42,8 @@ export interface DriveOptions {
    * `@rebofiles/drive/rebodocs`, by Rebodocs' engine. Without it, the viewer shows what `previewDocument` reads.
    */
   viewDocument?: (element: HTMLElement, bytes: Uint8Array) => ShownDocument | Promise<ShownDocument>;
+  /** The first page of a Word document, drawn, for its thumbnail in the grid and the details: `thumbDocx` of `@rebofiles/drive/rebodocs`. */
+  thumbDocument?: (bytes: Uint8Array) => Promise<HTMLElement>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -210,6 +212,43 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   };
   const texts = new Map<string, string | null>();
   const pages = new Map<string, DocumentPreview | null>();
+  /** The first page of each Word document as its engine draws it, for thumbnails: null while it is made, an Error when it could not be. */
+  const thumbs = new Map<string, HTMLElement | null | Error>();
+  /** The first page of a document, small, made once for each version; undefined where there is no way to make it. */
+  const docThumb = (file: FileEntry, fit: 'page' | 'width'): Child | undefined => {
+    const make = options.thumbDocument;
+    if (!make || kindOf(file) !== 'docx' || file.versions[0].size > PREVIEW_LIMIT) return undefined;
+    const key = `${file.id}:${file.versions[0].id}`;
+    const url = urlOf(file);
+    if (url && !thumbs.has(key)) {
+      thumbs.set(key, null);
+      fetch(url)
+        .then((answer) => answer.arrayBuffer())
+        .then((bytes) => make(new Uint8Array(bytes)))
+        .then(
+          (page) => (thumbs.set(key, page), render()),
+          (error: Error) => (thumbs.set(key, error), render()),
+        );
+    }
+    const page = thumbs.get(key);
+    if (page instanceof Error) return undefined;
+    // Its own element once the page is there, which the drive does not draw again: a copy of the page, made smaller to fit.
+    return h('div', {
+      key: `thumb:${key}:${fit}:${page ? 'on' : 'wait'}`,
+      class: `rf-doc-thumb rf-fit-${fit}`,
+      'aria-hidden': 'true',
+      'data-own': true,
+      mount: (box: HTMLElement) => {
+        if (!page) return;
+        const copy = page.cloneNode(true) as HTMLElement;
+        const width = Number(page.dataset.width) || 816;
+        const height = Number(page.dataset.height) || 1056;
+        const scale = fit === 'width' ? box.clientWidth / width : Math.min(box.clientWidth / width, box.clientHeight / height);
+        copy.style.cssText = `width:${width}px;height:${height}px;transform:scale(${scale});transform-origin:top left;position:absolute;left:${Math.max(0, (box.clientWidth - width * scale) / 2)}px;top:${fit === 'width' ? 0 : Math.max(0, (box.clientHeight - height * scale) / 2)}px`;
+        box.appendChild(copy);
+      },
+    });
+  };
 
   // ---- Changes, each telling what else shows the drive, and the toast ----
 
@@ -598,7 +637,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               return item(
                 entry,
                 'rf-card',
-                h('div', { class: `rf-thumb rf-k-${kind}` }, tick(entry), url ? h('img', { src: url, alt: '', loading: 'lazy' }) : icon(entry.kind === 'folder' ? 'folder' : 'doc', 34)),
+                h(
+                  'div',
+                  { class: `rf-thumb rf-k-${kind}` },
+                  tick(entry),
+                  url ? h('img', { src: url, alt: '', loading: 'lazy' }) : (entry.kind === 'file' && docThumb(entry, 'width')) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
+                ),
                 h('div', { class: 'rf-name' }, tile(entry), h('span', null, entry.name)),
               );
             }),
@@ -607,6 +651,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   function preview(file: FileEntry) {
+    const thumb = docThumb(file, 'page');
+    if (thumb) return h('div', { class: 'rf-preview rf-preview-doc' }, thumb);
     const kind = kindOf(file);
     const reads = kind === 'text' || (kind === 'docx' && options.previewDocument && file.versions[0].size <= PREVIEW_LIMIT);
     const url = kind === 'image' ? urlOf(file, 640) : kind === 'pdf' || reads ? urlOf(file) : null;

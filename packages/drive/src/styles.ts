@@ -107,7 +107,7 @@ export const CSS = `
 .rf-row:hover .rf-tick, [data-picking='true'] .rf-row .rf-tick, .rf-row[aria-selected='true'] .rf-tick { width: 18px; border-width: 1.5px; margin-right: 0; }
 [aria-selected='true'] > * > .rf-tick, [aria-selected='true'] > .rf-tick { background: var(--rf-brand); border-color: var(--rf-brand); color: var(--rf-on-brand); }
 .rf-thumb { position: relative; }
-.rf-thumb .rf-tick { position: absolute; top: 8px; left: 8px; opacity: 0; transition: opacity .12s; }
+.rf-thumb .rf-tick { position: absolute; top: 8px; left: 8px; z-index: 2; opacity: 0; transition: opacity .12s; }
 .rf-card:hover .rf-thumb .rf-tick, [data-picking='true'] .rf-thumb .rf-tick, .rf-card[aria-selected='true'] .rf-thumb .rf-tick { opacity: 1; }
 .rf-head.rf-picking { gap: 6px; background: var(--rf-brand-light); border-radius: 12px; margin: 6px 8px 0; padding: 6px 10px; min-height: 48px; }
 .rf-picked-count { font-size: 14px; color: var(--rf-ink); white-space: nowrap; }
@@ -151,6 +151,11 @@ export const CSS = `
 .rf-details-in { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .rf-details h2 { margin: 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
 .rf-none { padding: 24px 16px; color: var(--rf-muted); }
+.rf-doc-thumb { position: absolute; inset: 0; overflow: hidden; }
+.rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
+.rf-thumb .rf-doc-thumb { inset: 8px 10px 0; border-radius: 6px 6px 0 0; }
+.rf-preview.rf-preview-doc { position: relative; height: 220px; }
+.rf-preview-doc .rf-doc-thumb { inset: 12px; }
 .rf-preview { height: 150px; border-radius: 12px; background: var(--rf-surface); display: grid; place-items: center; overflow: hidden; border: 1px solid var(--rf-border); }
 .rf-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
 /* A page is paper in either theme, with the ink of paper. */

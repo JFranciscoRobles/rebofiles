@@ -97,3 +97,46 @@ export async function viewDocx(element: HTMLElement, bytes: Uint8Array): Promise
   layout('all');
   return { pages: editor.pageCount, layout, destroy: () => editor.destroy() };
 }
+
+/** Thumbnails made one at a time: each needs an editor laid out for a moment. */
+let making: Promise<unknown> = Promise.resolve();
+
+/**
+ * The first page of a Word document as Rebodocs draws it, for a thumbnail: drawn once by its editor out of
+ * sight, and given as the element of that page, at its real size (`data-width`, `data-height` in pixels), to be
+ * shown made smaller. `mountDrive(element, { thumbDocument: thumbDocx })`.
+ */
+export function thumbDocx(bytes: Uint8Array): Promise<HTMLElement> {
+  const made = making.then(async () => {
+    const { Editor } = await import('@rebodocs/editor');
+    const box = document.createElement('div');
+    box.setAttribute('aria-hidden', 'true');
+    box.style.cssText = 'position:fixed;left:-10000px;top:0;width:1000px;height:1400px;overflow:hidden;visibility:hidden;pointer-events:none';
+    document.body.appendChild(box);
+    const editor = new Editor(box, importDocx(bytes));
+    try {
+      editor.readOnly = true;
+      editor.setZoom(1);
+      // Its text is put in the page as it comes into view: a frame or two after.
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+      const page = box.querySelector<HTMLElement>('.dx-page');
+      if (!page) throw new Error('The document has no page to show.');
+      const copy = page.cloneNode(true) as HTMLElement;
+      copy.dataset.width = String(page.offsetWidth);
+      copy.dataset.height = String(page.offsetHeight);
+      for (const away of copy.querySelectorAll('[contenteditable], textarea, input, .dx-caret, .dx-sel')) away.remove();
+      // In the editor's own class, so the rules of its pages still hold outside it.
+      const shell = document.createElement('div');
+      shell.className = 'dx-editor dx-readonly';
+      shell.appendChild(copy);
+      shell.dataset.width = copy.dataset.width;
+      shell.dataset.height = copy.dataset.height;
+      return shell;
+    } finally {
+      editor.destroy();
+      box.remove();
+    }
+  });
+  making = made.catch(() => undefined);
+  return made;
+}
