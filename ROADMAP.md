@@ -18,7 +18,7 @@ habit serves both.
 | `packages/react` | `packages/react` | `<FileDrive>` and the headless hooks (`DriveProvider`, `useFolder`, `useFile`, `useUpload`). No logic of its own: it mounts the drive and exposes it. |
 | `packages/collab` | `packages/server` | The routes, `authorize()`, and the two adapters: the bytes (S3, disk) and the metadata (memory, SQLite, Postgres). |
 | `packages/mcp` | `packages/mcp` | The tools for an assistant: list, search, read, move, rename, trash. |
-| `apps/desktop` | `packages/desktop` + `apps/desktop` | The sync engine as a package; the Tauri application that uses it. |
+| `apps/desktop` | `packages/sync` + `apps/desktop` | The sync engine as a package (`@rebofiles/sync`, as `@rebofiles/desktop` is the application's name); the Tauri application that uses it. |
 | `apps/site` | `apps/site` | Next.js 16 and Tailwind 4, the landing of the handoff, the docs, the status page. |
 | `apps/demo` | `apps/demo` | The drive running entirely in the browser, on memory: the one on the landing. |
 | `apps/playground` | `apps/playground` | `npm run dev`: the drive against a local server and a folder of the disk. |
@@ -72,14 +72,17 @@ The same rules:
 Taken on October 26, 2026, by running `npm test`, every one passing:
 
 - `packages/core` · 63 · Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles inherited down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity told from two drives, text found in a file, folder colours and placeholders.
-- `packages/server` · 77 · The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, deleting in one request, who may do what, sharing with two people and links read without signing in, with a password or for one download, news of what is shared and `onShare`, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite, Postgres on PGlite and in the process, pages of another origin, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names.
-- `packages/drive` · 38 · The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals, the trash; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; sizes, dates and kinds of file; the drive kept in the page.
+- `packages/server` · 89 · The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, deleting in one request, who may do what, sharing with two people and links read without signing in, with a password or for one download, news of what is shared and `onShare`, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite, Postgres on PGlite and in the process, pages of another origin, and the signature against AWS's example. One more, two processes on one Postgres, runs with `REBOFILES_TEST_POSTGRES`: passed on Postgres 16 on October 25, 2026, twenty folders made at once by two pools, twenty names. Uploads refused before and after they arrive (beforeUpload, the type of their bytes, a ClamAV that knows EICAR, and one that is down); uploads left halfway swept from a bucket and the disk; the events, each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut.
+- `packages/drive` · 40 · The client against the routes and against a bucket: folders, sharing, links, uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals, the trash; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; sizes, dates and kinds of file; the drive kept in the page; what the server refused, said in each language.
 - `packages/mcp` · 19 · The protocol and every tool over HTTP and stdio against a drive in the same process: two people's assistants, each seeing and doing only what its person may; activity, a search by what is written, folder colours; Word documents read and edited with Rebodocs, each change a version. Driven also by the protocol's official SDK as a client.
-- `apps/desktop` · 2 · Which server the window is of, kept and tried; and, in Rust (`cargo test`), a name taken in Downloads made free.
+- `packages/react` · 9 · The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change; a view loading as itself; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and `<FileDrive>` beside the hooks.
+- `packages/sync` · 8 · A folder of the disk and a drive behind its routes kept the same: made, changed, moved, renamed and taken away on each side; both changed kept twice; a folder and a file of one name; the files of the systems left out; a disk found empty refused; a sync that goes on, run by the events and by the disk.
+- `examples` · 5 · Next.js, Express, Hono and Fastify, each served on a port and asked over HTTP: a folder, a file of two parts uploaded and read back, the events of a change; and who asks from a JWT, a forged one refused.
+- `apps/desktop` · 5 · Which server the window is of, kept and tried; and, in Rust (`cargo test`), a name taken in Downloads made free, a path of the folder synced that would leave it refused, and what is listed, moved and taken away there.
 
 ### The interface
 
-`npm run test:browser` · 48 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, uploads in parts, the preview and the viewer, "(2)" when asked, renaming with F2, the trash with Delete and back, search by name and by what is written, moving, emptying the trash, the drive in Spanish at the width of a phone. Sharing with Bea, a link opened signed out until it is taken back, one with a password, what is new in Shared with me. The panel of uploads, several at once, stopped, resumed; folders dropped; the same file and the same name asked about; .zip of what is picked and of a link's folder, and what it left out. The list in an order of one's choosing, the menu of an entry, undo; settings, storage and quotas; activity; folder colours and pictures shown blurred while they come. The keyboard alone; axe, by WCAG 2.2 AA, on every state, light and dark; the drive with no framework, and a whole drive built from the hooks alone; the demo's Claude through the MCP tools.
+`npm run test:browser` · 50 · The playground in Chrome with Playwright, real clicks and keys: a folder made and opened, uploads in parts, the preview and the viewer, "(2)" when asked, renaming with F2, the trash with Delete and back, search by name and by what is written, moving, emptying the trash, the drive in Spanish at the width of a phone. Sharing with Bea, a link opened signed out until it is taken back, one with a password, what is new in Shared with me. The panel of uploads, several at once, stopped, resumed; folders dropped; the same file and the same name asked about; .zip of what is picked and of a link's folder, and what it left out. The list in an order of one's choosing, the menu of an entry, undo; settings, storage and quotas; activity; folder colours and pictures shown blurred while they come. The keyboard alone; axe, by WCAG 2.2 AA, on every state, light and dark; the drive with no framework, and a whole drive built from the hooks alone; the demo's Claude through the MCP tools. A folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard, in the list and the grid.
 
 By hand:
 
@@ -89,13 +92,15 @@ Driven in Chrome on the playground and against Cloudflare R2: a Word document up
 
 - `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
 - `Other browsers.` Chrome only; not Safari or Firefox, and not on a real phone. The desktop window is Safari's engine: started, not driven by tests.
-- `Two processes on SQLite.` SQLite was opened by two handlers one after the other, not at once; for more than one process, Postgres.
+- `Two processes on SQLite.` SQLite was opened by two handlers one after the other for changes; the events of one were seen by the other. For more than one process that writes, Postgres.
+- `Windows and Linux.` The Desktop workflow builds and tests the application on both; it has not run yet, and nobody has used it there.
+- `The workflows.` CI, Desktop and Release are written; none has run on GitHub yet.
 
 ## Known limits
 
 Storage
 
-- An upload left halfway stays in the bucket as parts for a day, to be gone on with; one never gone on with waits for a lifecycle rule of the bucket.
+- An upload left halfway stays in the bucket as parts for a day, to be gone on with; after that the server sweeps it, as requests come.
 
 Metadata
 
@@ -178,11 +183,13 @@ server, the preview of a Word document, a strict typecheck.
 
 ### 0.6.0 · The desktop
 
-18. **`desktop`:** a folder of the disk kept like a folder of the drive,
-    first one way, then both. Two changes to one file keep both, the second
-    as a copy beside it.
+18. ✅ **`sync`:** a folder of the disk kept like a folder of the drive, both
+    ways (`@rebofiles/sync`, `rebofiles-sync`). Two changes to one file keep
+    both, the second as a copy beside it.
 19. ✅ **`apps/desktop`:** the Tauri application, on a Mac first: the drive
-    in a window, against a server. The sync of 18 goes into it once made.
+    in a window, against a server, and the sync of 18 in it (Server → Sync a
+    Folder…). Built for Windows and Linux by the Desktop workflow; signed
+    when it is given the certificates.
 
 ### 1.0.0
 

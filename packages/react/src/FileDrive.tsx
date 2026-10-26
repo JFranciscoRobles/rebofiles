@@ -9,16 +9,16 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DriveProvider, type DriveProviderProps, useDrive, useOuterDrive } from './headless';
 
-export interface FileDriveProps extends Omit<DriveProviderProps, 'children'>, Omit<DriveOptions, 'base' | 'client' | 'headers' | 'language' | 'texts' | 'logo' | 'onChange'> {
+export interface FileDriveProps extends Omit<DriveProviderProps, 'children'>, Omit<DriveOptions, 'base' | 'client' | 'headers' | 'language' | 'texts' | 'logo' | 'onChange' | 'live'> {
   /** What goes before the title; ReboFiles' mark unless given. */
   logo?: ReactNode;
 }
 
-export function FileDrive({ base, client, headers, language, texts, ...props }: FileDriveProps) {
+export function FileDrive({ base, client, headers, language, texts, live, ...props }: FileDriveProps) {
   // Inside a provider of the application's, the drive is that one's, and so are its client and its language.
   if (useOuterDrive() && !base && !client) return <Mounted {...props} />;
   return (
-    <DriveProvider base={base} client={client} headers={headers} language={language} texts={texts}>
+    <DriveProvider base={base} client={client} headers={headers} language={language} texts={texts} live={live}>
       <Mounted {...props} />
     </DriveProvider>
   );
@@ -45,6 +45,8 @@ function Mounted({ logo, ...options }: Omit<FileDriveProps, keyof Omit<DriveProv
       texts,
       language,
       logo: logo ? (slot ?? undefined) : undefined,
+      // The provider watches for the whole page, and tells the drive through its revision.
+      live: false,
       onChange: () => {
         own.current = true;
         changed();

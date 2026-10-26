@@ -443,9 +443,8 @@ export const desktop: DocPage = {
       body: (
         <List
           items={[
-            '让磁盘上的文件夹像网盘文件夹一样被管理：同步引擎 @rebofiles/desktop 是下一步。',
             '通过服务器页面登录，适用于会话只靠 cookie 的服务器。',
-            'Windows 和 Linux：构建方式相同，但尚未测试。签名和公证：尚未完成。',
+            'Windows 和 Linux：由 Desktop 工作流构建 .dmg、Windows 安装程序、.deb 和 AppImage；尚未手动测试。将证书作为密钥提供后即可签名和公证：目前尚未提供。',
           ]}
         />
       ),

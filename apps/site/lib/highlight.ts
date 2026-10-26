@@ -5,7 +5,7 @@
 import { type Highlighter, createHighlighter } from 'shiki';
 
 const THEME = 'github-light';
-const LANGS = ['ts', 'tsx', 'bash', 'json', 'jsonc', 'sql', 'prisma'];
+const LANGS = ['ts', 'tsx', 'bash', 'json', 'jsonc', 'sql', 'prisma', 'nginx'];
 
 let highlighter: Promise<Highlighter> | undefined;
 const shiki = () => (highlighter ??= createHighlighter({ themes: [THEME], langs: LANGS }));

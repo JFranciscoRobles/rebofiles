@@ -4,7 +4,7 @@
 // For one machine, a playground or a desktop; a site puts them in a bucket.
 
 import { createReadStream } from 'node:fs';
-import { mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { READ_LIFE, type Storage, attachment, partsOf, shownWindow } from './storage';
@@ -97,6 +97,37 @@ export function diskStorage(options: DiskOptions): Storage {
 
     async remove(keys) {
       for (const key of keys) await rm(pathOf(key), { force: true });
+    },
+
+    async read(key, range) {
+      const file = await open(pathOf(key), 'r');
+      try {
+        const size = (await file.stat()).size;
+        const from = Math.min(range?.from ?? 0, size);
+        const to = Math.min(range?.to ?? size, size);
+        const bytes = new Uint8Array(Math.max(0, to - from));
+        await file.read(bytes, 0, bytes.length, from);
+        return bytes;
+      } finally {
+        await file.close();
+      }
+    },
+
+    async sweepUploads(before) {
+      // The parts of an upload, and a whole one being put together, left by an upload that never finished.
+      const keys = new Set<string>();
+      const look = async (dir: string): Promise<void> => {
+        for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+          const path = join(dir, entry.name);
+          if (entry.isDirectory()) await look(path);
+          else if (/\.(part\d+|uploading)$/.test(entry.name) && (await stat(path)).mtimeMs < before.getTime()) {
+            await rm(path, { force: true });
+            keys.add(path.replace(/\.(part\d+|uploading)$/, ''));
+          }
+        }
+      };
+      await look(folder);
+      return keys.size;
     },
 
     async serve(request, path) {

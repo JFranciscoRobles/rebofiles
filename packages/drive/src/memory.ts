@@ -5,7 +5,7 @@
 
 import * as core from '@rebofiles/core';
 import type { Context, Drive, DriveErrorCode, Entry, EntryId, FileEntry, FolderEntry } from '@rebofiles/core';
-import { type DriveClient, RequestError, type UploadOptions } from './client';
+import { type DriveClient, type DriveEvent, RequestError, type UploadOptions } from './client';
 import { placeholderOf, renditionsOf } from './images';
 
 export interface MemoryOptions {
@@ -68,10 +68,25 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     }
   };
   const lines: core.Activity[] = [];
+  // Those watching, told of every change as the server tells them: where it was, and what changed.
+  const watchers = new Set<(event: DriveEvent) => void>();
+  const tell = (before: Drive, after: Drive, by: string) => {
+    if (!watchers.size || before === after) return;
+    const { put, removed } = core.changes(before, after);
+    const folders = new Set<EntryId | null>();
+    for (const entry of put) folders.add(entry.parent).add(before.entries.get(entry.id)?.parent ?? entry.parent);
+    for (const id of removed) folders.add(before.entries.get(id)?.parent ?? null);
+    const event: DriveEvent = { by, at: context().at, folders: [...folders], entries: put.map((entry) => entry.id) };
+    // After the change is answered, as a server's comes.
+    setTimeout(() => {
+      for (const watcher of watchers) watcher(event);
+    });
+  };
   const change = <T>(work: (current: Drive) => { drive: Drive; answer: T }, by = user) =>
     run(() => {
       const done = work(drive);
       if (done.drive !== drive) lines.push(...core.activityOf(drive, done.drive, by, context().at));
+      tell(drive, done.drive, by);
       drive = done.drive;
       return done.answer;
     });
@@ -96,6 +111,11 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
   const texts = new Map<EntryId, { version: string; text: string }>();
 
   const client: DriveClient = {
+    watch(onChange, how = {}) {
+      watchers.add(onChange);
+      how.onState?.(true);
+      return () => watchers.delete(onChange);
+    },
     settings: async () => ({ drive: settings, mine, settings: core.settingsFor(settings, mine), canConfigure: true, saved }),
     saveSettings: (given) =>
       run(() => {
@@ -264,6 +284,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
       const at = context(by);
       const next = work(drive, at);
       lines.push(...core.activityOf(drive, next, by, at.at));
+      tell(drive, next, by);
       drive = next;
     },
   });

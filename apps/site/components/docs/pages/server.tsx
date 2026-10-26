@@ -550,9 +550,8 @@ export const desktop: DocPage = {
       body: (
         <List
           items={[
-            'Keeping a folder of the disk like a folder of the drive: the sync engine, @rebofiles/desktop, comes next.',
             'Signing in through the server’s page, for a server whose session is only a cookie.',
-            'Windows and Linux: built the same way, not tried. Signed and notarized: not yet.',
+            'Windows and Linux: built by the Desktop workflow, a .dmg, an installer of Windows, a .deb and an AppImage; not tried by hand yet. Signed and notarized when the certificates are given to it as secrets: none are yet.',
           ]}
         />
       ),

@@ -15,6 +15,7 @@ export {
   type TextFound,
   type LinkClient,
   type LinkListing,
+  type DriveEvent,
   RequestError,
   createDriveClient,
   createLinkClient,
@@ -23,6 +24,7 @@ export {
 } from './client';
 export { type MemoryOptions, type MemoryClient, createMemoryClient } from './memory';
 export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate } from './i18n';
+export { refusalText, REFUSAL_CODES } from './refusals';
 export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
 export { textOf, TEXT_READ } from './text';

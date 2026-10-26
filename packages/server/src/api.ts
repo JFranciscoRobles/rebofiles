@@ -42,6 +42,7 @@
 //   POST   /entries/:id/links             { days, password, once }: a link to read it without signing in, and its address
 //   GET    /entries/:id/links/:link       the address of a link again
 //   DELETE /entries/:id/links/:link       taken back
+//   GET    /events                        what changes, as it happens (server-sent events): the folders and entries of each change one may see
 //
 // Every one asks `identify` who is asking and `authorize` whether they may,
 // but for what a link reads, which asks neither: the link is the permission.
@@ -68,6 +69,7 @@ async function passwordIs(kept: unknown, given: string): Promise<boolean> {
 }
 import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
+import type { Inspect, UploadAsked } from './inspect';
 import { type KeptText, type MetadataStore, activityIn } from './metadata';
 import { Refused, answerTo } from './refused';
 import { type FinishedPart, READ_LIFE, type Storage, UploadGone, shownWindow } from './storage';
@@ -113,6 +115,25 @@ export interface DriveServerOptions {
   /** Pages of other origins that may use the routes, as `['tauri://localhost', 'https://app.example.com']`: none unless said. */
   cors?: { origins: string[] };
   onShare?: (event: { entry: Entry; with: string; role: Role; by: User; first: boolean }) => void | Promise<void>;
+  /**
+   * Asked before an upload is given addresses, with what the page says of it: its name, type, size and where it goes.
+   * Throw a `Refused` to refuse it with a message of yours (`new Refused(415, 'no-videos', 'No videos here.')`), or
+   * return false for a 403. For each new file and each new version, not for the smaller pictures the page makes.
+   */
+  beforeUpload?: (upload: UploadAsked, drive: Drive) => unknown;
+  /**
+   * Asked once the bytes are in the storage and before the file is listed, with a `read` of them: a scan for viruses
+   * (`clamav()`), the type its bytes are against the one its name says (`checkType()`). Throw a `Refused`, or return
+   * false, and the bytes are taken away and the upload refused (422). Any other error refuses it too (503): a file
+   * not looked at is not let in. Needs a storage that can `read`, as both of this package can.
+   */
+  inspect?: Inspect;
+  /**
+   * What changes told as it happens, at `GET /events`, to the pages that watch: a change made here at once, one made by
+   * another process on the same store (of a store with `revision`, as SQLite's and Postgres') within `poll`
+   * milliseconds, 2000 unless said. False for none: the pages ask again as they did, after their own changes.
+   */
+  live?: false | { poll?: number };
   now?: () => Date;
   newId?: () => string;
 }
@@ -164,6 +185,20 @@ interface Address {
   width?: number;
   height?: number;
 }
+
+/** What a page watching is told of a change: where it was, and what changed of what it may read. */
+export interface DriveEvent {
+  /** Who made it, when this process made it; null for one seen in the store, made by another. */
+  by: string | null;
+  at: string;
+  /** The folders where something came, went, or changed, that the one watching may list: null is the top. */
+  folders: (EntryId | null)[];
+  /** The entries changed, or made, that the one watching may read. */
+  entries: EntryId[];
+}
+
+/** How often a page watching is sent a line of nothing, so what is between does not take it for gone. */
+const HEARTBEAT = 25_000;
 
 /** How often the trash is looked at for what has been there longer than the settings let it. */
 const SWEEP_EVERY = 10 * 60_000;
@@ -224,6 +259,8 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
       const { drive, answer } = await work(before);
       if (drive !== before) {
         await options.metadata.save(core.changes(before, drive));
+        told = drive;
+        void tell(before, drive, by === 'drive' || by === 'trash' ? null : by);
         // Its activity after it, as what is kept beside: a change kept with no line of it is better than a line of none.
         await record(core.activityOf(before, drive, by, now())).catch((error) => console.error('The activity could not be kept:', error));
         // What was saved is what is held, under the lock that kept others out meanwhile: nothing to load for it.
@@ -235,6 +272,97 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     const run = queue.then(() => (options.metadata.lock ? options.metadata.lock(step) : step()));
     queue = run.catch(() => undefined);
     return run;
+  };
+
+  // ---- What changes, told to the pages watching ----
+  const watchers = new Set<{ user: User; send: (text: string) => void }>();
+  /** The drive as it was last told: a drive loaded that is another was changed by another process. */
+  let told: Drive | undefined;
+  const tell = async (before: Drive, after: Drive, by: string | null) => {
+    if (!watchers.size) return;
+    const { put, removed } = core.changes(before, after);
+    if (!put.length && !removed.length) return;
+    // Where each change was: the folder of what changed, the one it left when it moved, the one of what is gone.
+    const folders = new Set<EntryId | null>();
+    // The top is each one's own: told only to whose came, went or changed there, unless it is one drive for everyone.
+    const atTheTop = new Set<string>();
+    const place = (entry: Entry | undefined) => {
+      if (!entry) return;
+      folders.add(entry.parent);
+      if (entry.parent === null) atTheTop.add(entry.owner);
+    };
+    for (const entry of put) {
+      place(entry);
+      const was = before.entries.get(entry.id);
+      if (was && was.parent !== entry.parent) place(was);
+    }
+    for (const id of removed) place(before.entries.get(id));
+    const at = now();
+    for (const watcher of watchers) {
+      try {
+        const entries = (await readable(watcher.user, put, after)).map((entry) => entry.id);
+        const seen: (EntryId | null)[] = [];
+        for (const id of folders) {
+          const folder = id === null ? null : after.entries.get(id);
+          if (id === null && options.top !== 'everyone' && !atTheTop.has(watcher.user.id)) continue;
+          if (folder !== undefined && (await options.authorize(watcher.user, 'list', folder, after))) seen.push(id);
+        }
+        if (entries.length || seen.length) watcher.send(`event: change\ndata: ${JSON.stringify({ by, at, folders: seen, entries } satisfies DriveEvent)}\n\n`);
+      } catch (error) {
+        console.error('A change could not be told:', error);
+      }
+    }
+  };
+  // Changes of other processes, from the store's revision, while some page watches: of a store without one, only this process's.
+  const poll = options.live === false ? 0 : (options.live?.poll ?? 2000);
+  let polling: ReturnType<typeof setInterval> | undefined;
+  const look = async () => {
+    try {
+      const drive = await load();
+      if (told && drive !== told) await tell(told, drive, null);
+      told = drive;
+    } catch (error) {
+      console.error('The store could not be looked at for changes:', error);
+    }
+  };
+  const watch = (user: User, signal: AbortSignal): Response => {
+    let watcher: { user: User; send: (text: string) => void } | undefined;
+    let beat: ReturnType<typeof setInterval> | undefined;
+    const stop = () => {
+      if (watcher) watchers.delete(watcher);
+      clearInterval(beat);
+      if (!watchers.size) clearInterval(polling), (polling = undefined);
+    };
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const send = (text: string) => {
+          try {
+            controller.enqueue(encoder.encode(text));
+          } catch {
+            stop();
+          }
+        };
+        watcher = { user, send };
+        watchers.add(watcher);
+        send('retry: 3000\n: watching\n\n');
+        beat = setInterval(() => send(': still\n\n'), HEARTBEAT);
+        (beat as { unref?: () => void }).unref?.();
+        if (options.metadata.revision && !polling) {
+          void load().then((drive) => (told ??= drive));
+          polling = setInterval(look, poll);
+          (polling as { unref?: () => void }).unref?.();
+        }
+        signal.addEventListener('abort', () => {
+          stop();
+          try {
+            controller.close();
+          } catch {}
+        });
+      },
+      cancel: stop,
+    });
+    return new Response(body, { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' } });
   };
 
   // Kept by the store when it can, else for as long as the process lasts.
@@ -270,6 +398,40 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   };
   /** The folders down to an entry that the one asking may read: from where it was shared with them, not above. */
   const pathOf = async (user: User, drive: Drive, folders: Entry[]) => readable(user, folders, drive);
+  /** What `inspect` says of an upload whose bytes arrived: nothing when it lets it in; its bytes taken away, and refused, when not. */
+  const inspected = async (pending: Pending, user: User) => {
+    const storage = options.storage;
+    if (!storage.read) throw new Error('`inspect` needs a storage that can read: this one cannot.');
+    const drive = await load();
+    const of = pending.of ?? pending.rendition?.of;
+    const file = of ? core.getFile(drive, of) : undefined;
+    const parent = folderOf(drive, file ? file.parent : pending.file!.parent) as core.FolderEntry | null;
+    let refusal: unknown;
+    try {
+      const said = await options.inspect!(
+        {
+          user,
+          purpose: pending.rendition ? 'rendition' : pending.of ? 'version' : 'file',
+          name: file?.name ?? pending.file!.name,
+          type: pending.type,
+          size: pending.size,
+          parent,
+          ...(file ? { file } : {}),
+          key: pending.key,
+          read: (range) => storage.read!(pending.key, range),
+        },
+        drive,
+      );
+      if (said === false) refusal = new Refused(422, 'refused-content', `${file?.name ?? pending.file!.name} was not kept: it was refused when it was looked at.`);
+    } catch (error) {
+      refusal =
+        error instanceof Refused ? error : (console.error('inspect failed:', error), new Refused(503, 'not-inspected', 'The file could not be looked at before it is kept. Try again in a moment.'));
+    }
+    if (refusal) {
+      await storage.remove([pending.key]).catch((error) => console.error('The bytes of a refused upload could not be taken away:', error));
+      throw refusal;
+    }
+  };
   /** The same address for a link every time, as its token is sealed until the link expires. */
   const linkToken = (link: { id: string; expires: string }) => sealToken(options.secret, { purpose: 'link', link: link.id } satisfies LinkToken, 0, Date.parse(link.expires));
 
@@ -278,6 +440,8 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   const sweep = async () => {
     if (Date.now() - sweptAt < SWEEP_EVERY) return;
     sweptAt = Date.now();
+    // Uploads left halfway, past the life of their tokens, so none can be finished any more: their parts taken away.
+    void options.storage.sweepUploads?.(new Date(Date.parse(now()) - (UPLOAD_LIFE + 3600) * 1000)).catch((error) => console.error('Uploads left halfway could not be swept:', error));
     const days = (await driveSettings()).trashDays;
     if (!days) return;
     const before = new Date(Date.parse(now()) - days * 86_400_000).toISOString();
@@ -321,6 +485,9 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
       const linkId = decodeURIComponent(/\/links\/([^/]+)/.exec(path)?.[1] ?? '');
 
       switch (route) {
+        case 'GET /events':
+          if (!poll) throw new Refused(404, 'no-route', 'This server does not tell changes as they happen.');
+          return watch(user, request.signal);
         case 'GET /entries': {
           const drive = await load();
           const folder = folderOf(drive, url.searchParams.get('folder'));
@@ -506,6 +673,19 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             if (parent && core.isTrashed(drive, parent.id)) throw new Refused(409, 'in-trash', 'That folder is in the trash.');
             pending = { versionId, size, type, user: user.id, file: { id: newId(), name, parent: parent?.id ?? null } };
           }
+          if (options.beforeUpload) {
+            const of = pending.of ? core.getFile(drive, pending.of) : undefined;
+            const asked: UploadAsked = {
+              user,
+              purpose: of ? 'version' : 'file',
+              name: of?.name ?? pending.file!.name,
+              type,
+              size,
+              parent: folderOf(drive, of ? of.parent : pending.file!.parent) as core.FolderEntry | null,
+              ...(of ? { file: of } : {}),
+            };
+            if ((await options.beforeUpload(asked, drive)) === false) throw new Refused(403, 'upload-refused', `${asked.name} may not be uploaded here.`);
+          }
           // Room in the space of whoever owns it: one's own for a new file, the owner's for a version of theirs.
           const quota = (await driveSettings()).quota;
           if (quota !== null) {
@@ -531,6 +711,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
             await options.storage.abortUpload(pending.key, pending.state, pending.size).catch(() => undefined);
             throw error;
           }
+          if (options.inspect) await inspected(pending, user);
           const version = { id: pending.versionId, key: pending.key, size: pending.size, ...(pending.sha256 ? { sha256: pending.sha256 } : {}) };
           return Response.json(
             await change(async (drive) => {

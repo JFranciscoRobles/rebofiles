@@ -5,7 +5,7 @@ import { PageFooter } from '@/components/docs/frame/PageFooter';
 import { PageIndex } from '@/components/docs/frame/PageIndex';
 import { docPageOf, headingsOf } from '@/components/docs/registry';
 import { SectionHead } from '@/components/docs/ui';
-import { type Locale, dict } from '@/lib/i18n';
+import { type Locale, dict, localePath } from '@/lib/i18n';
 import { JsonLd, docLd, pageMeta } from '@/lib/seo';
 import { PAGES, REPO, hrefOf, markdownOf, navOf } from '@/lib/site';
 
@@ -16,7 +16,7 @@ export function docMeta(locale: Locale, slug: string): Metadata {
   const page = docPageOf(locale, slug);
   if (!page) return {};
   // The Markdown made for a language model is of the English page.
-  return pageMeta({ title: page.title, description: page.description, path: hrefOf(slug), locale, type: 'article', markdown: locale === 'en' ? markdownOf(slug) : undefined });
+  return pageMeta({ title: page.title, description: page.description, path: hrefOf(slug), locale, type: 'article', markdown: localePath(locale, markdownOf(slug)) });
 }
 
 export function DocView({ locale, slug }: { locale: Locale; slug: string }) {

@@ -5,6 +5,8 @@
 // No console of its own on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod sync;
+
 use std::path::{Path, PathBuf};
 use tauri::menu::{Menu, MenuItem, Submenu};
 use tauri::webview::DownloadEvent;
@@ -32,11 +34,13 @@ fn main() {
             // The menu of a Mac as it is, with one more: the server the window is of.
             let menu = Menu::default(app.handle())?;
             let change = MenuItem::with_id(app, "change-server", "Change Server…", true, Some("CmdOrCtrl+Shift+K"))?;
-            menu.append(&Submenu::with_items(app, "Server", true, &[&change])?)?;
+            let sync = MenuItem::with_id(app, "sync-folder", "Sync a Folder…", true, Some("CmdOrCtrl+Shift+S"))?;
+            menu.append(&Submenu::with_items(app, "Server", true, &[&change, &sync])?)?;
             app.set_menu(menu)?;
             app.on_menu_event(|app, event| {
-                if event.id() == "change-server" {
-                    let _ = app.emit("change-server", ());
+                let id = event.id().as_ref();
+                if id == "change-server" || id == "sync-folder" {
+                    let _ = app.emit(id, ());
                 }
             });
 
@@ -56,6 +60,16 @@ fn main() {
                 .build()?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            sync::sync_default_folder,
+            sync::sync_list,
+            sync::sync_read,
+            sync::sync_write,
+            sync::sync_mkdir,
+            sync::sync_remove,
+            sync::sync_move,
+            sync::sync_stat,
+        ])
         .run(tauri::generate_context!())
         .expect("the application could not start");
 }

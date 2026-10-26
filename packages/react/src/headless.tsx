@@ -36,16 +36,28 @@ export interface DriveProviderProps {
   language?: 'en' | 'es' | 'zh';
   /** Texts of another language, with the keys of the English ones. */
   texts?: Texts;
+  /** What others change, asked again as it happens, from the server's `/events`: true unless said. */
+  live?: boolean;
   children: ReactNode;
 }
 
-export function DriveProvider({ base = '/api/files', client, headers, language, texts, children }: DriveProviderProps) {
+export function DriveProvider({ base = '/api/files', client, headers, language, texts, live = true, children }: DriveProviderProps) {
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const made = useMemo(() => client ?? createDriveClient({ base, headers: () => headersRef.current?.() ?? {} }), [client, base]);
   const [revision, setRevision] = useState(0);
   const changed = useCallback(() => setRevision((n) => n + 1), []);
   const [settings, setSettings] = useState<SettingsAnswer | null>(null);
+  // What others change, as it happens: every hook asks again a moment after, once for changes that come together.
+  useEffect(() => {
+    if (!live || !made.watch) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = made.watch(() => {
+      clearTimeout(timer);
+      timer = setTimeout(changed, 250);
+    });
+    return () => (clearTimeout(timer), stop());
+  }, [made, live, changed]);
   // Asked again after every change: one made in the settings among them.
   // biome-ignore lint/correctness/useExhaustiveDependencies: revision is when to ask again, not what is asked
   useEffect(() => {

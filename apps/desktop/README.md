@@ -18,7 +18,7 @@ Rust, and on a Mac Xcode's command-line tools. From the root:
 ```bash
 npm run dev             # the playground, the server it connects to: http://localhost:5180/api/files
 npm run desktop         # the window, its page from Vite at :5190
-npm run build:desktop   # ReboFiles.app and a .dmg, in src-tauri/target/release/bundle
+npm run build:desktop   # ReboFiles.app and a .dmg (on a Mac), in src-tauri/target/release/bundle
 ```
 
 The playground lets the window in already. Another server lets it in with
@@ -36,11 +36,27 @@ The token goes as `Authorization: Bearer …`, for an `identify` that reads one.
 A server whose session is only a cookie needs a token for the window: the
 cookies of another origin do not go with its requests.
 
+## A folder kept in sync
+
+**Server → Sync a Folder…** (⇧⌘S) asks which folder of this computer,
+`~/ReboFiles` unless said, and keeps it the same as the drive while the
+window is open, with `@rebofiles/sync`: when it starts, when the drive tells
+a change, when the window comes back to the front, and every half a minute.
+The chip at the bottom says how the last run went; a click on it opens the
+dialog again, to stop it. The disk is read and written by the application's
+own commands (`src-tauri/src/sync.rs`), which never leave that folder; what
+is taken away goes to `.rebofiles/removed/` inside it.
+
+## Other systems, and signing
+
+`.github/workflows/desktop.yml` builds and tests it on a Mac, Windows and
+Linux: a .dmg, an installer of Windows, a .deb and an AppImage. Signed and
+notarized when the certificates are given to it as secrets (`APPLE_*`,
+`WINDOWS_CERTIFICATE`); unsigned otherwise, which runs with a warning the
+first time.
+
 ## What it does not do yet
 
-- **Keep a folder of the disk like a folder of the drive.** That is the sync
-  engine of the roadmap (`packages/desktop`), the next step.
 - Sign in through the server's page, for a server of cookies only.
-- Windows and Linux: built the same way, not tried.
-- Signed and notarized: `npm run build:desktop` makes an application for this
-  computer; one for others needs an Apple Developer ID.
+- Windows and Linux: built by the workflow, not used there by hand yet.
+- Its sync watches the disk every half a minute, not as each file changes.

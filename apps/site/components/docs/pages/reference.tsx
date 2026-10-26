@@ -6,7 +6,9 @@ import { REPO, hrefOf } from '@/lib/site';
 import { PUBLISHED, VERSION } from '@/lib/home';
 import { InstallCommand } from '../frame/InstallCommand';
 import { CLIENT, HOOKS, PACKAGE_DOCS, PROPS } from '../reference';
+import type { Locale } from '@/lib/i18n';
 import { type Route, routeId, routes } from '../routes';
+import { routeIn } from '../routesI18n';
 import { CHECKED, LIMITS, MEASURED, NOT_CHECKED, ROADMAP, TESTS } from '../status/data';
 import { C, Code, type DocPage, List, P, RefTable, Table, withCode } from '../ui';
 import { hookId, propId } from './app';
@@ -16,7 +18,7 @@ export const clientId = (name: string) => `client-${name}`;
 
 export const packages: DocPage = {
   title: 'Packages',
-  description: 'Five packages, each for one thing, at the same version: which to install, where each runs, what each gives, and the applications of the repository.',
+  description: 'Six packages, each for one thing, at the same version: which to install, where each runs, what each gives, and the applications of the repository.',
   source: 'apps/site/components/docs/reference.ts',
   lead: <>Every package is at the same version, {VERSION}, and changes together. Each has no dependencies but core and, where it says, Rebodocs as an optional peer.</>,
   sections: [
@@ -137,7 +139,7 @@ const client = createDriveClient({
 const { entries } = await client.list(null);
 const file = await client.upload(input.files[0], { parent: entries[0].id, onProgress: ({ sent, size }) => draw(sent / size) });`;
 
-export const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings'] as const;
+export const GROUPS = ['Reading', 'Changing', 'Uploads', 'Sharing', 'Files', 'Settings', 'Live'] as const;
 
 export const client: DocPage = {
   title: 'Client API',
@@ -176,7 +178,15 @@ export const METHOD: Record<Route['method'], string> = {
 };
 
 /** The routes of one kind, as api.ts says them; the column heads and the label in the page's language. */
-export function RouteTable({ through, words = ['Routes', 'Routes of a link', 'Route', 'What it does'] }: { through: Route['through']; words?: [string, string, string, string] }) {
+export function RouteTable({
+  through,
+  words = ['Routes', 'Routes of a link', 'Route', 'What it does'],
+  locale = 'en',
+}: {
+  through: Route['through'];
+  words?: [string, string, string, string];
+  locale?: Locale;
+}) {
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: it scrolls sideways on a phone, and a keyboard has to reach what is hidden (WCAG 2.1.1)
     <section className="mt-5 max-w-[920px] overflow-x-auto rounded-[14px] border border-border" aria-label={through === 'link' ? words[1] : words[0]} tabIndex={0}>
@@ -196,7 +206,7 @@ export function RouteTable({ through, words = ['Routes', 'Routes of a link', 'Ro
                   <span className={`mr-2 inline-block w-[62px] rounded-[5px] px-1.5 py-0.5 text-center font-code text-[11.5px] font-semibold ${METHOD[route.method]}`}>{route.method}</span>
                   <code className="font-code text-[13.5px] text-ink">{route.path}</code>
                 </td>
-                <td className="px-4.5 py-3.5 leading-normal text-ink-soft">{route.does || '—'}</td>
+                <td className="px-4.5 py-3.5 leading-normal text-ink-soft">{routeIn(locale, route) || '—'}</td>
               </tr>
             ))}
         </tbody>

@@ -4,7 +4,7 @@
 // the drive's screen and React's useUploads both show.
 
 import { type Entry, type EntryId, type FileEntry, sameName } from '@rebofiles/core';
-import { type DriveClient, type UploadOptions, hashOf } from './client';
+import { type DriveClient, RequestError, type UploadOptions, hashOf } from './client';
 
 export interface UploadItem {
   id: number;
@@ -15,6 +15,8 @@ export interface UploadItem {
   /** `checking` while it is looked for in the drive; `asking` while what to do with one there already is asked. */
   state: 'waiting' | 'checking' | 'asking' | 'sending' | 'done' | 'failed' | 'stopped' | 'skipped';
   error?: string;
+  /** What the server refused it as (`over-quota`, `virus-found`…), to say it in another language. */
+  refused?: string;
   /** Bytes a second, as it has gone the last few seconds; while it is going. */
   speed?: number;
   /** Seconds it has left, at that speed; while it is going. */
@@ -181,7 +183,13 @@ export function createUploads(client: DriveClient, options: UploadsOptions): Upl
       options.onDone?.(entry, items.find((one) => one.id === id)!);
     } catch (error) {
       const stopped = stop.signal.aborted;
-      set(id, { state: stopped ? 'stopped' : 'failed', error: stopped ? undefined : (error as Error).message, speed: undefined, remaining: undefined });
+      set(id, {
+        state: stopped ? 'stopped' : 'failed',
+        error: stopped ? undefined : (error as Error).message,
+        refused: error instanceof RequestError ? error.code : undefined,
+        speed: undefined,
+        remaining: undefined,
+      });
       if (!stopped) options.onFail?.(items.find((one) => one.id === id)!);
     } finally {
       stops.delete(id);

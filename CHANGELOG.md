@@ -8,6 +8,42 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Added
 
+- **Changes as they happen.** `GET /events` of the server, a stream of
+  server-sent events: each change told to each one watching as far as they
+  may see it, the folders they may list and the entries they may read; one of
+  another process on the same store within two seconds, from its revision
+  (`live: { poll }`, `live: false` for none). `client.watch()` reads it with
+  `fetch`, so it carries the headers, and comes back after a cut. The drive,
+  `<FileDrive>` and every hook under a `DriveProvider` ask again a moment
+  after; the drive kept in the page tells the same.
+- **Folders of thousands.** From 200 entries, the list and the grid put in
+  the page only what is in sight, with the room of the rest kept; the keyboard
+  goes through all, each with `aria-posinset` and `aria-setsize`.
+- **Uploads checked.** `beforeUpload` of the server, before an upload is
+  given addresses; `inspect`, once its bytes arrived and before it is listed,
+  with a `read` of them, its bytes taken away when it refuses. `checkType()`
+  refuses a program, and a file whose bytes are not those of its extension;
+  `clamav()` asks clamd; `inspectAll()` asks several. `typeOfBytes()`. A
+  storage may `read` and `sweepUploads`; both of the server do.
+- **Uploads left halfway swept.** Past the life of their tokens, by the server
+  every ten minutes, from a bucket (under its prefix) and from the disk.
+- **`@rebofiles/sync`.** A folder of the disk kept as a folder of the drive,
+  both ways, with conflicts kept twice, moves followed and a disk found empty
+  refused: `syncOnce`, `nodeFolder`, `watchSync`, and `rebofiles-sync` as a
+  command. In the desktop application, **Server → Sync a Folder…**.
+- **The refusals of the server in every language.** In Spanish and Chinese,
+  the drive says them by their code; `refusalText(error, language)`.
+- **Examples** of the server in Next.js, Express, Hono and Fastify, and of who
+  asks from Auth.js, Clerk or a JWT of your own, in `examples/`, each served
+  and asked over HTTP by its tests; a page of the documentation shows them.
+- **Documentation:** Frameworks and sign-in, Checking uploads, Live changes
+  and large folders, Sync a folder, Going to production, in English, Spanish
+  and Mandarin; the routes and the tools of the assistant described in each
+  language; `llms.txt` in each (`/es/llms.txt`, `/zh/llms.txt`).
+- **CI and releases.** GitHub Actions for the lint, types, tests, builds and
+  Chrome on every push; the desktop application on a Mac, Windows and Linux;
+  a release by hand. Changesets with the six packages in one `fixed` group.
+
 - **`@rebofiles/core`, the model of a drive.** A `Drive` is an immutable
   value of entries, folders and files, each in a folder or at the top.
   `createFolder`, `addFile`, `rename`, `move`, `moveToTrash`, `restore`,
@@ -359,6 +395,12 @@ minor version (0.x.0) may change the API; such changes are listed under
   longer read out at every step; a failed upload as an alert.
 
 ### Changed
+
+- `nodeHandler` takes the path from `originalUrl` when there is one, so
+  `app.use('/api/files', …)` of Express works as it reads; and ends an
+  answer that goes on (the events) when the page is gone.
+- `<FileDrive>` takes `live`, for its provider; the drive it mounts does not
+  watch on its own inside one.
 
 - **An address to show a file is good for one to two hours**, from the start
   of its hour, instead of 15 minutes, so the browser can keep what it read.

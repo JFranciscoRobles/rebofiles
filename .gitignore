@@ -29,3 +29,6 @@ apps/desktop/src-tauri/gen
 /.vitest/
 /test-results/
 /playwright-report/
+
+# The certificate of Windows, written by the Desktop workflow while it signs.
+apps/desktop/src-tauri/signing.json

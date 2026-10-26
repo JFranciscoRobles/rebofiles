@@ -48,8 +48,9 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 | [`@rebofiles/drive`](packages/drive) | The whole drive without a framework, mounted on an element, and the client of the routes. | Any browser |
 | [`@rebofiles/react`](packages/react) | `<FileDrive>`, and the hooks it is built from. | React 18+ |
 | [`@rebofiles/mcp`](packages/mcp) | Tools for an AI assistant, over HTTP or stdio, with the user's own rights; with Rebodocs, its Word documents edited, each change a version. | Node 22.12+ |
+| [`@rebofiles/sync`](packages/sync) | A folder of the disk kept as a folder of the drive, both ways; `rebofiles-sync` as a command. | Node 22.12+, or a desktop app |
 
-`apps/desktop` is the drive in a window of its own, with Tauri; the sync of a folder of the disk follows, see the roadmap.
+`apps/desktop` is the drive in a window of its own, with Tauri, and a folder of the computer kept in sync from it. [`examples/`](examples) has the server in Next.js, Express, Hono and Fastify, and sign-in with Auth.js, Clerk or a token of your own, each run by its tests.
 
 ## Development
 
@@ -60,11 +61,12 @@ npm run demo        # the demo of the landing, at http://localhost:5181: entirel
 npm run site        # the landing page, at http://localhost:5182 (Next.js; npm run build:site makes it static, in apps/site/out,
                     # with the sitemap, llms.txt and a .md of each page, and fails on a page without its SEO)
 npm test            # Vitest
+npm run test:browser  # Playwright, in the Chrome of this computer
 npm run typecheck   # tsc, over every package
 npm run lint        # Biome
 ```
 
-[CONTRIBUTING.md](CONTRIBUTING.md) has where things go and the conventions.
+[CONTRIBUTING.md](CONTRIBUTING.md) has where things go, the conventions, and how a release is made. Every push and pull request runs the same in [GitHub Actions](.github/workflows/ci.yml).
 
 ## License
 

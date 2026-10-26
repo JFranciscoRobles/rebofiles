@@ -1,7 +1,7 @@
 // En equipo: un asistente de IA trabajando en el drive, con los permisos de su persona.
 
-import { TOOLS } from '@rebofiles/mcp';
 import { C, Callout, Code, type DocPage, List, P, RefTable } from '../../ui';
+import { toolsIn } from '../../routesI18n';
 import { CLAUDE, DocumentTools, HTTP, STDIO, toolId } from '../together';
 
 export const assistants: DocPage = {
@@ -60,12 +60,12 @@ export const assistants: DocPage = {
       title: 'Todas las herramientas',
       badge: 'Herramientas',
       color: 'purple',
-      lead: 'Tal como el servidor se las describe al asistente, en inglés.',
+      lead: 'Lo que hace cada una, traducido. Al asistente se las describe en inglés, que todos los modelos leen.',
       body: (
         <RefTable
           label="Herramientas del drive"
           name="Herramienta"
-          rows={TOOLS.map((tool) => ({ id: toolId(tool.name), name: tool.name, type: tool.annotations.readOnlyHint ? 'lee' : 'escribe', does: tool.description }))}
+          rows={toolsIn('es').map((tool) => ({ id: toolId(tool.name), name: tool.name, type: tool.annotations.readOnlyHint ? 'lee' : 'escribe', does: tool.description }))}
         />
       ),
     },

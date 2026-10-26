@@ -43,6 +43,7 @@ export const PROPS: Prop[] = [
   { name: 'textDocument', type: '(bytes) => string', group: 'Word documents', does: 'What is written in it, sent at upload, for a search to find it by. `textOfDocx`.' },
   { name: 'onOpenDocument', type: '(file, url) => void', group: 'Word documents', does: 'Gives a .docx an “Open in Rebodocs” button, called with an address to read it from.' },
   { name: 'onChange', type: '() => void', group: 'Events', does: 'After every change made from the drive, for what else in the page shows it (mountDrive; in React, the provider tells the hooks).' },
+  { name: 'live', type: 'boolean', group: 'Events', does: 'What others change, shown as it happens, from the server’s `/events`. `true` unless said; in React, the provider’s.' },
 ];
 
 export interface Hook {
@@ -52,7 +53,11 @@ export interface Hook {
 }
 
 export const HOOKS: Hook[] = [
-  { name: 'DriveProvider', short: 'The client and the words, for every hook under it.', gives: '`base`, `client`, `headers`, `language`, `texts`; a <FileDrive> inside it uses the same.' },
+  {
+    name: 'DriveProvider',
+    short: 'The client and the words, for every hook under it.',
+    gives: '`base`, `client`, `headers`, `language`, `texts`, `live`; a <FileDrive> inside it uses the same. Every hook asks again when someone else changes the drive.',
+  },
   { name: 'useEntries', short: 'A folder, Recent, the trash, Shared with me or a search.', gives: '`entries`, `path`, `folder`, `loading`, `error`, `refresh`: asked again after every change.' },
   { name: 'useEntry', short: 'One entry as it is now, and where it is.', gives: '`entry`, `path`, `trashed`, `loading`, `error`.' },
   {
@@ -73,7 +78,7 @@ export interface Method {
   name: string;
   signature: string;
   does: string;
-  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings';
+  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live';
 }
 
 /** The client of the routes, `createDriveClient({ base })`, and what `createMemoryClient` answers the same way. */
@@ -115,6 +120,12 @@ export const CLIENT: Method[] = [
   { group: 'Settings', name: 'settings', signature: 'settings()', does: 'The drive’s settings, one’s own, and whether one may change the drive’s.' },
   { group: 'Settings', name: 'saveSettings', signature: 'saveSettings(settings)', does: 'The drive’s, for whoever may configure it.' },
   { group: 'Settings', name: 'saveMySettings', signature: 'saveMySettings(mine)', does: 'One’s own language and theme.' },
+  {
+    group: 'Live',
+    name: 'watch',
+    signature: 'watch(onChange, { onState })',
+    does: 'What anyone changes, as it happens: the folders and entries of each change one may see. Comes back by itself after a cut. Returns what stops it.',
+  },
 ];
 
 export interface ServerOption {
@@ -135,6 +146,17 @@ export const SERVER_OPTIONS: ServerOption[] = [
   { name: 'settings', type: 'Partial<DriveSettings>', does: 'The defaults until someone changes them: language, theme, brand colour, pictures, `quota`, `trashDays`.' },
   { name: 'cors', type: '{ origins: string[] }', does: 'Pages of other origins that may use the routes: the desktop window, a page of another domain.' },
   { name: 'onShare', type: '(event) => void', does: 'Each share kept, with who, by whom and whether it is the first: to tell the person.' },
+  {
+    name: 'beforeUpload',
+    type: '(upload, drive) => boolean | void',
+    does: 'Asked before an upload is given addresses, with its name, type, size and folder: throw a `Refused`, or return false, to refuse it.',
+  },
+  {
+    name: 'inspect',
+    type: '(upload, drive) => boolean | void',
+    does: 'Asked once the bytes arrived, before the file is listed, with a `read` of them: `checkType()`, `clamav()`, or yours. A refusal takes the bytes away.',
+  },
+  { name: 'live', type: 'false | { poll }', does: 'Changes told at `/events` as they happen; those of another process on the same store within `poll` ms (2000). `false` for none.' },
   { name: 'now', type: '() => Date', does: 'The clock, for tests.' },
   { name: 'newId', type: '() => string', does: 'The ids of new entries; random UUIDs unless given.' },
 ];
@@ -170,6 +192,7 @@ export const PACKAGE_DOCS: PackageDoc[] = [
       'createLinkClient',
       'createMemoryClient',
       'createUploads',
+      'refusalText',
       'lookInDrive',
       'downloadZip',
       'writeZip',
@@ -184,7 +207,21 @@ export const PACKAGE_DOCS: PackageDoc[] = [
     what: 'The routes, authorize(), signed addresses, the bytes on S3 or a disk, the metadata in memory, SQLite or Postgres.',
     runs: 'Node 22.12+',
     install: 'npm install @rebofiles/server',
-    gives: ['createDriveHandler', 'nodeHandler', 'byRoles', 'everyone', 's3Storage', 's3OptionsFrom', 'diskStorage', 'memoryMetadata', 'sqliteMetadata', 'postgresMetadata'],
+    gives: [
+      'createDriveHandler',
+      'nodeHandler',
+      'byRoles',
+      'everyone',
+      's3Storage',
+      's3OptionsFrom',
+      'diskStorage',
+      'memoryMetadata',
+      'sqliteMetadata',
+      'postgresMetadata',
+      'checkType',
+      'clamav',
+      'Refused',
+    ],
   },
   {
     name: '@rebofiles/core',
@@ -201,11 +238,10 @@ export const PACKAGE_DOCS: PackageDoc[] = [
     gives: ['createMcpHandler', 'serveStdio', 'TOOLS', 'allTools', 'documentTools', 'driveAt'],
   },
   {
-    name: '@rebofiles/desktop',
-    what: 'A folder of the disk kept like a folder of the drive. The Tauri application it goes into is here already, in apps/desktop.',
-    runs: 'Mac first',
-    install: '',
-    gives: [],
-    comes: '0.6',
+    name: '@rebofiles/sync',
+    what: 'A folder of the disk kept as a folder of the drive, both ways: changes sent and taken, conflicts kept twice, moves followed. In the desktop application, and as a command.',
+    runs: 'Node 22.12+, or a desktop app',
+    install: 'npm install @rebofiles/sync',
+    gives: ['syncOnce', 'watchSync', 'nodeFolder', 'loadState', 'saveState', 'rebofiles-sync'],
   },
 ];

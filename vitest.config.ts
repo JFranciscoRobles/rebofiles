@@ -10,7 +10,7 @@ export default defineConfig({
       {
         test: {
           name: 'node',
-          include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
+          include: ['packages/*/test/**/*.test.{ts,tsx}', 'apps/*/test/**/*.test.ts', 'examples/test/**/*.test.ts'],
           exclude: ['**/node_modules/**'],
           // Postgres in the process (PGlite) is slow to start when the machine is busy, as with a build of Rust beside.
           testTimeout: 20_000,

@@ -1,0 +1,151 @@
+// What each route of the server and each tool of the assistant does, in
+// Spanish and Mandarin, by its method and path, or its name. The routes and the
+// tools are the code's; what is not here is read in English, as the code says it.
+
+import { TOOLS } from '@rebofiles/mcp';
+import type { Locale } from '@/lib/i18n';
+import type { Route } from './routes';
+
+const ROUTES: Record<'es' | 'zh', Record<string, string>> = {
+  es: {
+    'GET /entries?folder=…': 'Lo que hay en una carpeta (ninguna: arriba del todo), y dónde está',
+    'GET /entries/:id': 'Una entrada, y dónde está',
+    'GET /recent': 'Los últimos archivos cambiados',
+    'GET /trash': 'Lo que hay en la papelera',
+    'GET /search?q=…&within=…&trashed=1': 'Encontrado por nombre',
+    'POST /folders': '{ name, parent }',
+    'POST /uploads':
+      '{ name, parent, type, size }, o { file, type, size } para una versión nueva: adónde enviar las partes; o { rendition: { file, version, size, width, height }, type, size }: una imagen más pequeña de una versión',
+    'POST /uploads/finish': '{ token, parts: [{ number, etag }] }: el archivo, una vez llegados sus bytes',
+    'POST /uploads/resume': '{ token }: una subida cortada, retomada: lo que llegó, y adónde enviar el resto',
+    'POST /uploads/abort': '{ token }: una subida abandonada, y lo que llegó de ella, quitado',
+    'PATCH /entries/:id': '{ name }, { parent } o { color }, con { ifTaken: \'keep-both\' } para añadir "(2)"',
+    'POST /entries/:id/trash': 'A la papelera',
+    'POST /entries/:id/restore': 'Fuera de ella',
+    'DELETE /entries/:id': 'Borrado para siempre, desde la papelera',
+    'POST /trash/empty': 'Vacía la papelera de quien pregunta',
+    'GET /entries/:id/download?version=&inline=1&size=': 'Una dirección para leerlo, o para mostrarlo en la página; con size, una imagen más pequeña cuando la hay',
+    'POST /entries/:id/versions/:v/restore': 'Una versión anterior, de nuevo la actual',
+    'POST /zip': '{ ids }: lo que tendría un archivo .zip de ellos, las carpetas con su contenido, en sus rutas',
+    'POST /urls': '{ ids, inline, size }: las direcciones de muchos archivos a la vez, para una cuadrícula; hasta cuándo vale cada una',
+    'GET /info': 'Dónde están los bytes, como lo lee una persona',
+    'GET /usage': 'Los bytes que guarda quien pregunta, y cuántos puede',
+    'GET /settings': 'Los ajustes del drive, los de quien pregunta, y si puede cambiar los del drive',
+    'PUT /settings': "Los del drive, para quien puede 'configure'",
+    'PUT /settings/mine': '{ language, theme }: los propios',
+    'GET /entries/:id/activity?limit=': 'Lo que se le hizo, y dentro de ella si es carpeta, lo más nuevo primero',
+    'GET /search/text?q=': 'Archivos por lo que tienen escrito, con un trozo alrededor de lo encontrado',
+    'PUT /entries/:id/text': '{ version, text }: lo que tiene escrito un archivo, como lo leyó la página, para encontrarlo',
+    'PUT /entries/:id/placeholder': '{ version, placeholder }: la imagen diminuta que se muestra borrosa mientras llega una imagen',
+    'POST /duplicates': '{ hashes }: los archivos que ya tienen esos bytes, de lo que uno puede leer',
+    'GET /shared': 'Lo que otros compartieron con quien pregunta',
+    'GET /shared/new': 'Cuántos de esos son nuevos desde la última vez que miró',
+    'POST /shared/seen': 'Ya miró: ninguno es nuevo',
+    'POST /entries/:id/shares': '{ with, role }: compartido, o con otro rol',
+    'DELETE /entries/:id/shares/:with': 'Ya no compartido con esa persona',
+    'POST /entries/:id/links': '{ days, password, once }: un enlace para leerlo sin iniciar sesión, y su dirección',
+    'GET /entries/:id/links/:link': 'La dirección de un enlace, otra vez',
+    'DELETE /entries/:id/links/:link': 'Retirado',
+    'GET /events': 'Lo que cambia, en el momento (server-sent events): las carpetas y entradas de cada cambio que uno puede ver',
+    'GET /links/:token?folder=…': 'Lo que lee el enlace, o una carpeta dentro de él',
+    'GET /links/:token/download?id=…&inline=1': 'Una dirección para leer un archivo del enlace',
+    'GET /links/:token/zip?ids=…': 'Lo que tiene un .zip de parte de él (todo, si no se dice)',
+    'GET /links/:token/urls?ids=…': 'Las direcciones de algunos de sus archivos',
+  },
+  zh: {
+    'GET /entries?folder=…': '文件夹中的内容（不指定：最顶层），以及它所在的位置',
+    'GET /entries/:id': '单个条目，以及它所在的位置',
+    'GET /recent': '最近更改的文件',
+    'GET /trash': '回收站中的内容',
+    'GET /search?q=…&within=…&trashed=1': '按名称查找',
+    'POST /folders': '{ name, parent }',
+    'POST /uploads': '{ name, parent, type, size }，或新版本用 { file, type, size }：各部分发往何处；或 { rendition: { file, version, size, width, height }, type, size }：某个版本的缩略图',
+    'POST /uploads/finish': '{ token, parts: [{ number, etag }] }：字节到达后，生成文件',
+    'POST /uploads/resume': '{ token }：继续中断的上传：已到达的部分，以及其余部分发往何处',
+    'POST /uploads/abort': '{ token }：放弃上传，并删除已到达的部分',
+    'PATCH /entries/:id': '{ name }、{ parent } 或 { color }，加 { ifTaken: \'keep-both\' } 时追加 "(2)"',
+    'POST /entries/:id/trash': '移入回收站',
+    'POST /entries/:id/restore': '移出回收站',
+    'DELETE /entries/:id': '从回收站中永久删除',
+    'POST /trash/empty': '清空请求者的回收站',
+    'GET /entries/:id/download?version=&inline=1&size=': '用于读取或在页面中显示的地址；带 size 时，返回已有的较小图片',
+    'POST /entries/:id/versions/:v/restore': '将较早的版本恢复为当前版本',
+    'POST /zip': '{ ids }：它们的 .zip 包含的内容，文件夹连同其内容，按路径排列',
+    'POST /urls': '{ ids, inline, size }：一次获取多个文件的地址，用于网格；以及每个地址的有效期',
+    'GET /info': '字节存放在哪里，以人可读的方式',
+    'GET /usage': '请求者占用的字节数，以及上限',
+    'GET /settings': '云盘的设置、请求者自己的设置，以及能否更改云盘设置',
+    'PUT /settings': "云盘的设置，供有 'configure' 权限的人使用",
+    'PUT /settings/mine': '{ language, theme }：自己的设置',
+    'GET /entries/:id/activity?limit=': '对它所做的操作，若是文件夹，还包括其中的内容，最新的在前',
+    'GET /search/text?q=': '按文件中的文字查找，并附上找到处周围的一段',
+    'PUT /entries/:id/text': '{ version, text }：页面读取的文件文字，用于搜索',
+    'PUT /entries/:id/placeholder': '{ version, placeholder }：图片加载前模糊显示的小图',
+    'POST /duplicates': '{ hashes }：在可读范围内，已有相同字节的文件',
+    'GET /shared': '他人与请求者共享的内容',
+    'GET /shared/new': '自上次查看以来新增的数量',
+    'POST /shared/seen': '已查看：不再有新的',
+    'POST /entries/:id/shares': '{ with, role }：共享，或更改角色',
+    'DELETE /entries/:id/shares/:with': '不再与其共享',
+    'POST /entries/:id/links': '{ days, password, once }：无需登录即可读取的链接及其地址',
+    'GET /entries/:id/links/:link': '再次获取链接的地址',
+    'DELETE /entries/:id/links/:link': '撤回链接',
+    'GET /events': '实时的更改（server-sent events）：每次更改中自己可见的文件夹和条目',
+    'GET /links/:token?folder=…': '链接可读取的内容，或其中的某个文件夹',
+    'GET /links/:token/download?id=…&inline=1': '读取链接中某个文件的地址',
+    'GET /links/:token/zip?ids=…': '其中部分内容（未指定则全部）的 .zip 包含的内容',
+    'GET /links/:token/urls?ids=…': '其中部分文件的地址',
+  },
+};
+
+const TOOL_WORDS: Record<'es' | 'zh', Record<string, string>> = {
+  es: {
+    list_folder: 'Lo que hay en una carpeta del drive, las carpetas primero, o arriba del todo de Mis archivos. Da el id de cada una, para las demás herramientas.',
+    search: 'Archivos y carpetas cuyo nombre tiene cada palabra de la búsqueda, con o sin mayúsculas y acentos; dentro de una carpeta, o en la papelera, si se pide.',
+    search_text: 'Archivos cuyo texto tiene cada palabra de la búsqueda, con un trozo del texto alrededor de lo encontrado: archivos de texto y documentos de Word, como se leyeron al subirlos.',
+    get_info: 'Un archivo o carpeta: su tipo, tamaño, dueño, cuándo cambió y quién, dónde está, con quién se comparte, y sus versiones.',
+    read_file:
+      'El texto de un archivo: texto, Markdown, CSV, JSON y parecidos, y documentos de Word (.docx) cuando el servidor tiene Rebodocs. De una versión, si se da. No imágenes ni PDF. Hasta un megabyte.',
+    list_recent: 'Los últimos archivos cambiados que puede leer la persona para quien trabaja el asistente, el más reciente primero.',
+    list_shared: 'Lo que otros compartieron con la persona para quien trabaja el asistente.',
+    get_activity: 'Quién hizo qué a un archivo o carpeta, y, de una carpeta, a lo que tiene dentro: creado, subido, renombrado, movido, a la papelera, compartido. Lo más nuevo primero.',
+    create_folder: 'Una carpeta nueva; con "(2)" tras su nombre si ya está ocupado ahí.',
+    create_text_file: 'Un archivo nuevo con el texto dado, su tipo por su nombre (.md, .csv, .json, .txt…); con "(2)" tras su nombre si ya está ocupado ahí.',
+    update_text_file: 'El texto dado pasa a ser el archivo; lo que era queda como su versión anterior, para restaurarla.',
+    restore_version: 'Una versión anterior de un archivo pasa a ser la actual, como versión nueva: la que era se queda, así que también se puede deshacer.',
+    rename: 'Otro nombre para un archivo o carpeta; se rechaza si otro de la misma carpeta lo tiene.',
+    set_folder_color: 'Un color para una carpeta, para distinguirla de un vistazo: red, orange, yellow, green, teal, blue, purple, pink, gray; o "none" para el del drive.',
+    move: 'Un archivo o carpeta a otra carpeta, o arriba del todo de Mis archivos; se rechaza si el nombre está ocupado ahí.',
+    move_to_trash: 'A la papelera, con lo que tiene dentro; restore la saca. Aquí nada se borra para siempre.',
+    restore: 'De vuelta a la carpeta en que estaba, o arriba del todo si ya no está; con "(2)" si su nombre se ocupó mientras.',
+  },
+  zh: {
+    list_folder: '云盘某个文件夹中的内容（文件夹在前），或“我的文件”的最顶层。给出每一项的 id，供其他工具使用。',
+    search: '名称包含查询中每个词的文件和文件夹，不区分大小写和重音；可在某个文件夹内或回收站中查找。',
+    search_text: '文字包含查询中每个词的文件，并附上找到处周围的一段：上传时读取的文本文件和 Word 文档。',
+    get_info: '单个文件或文件夹：类型、大小、所有者、何时由谁更改、位置、与谁共享，以及各个版本。',
+    read_file: '文件的文字：纯文本、Markdown、CSV、JSON 等，以及服务器装有 Rebodocs 时的 Word 文档（.docx）。可指定版本。不含图片和 PDF。最多一兆字节。',
+    list_recent: '助手所服务的人可读取的、最近更改的文件，最新的在前。',
+    list_shared: '他人与助手所服务的人共享的内容。',
+    get_activity: '谁对某个文件或文件夹做了什么，若是文件夹还包括其中的内容：创建、上传、重命名、移动、移入回收站、共享。最新的在前。',
+    create_folder: '新文件夹；名称已被占用时在后面加 "(2)"。',
+    create_text_file: '包含给定文字的新文件，类型取自名称（.md、.csv、.json、.txt…）；名称已被占用时在后面加 "(2)"。',
+    update_text_file: '给定的文字成为文件的当前内容；原内容保留为上一个版本，可以恢复。',
+    restore_version: '将文件的较早版本作为新版本恢复为当前版本：原版本仍保留，因此也可以撤销。',
+    rename: '给文件或文件夹改名；同一文件夹中已有同名项时拒绝。',
+    set_folder_color: '给文件夹设置颜色，便于一眼区分：red、orange、yellow、green、teal、blue、purple、pink、gray；或用 "none" 恢复云盘默认颜色。',
+    move: '将文件或文件夹移到另一个文件夹，或“我的文件”的最顶层；名称已被占用时拒绝。',
+    move_to_trash: '连同其中的内容移入回收站；restore 可将其移出。这里不会永久删除任何内容。',
+    restore: '回到原来的文件夹，若该文件夹已不在则回到最顶层；其间名称被占用时加 "(2)"。',
+  },
+};
+
+/** What a route does, in a language: as the code says it, in English, when it is not here. */
+export const routeIn = (locale: Locale, route: Route) => (locale === 'en' ? route.does : (ROUTES[locale][`${route.method} ${route.path}`] ?? route.does));
+
+/** The tools of the assistant, what each does said in a language. */
+export const toolsIn = (locale: Locale) => TOOLS.map((tool) => ({ ...tool, description: locale === 'en' ? tool.description : (TOOL_WORDS[locale][tool.name] ?? tool.description) }));
+
+/** For a test: what is said of routes and tools that are not there any more, or what is there and not said. */
+export const ROUTE_KEYS = Object.keys(ROUTES.es);
+export const TOOL_KEYS = Object.keys(TOOL_WORDS.es);

@@ -107,6 +107,37 @@ The desktop application, or a page of another domain, is let in with `cors:
 question answered first, and the `ETag` of a part readable. Only those
 listed; a bucket needs the same in its own rule of origins.
 
+## Uploads checked
+
+Two moments to refuse a file: `beforeUpload`, before it is given addresses,
+with what the page says of it; and `inspect`, once its bytes are in the
+storage and before it is listed, with a `read` of them. What `inspect`
+refuses is taken out of the storage.
+
+```ts
+import { Refused, checkType, clamav, inspectAll } from '@rebofiles/server';
+
+createDriveHandler({
+  // …
+  beforeUpload: (upload) => {
+    if (upload.type.startsWith('video/')) throw new Refused(415, 'no-videos', 'No videos here.');
+  },
+  inspect: inspectAll(checkType(), clamav({ port: 3310 })),
+});
+```
+
+`checkType()` refuses a program, and a file whose bytes are not those of its
+extension. `clamav()` asks clamd by INSTREAM; when it cannot be asked, the
+file is refused with a 503, not let in unscanned.
+
+## Changes as they happen
+
+`GET /events` is a stream of server-sent events: each change told to each one
+watching, as far as they may see it (the folders they may list, the entries
+they may read). A change of another process on the same store is seen by its
+revision within `live.poll` milliseconds (2000). `live: false` for none. The
+client watches with `client.watch()`, and the drive and the hooks with it.
+
 ## Addresses
 
 The bytes are read from addresses the server signs. One to download a file
@@ -153,9 +184,11 @@ against AWS or MinIO yet. Not on npm yet.
   beyond, not for millions of entries, which would need the store asked by
   folder.
 - **Uploads left halfway** stay in the bucket as parts, for a day, to be
-  gone on with (`POST /uploads/resume`); one never gone on with waits for a
-  lifecycle rule of the bucket ("abort incomplete multipart uploads after 1
-  day"). One stopped by the person is given up at once.
+  gone on with (`POST /uploads/resume`); after that the server sweeps them
+  every ten minutes, as requests come (`sweepUploads` of the storage). One
+  stopped by the person is given up at once.
+- **The events on a platform that cuts requests** (serverless functions):
+  the page connects again, and a change in between is seen at the next one.
 
 ## License
 

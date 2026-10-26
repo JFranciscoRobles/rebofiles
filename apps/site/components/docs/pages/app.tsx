@@ -437,7 +437,10 @@ export const languages: DocPage = {
             <C>texts</C> takes an object with the keys of <C>TEXTS.en</C>; TypeScript says which are missing. Values may have <C>{'{n}'}</C>, <C>{'{name}'}</C> and the like, filled as the English ones
             are.
           </P>
-          <Callout title="Errors from the server">are in English: the drive says them as they come. Their code (RequestError.code) is the same in every language, for words of your own.</Callout>
+          <Callout title="Errors from the server">
+            come in English, with the names and numbers of the case, and the drive says them so in English. In Spanish and Chinese it says them by their code (<C>RequestError.code</C>), in its words:{' '}
+            <C>refusalText(error, language)</C> does it for a screen of your own. A code of your application's, from a <C>Refused</C> of its own, is said as your server said it.
+          </Callout>
           <Callout title="Rebodocs speaks English and Spanish.">
             In Mandarin, the drive is in Chinese, and Rebodocs’ zoom bar and editor inside it are in English until Rebodocs has Chinese of its own.
           </Callout>

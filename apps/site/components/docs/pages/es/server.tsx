@@ -460,9 +460,8 @@ export const desktop: DocPage = {
       body: (
         <List
           items={[
-            'Mantener una carpeta del disco como una carpeta del drive: el motor de sincronización, @rebofiles/desktop, es lo siguiente.',
             'Iniciar sesión mediante la página del servidor, para un servidor cuya sesión es solo una cookie.',
-            'Windows y Linux: se construyen igual, sin probar. Firmada y notarizada: todavía no.',
+            'Windows y Linux: los construye el workflow Desktop, un .dmg, un instalador de Windows, un .deb y un AppImage; aún sin probar a mano. Firmada y notarizada cuando se le den los certificados como secretos: aún no hay.',
           ]}
         />
       ),

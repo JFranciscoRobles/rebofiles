@@ -4,6 +4,7 @@ import type { DocPage } from '../../ui';
 import * as app from './app';
 import * as files from './files';
 import * as reference from './reference';
+import * as running from './running';
 import * as schema from './schema';
 import * as server from './server';
 import * as together from './together';
@@ -22,17 +23,22 @@ export const DOC_PAGES_ZH: Partial<Record<string, DocPage>> = {
   uploads: files.uploads,
   previews: files.previews,
   search: files.search,
+  live: running.live,
   versions: files.versions,
   zip: files.zip,
   word: files.word,
   server: server.server,
+  frameworks: running.frameworks,
   authorize: server.authorize,
   storage: server.storage,
+  'checking-uploads': running.checkingUploads,
   metadata: server.metadata,
   sharing: server.sharing,
   activity: server.activity,
   schema: schema.schema,
   desktop: server.desktop,
+  sync: running.sync,
+  production: running.production,
   assistants: together.assistants,
   packages: reference.packages,
   components: reference.components,

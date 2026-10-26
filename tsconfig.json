@@ -15,5 +15,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "tools/*.ts", "playwright.config.ts"]
+  "include": ["packages/*/src", "packages/*/test", "apps/*/src", "tools/*.ts", "playwright.config.ts", "examples"],
+  "exclude": ["examples/auth/authjs.ts", "examples/auth/clerk.ts"]
 }

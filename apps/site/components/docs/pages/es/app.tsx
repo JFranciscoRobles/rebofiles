@@ -344,7 +344,8 @@ export const languages: DocPage = {
             como en los ingleses.
           </P>
           <Callout title="Los errores del servidor">
-            están en inglés: el drive los muestra tal como llegan. Su código (RequestError.code) es el mismo en todos los idiomas, para que pongas tus propias palabras.
+            llegan en inglés, con los nombres y números del caso. En español y chino el drive los dice por su código (<C>RequestError.code</C>), con sus palabras: <C>refusalText(error, language)</C>{' '}
+            lo hace para una pantalla propia. Un código de tu aplicación, de un <C>Refused</C> propio, se dice tal como lo dijo tu servidor.
           </Callout>
           <Callout title="Rebodocs habla inglés y español.">
             En chino, el drive está en chino, y la barra de zoom y el editor de Rebodocs dentro de él siguen en inglés hasta que Rebodocs tenga su propio chino.

@@ -283,3 +283,16 @@ describe('the client against a server on the network', () => {
     }
   });
 });
+
+describe('what the server refused, in the language of the drive', () => {
+  it('is what the server said in English, by its code in Spanish and Chinese, and as said for a code of the application', async () => {
+    const { refusalText, REFUSAL_CODES } = await import('../src/refusals');
+    const refused = new RequestError(413, 'over-quota', 'There is no room for it: 1.0 GB of 1.0 GB are used, and it is 3 MB.');
+    expect(refusalText(refused, 'en')).toBe(refused.message);
+    expect(refusalText(refused, 'es')).toBe('No queda espacio para él.');
+    expect(refusalText(refused, 'zh')).toBe('空间不足。');
+    expect(refusalText(new RequestError(415, 'no-videos', 'No videos here.'), 'es')).toBe('No videos here.');
+    expect(refusalText(new Error('offline'), 'zh')).toBe('offline');
+    expect(REFUSAL_CODES).toEqual(expect.arrayContaining(['virus-found', 'type-mismatch', 'name-taken', 'forbidden']));
+  });
+});

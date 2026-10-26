@@ -13,24 +13,43 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/server',
-    count: 77,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example.',
+    count: 89,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example. Uploads refused before and after they arrive: by beforeUpload, by the type their bytes are, by a ClamAV that knows EICAR, and while it is down; uploads left halfway swept from a bucket and the disk. The events: each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut.',
   },
   {
     where: 'packages/drive',
-    count: 38,
-    what: 'The client against the routes and against a bucket: uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; the drive kept in the page.',
+    count: 40,
+    what: 'The client against the routes and against a bucket: uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; the drive kept in the page; what the server refused, said in each language.',
+  },
+  {
+    where: 'packages/react',
+    count: 9,
+    what: 'The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change through useActions; a view loading as itself, not as the last; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and <FileDrive> beside the hooks.',
+  },
+  {
+    where: 'packages/sync',
+    count: 8,
+    what: 'A folder of the disk and a drive behind its routes kept the same: what is made, changed, moved, renamed and taken away on each side, both changed as a conflict kept twice, a folder and a file of one name, the files of the systems left out, a disk found empty refused; and a sync that goes on, run by the drive’s events and by a file of the disk.',
+  },
+  {
+    where: 'examples',
+    count: 5,
+    what: 'Next.js, Express, Hono and Fastify, each served on a port and asked over HTTP: a folder, a file of two parts uploaded and read back, and the events of a change; and who asks from a JWT, a forged one refused.',
   },
   {
     where: 'packages/mcp',
     count: 19,
     what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may; activity, a search by what is written, folder colours; Rebodocs’ tools on the drive’s Word documents, each change a version; and driven by the official SDK as a client.',
   },
-  { where: 'apps/desktop', count: 2, what: 'Which server the window is of, kept between starts and tried before it is taken; and in Rust, a name taken in Downloads made free.' },
+  {
+    where: 'apps/desktop',
+    count: 5,
+    what: 'Which server the window is of, kept between starts and tried before it is taken; and in Rust (cargo test), a name taken in Downloads made free, a path of the folder synced that would leave it refused, and what is listed, moved and taken away there.',
+  },
   {
     where: 'npm run test:browser',
-    count: 48,
-    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools.',
+    count: 50,
+    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools; a folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard and the grid.',
   },
 ];
 
@@ -52,7 +71,14 @@ export const CHECKED: [string, string][] = [
     'Pictures',
     'Against R2: a picture uploaded in four sizes and its placeholder, the grid reading the small ones from addresses good for an hour; a Word document’s first page made a picture at upload; a .zip of six files.',
   ],
-  ['The desktop', 'ReboFiles.app built on a Mac with Tauri and started; its page against the playground from another origin, an upload in parts through it.'],
+  [
+    'The desktop',
+    'ReboFiles.app built on a Mac with Tauri and started; its page against the playground from another origin, an upload in parts through it. Its sync of a folder built and its commands tested in Rust; not driven in the window yet.',
+  ],
+  [
+    'The documentation',
+    'axe on each page of the documentation added on October 26, 2026, in English, Spanish and Mandarin, at the width of a desktop and of a phone: nothing found, nothing wider than the screen.',
+  ],
   [
     'The builds',
     'Each package built as it goes to npm and installed from its tarball in an empty project: a server on node:http, the client uploading and reading back over the network, <FileDrive> rendered on a server, a strict typecheck.',
@@ -62,19 +88,30 @@ export const CHECKED: [string, string][] = [
 export const NOT_CHECKED: [string, string][] = [
   ['Other buckets', 'Cloudflare R2 only. Not AWS, MinIO or Backblaze yet.'],
   ['Other browsers', 'Chrome only; not Safari or Firefox, and not on a real phone. The desktop window, Safari’s engine, started but not driven by tests.'],
-  ['Two processes on SQLite', 'Opened by two handlers one after the other, not at once; for more than one process, Postgres.'],
+  ['Two processes on SQLite', 'Opened by two handlers one after the other for changes; the events of one seen by the other. For more than one process that writes, Postgres.'],
+  ['Windows and Linux', 'The Desktop workflow builds and tests the application on both; it has not run yet, and nobody has used it there.'],
+  ['The workflows', 'CI, Desktop and Release are written; none has run on GitHub yet.'],
 ];
 
 export const LIMITS: { area: string; items: string[] }[] = [
   {
     area: 'Storage',
-    items: ['An upload left halfway stays in the bucket as parts for a day, to be gone on with; one never gone on with waits for a lifecycle rule of the bucket.'],
+    items: ['An upload left halfway stays in the bucket as parts for a day, to be gone on with; after that the server sweeps it, as requests come.'],
   },
   {
     area: 'Metadata',
     items: [
       'The drive is held in memory and read again when the store says it changed: fine for a team and well beyond, not for millions of entries.',
       'Changes are put in order inside one process only, but on Postgres with a pool, where a lock of the database orders them across processes.',
+      'The changes of another process are seen by the events within two seconds, from the revision of the store.',
+    ],
+  },
+  {
+    area: 'Sync',
+    items: [
+      'A folder renamed on the disk is sent again as a new one; its old one goes to the trash.',
+      'A file goes whole each time, not the part of it that changed.',
+      'In the desktop application, the disk is looked at every half a minute and when the window comes to the front, not as each file changes.',
     ],
   },
   {
@@ -152,7 +189,7 @@ export const ROADMAP: Milestone[] = [
     version: '0.6.0',
     name: 'The desktop',
     items: [
-      { what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' },
+      { what: '@rebofiles/sync: a folder of the disk kept like a folder of the drive, in the window and as a command', done: true },
       { what: 'The Tauri application, on a Mac first: the drive in a window, against a server', done: true },
     ],
   },

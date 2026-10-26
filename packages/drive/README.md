@@ -89,6 +89,14 @@ be undone from the toast, or with ⌘Z: the trash, a move, a rename, a colour.
 A folder takes one of nine colours, from its details or its menu. The details
 have its activity: who did what to it, and in it.
 
+What others change comes as it happens, from the server's `/events`: a
+folder made, a file renamed or put in the trash shows in a moment, without
+loading again (`live: false` for none). A folder of many, from 200 entries,
+puts in the page only what is in sight and a few rows around it; the
+keyboard goes through all of them, and a screen reader is told where each
+is among all. What the server refused is said in the language of the drive,
+by its code (`refusalText`).
+
 ## Download as .zip
 
 Several picked, or a folder, are downloaded as one .zip made in the page:

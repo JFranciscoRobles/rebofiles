@@ -1,15 +1,17 @@
 // The documentation for language models, made from the site once it is built:
 // /llms.txt, the list of the pages with what each one is about; a Markdown file
 // beside each page (/docs/react.md); and /llms-full.txt, all of them in one.
+// The same in each language, under its prefix: /es/llms.txt, /zh/docs/react.md.
 // Read from the pages as built, so what a model reads is what a person reads:
 // the demos, which only run in a browser, are left out, and so is what is only
 // there to be clicked.
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
-import { NAV, SITE, hrefOf, markdownOf } from '../lib/site';
+import { LOCALES, type Locale, localePath } from '../lib/i18n';
+import { SITE, hrefOf, markdownOf, navOf } from '../lib/site';
 
 const OUT = join(import.meta.dirname, '../out');
 
@@ -158,8 +160,8 @@ interface Page {
   markdown: string;
 }
 
-function read(slug: string, title: string, group: string): Page {
-  const html = readFileSync(join(OUT, hrefOf(slug), 'index.html'), 'utf8');
+function read(locale: Locale, slug: string, title: string, group: string): Page {
+  const html = readFileSync(join(OUT, localePath(locale, hrefOf(slug)), 'index.html'), 'utf8');
   const { document } = parseHTML(html);
   const description = document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '';
   const main = document.querySelector('main');
@@ -190,26 +192,46 @@ function read(slug: string, title: string, group: string): Page {
   return { title, slug, group, description, markdown };
 }
 
-const pages = NAV.flatMap((group) => group.items.map((item) => read(item.slug, item.title, group.title)));
+/** What the site is, at the top of each llms.txt, in its language. */
+const INTRO: Record<Locale, { about: string; each: (full: string) => string }> = {
+  en: {
+    about:
+      'A file drive for the browser, built into your application, on your own storage: folders, uploads in parts that resume, previews and a viewer, versions, the trash, search by name and by what is written, sharing and links, activity, changes shown live, .zip downloads, a folder of the computer kept in sync, and tools for an AI assistant, in packages taken one at a time (@rebofiles/core, @rebofiles/server, @rebofiles/drive, @rebofiles/react, @rebofiles/mcp, @rebofiles/sync). The bytes go straight between the browser and your bucket (S3 or the disk); the entries are kept in memory, SQLite or Postgres; your application says who may do what. MIT.',
+    each: (full) => `Each page below is also a Markdown file, at the address given. All of them together, in one file: ${full}`,
+  },
+  es: {
+    about:
+      'Un drive de archivos para el navegador, dentro de tu aplicación, en tu propio almacenamiento: carpetas, subidas por partes que se reanudan, vistas previas y un visor, versiones, la papelera, búsqueda por nombre y por lo que está escrito, compartir y enlaces, actividad, cambios en vivo, descargas en .zip, una carpeta de la computadora sincronizada, y herramientas para un asistente de IA, en paquetes que se toman de uno en uno (@rebofiles/core, @rebofiles/server, @rebofiles/drive, @rebofiles/react, @rebofiles/mcp, @rebofiles/sync). Los bytes van directos entre el navegador y tu bucket (S3 o el disco); las entradas se guardan en memoria, SQLite o Postgres; tu aplicación dice quién puede hacer qué. MIT.',
+    each: (full) => `Cada página de abajo es también un archivo Markdown, en la dirección dada. Todas juntas, en un archivo: ${full}`,
+  },
+  zh: {
+    about:
+      '一个内置于你的应用、使用你自己存储的浏览器文件云盘：文件夹、可续传的分块上传、预览与查看器、版本、回收站、按名称和内容搜索、共享与链接、动态、实时显示的更改、.zip 下载、与电脑文件夹同步，以及供 AI 助手使用的工具，分为可单独使用的包（@rebofiles/core、@rebofiles/server、@rebofiles/drive、@rebofiles/react、@rebofiles/mcp、@rebofiles/sync）。字节在浏览器与你的存储桶（S3 或磁盘）之间直接传输；条目保存在内存、SQLite 或 Postgres 中；由你的应用决定谁能做什么。MIT 许可。',
+    each: (full) => `下面的每个页面也是一个 Markdown 文件，地址如下。全部内容合为一个文件：${full}`,
+  },
+};
 
-for (const page of pages) writeFileSync(join(OUT, markdownOf(page.slug)), `${page.markdown}\n`);
+const write = (path: string, text: string) => {
+  mkdirSync(dirname(join(OUT, path)), { recursive: true });
+  writeFileSync(join(OUT, path), text);
+};
 
-const intro = [
-  '# ReboFiles',
-  '',
-  '> A file drive for the browser, built into your application, on your own storage: folders, uploads in parts that resume, previews and a viewer, versions, the trash, search by name and by what is written, sharing and links, activity, .zip downloads and tools for an AI assistant, in packages taken one at a time (@rebofiles/core, @rebofiles/server, @rebofiles/drive, @rebofiles/react, @rebofiles/mcp). The bytes go straight between the browser and your bucket (S3 or the disk); the entries are kept in memory, SQLite or Postgres; your application says who may do what. MIT.',
-  '',
-  `Each page below is also a Markdown file, at the address given. All of them together, in one file: ${SITE}/llms-full.txt`,
-];
-const list = NAV.flatMap((group) => [
-  '',
-  `## ${group.title}`,
-  '',
-  ...pages.filter((page) => page.group === group.title).map((page) => `- [${page.title}](${SITE}${markdownOf(page.slug)}): ${page.description}`),
-]);
-writeFileSync(join(OUT, 'llms.txt'), `${[...intro, ...list].join('\n')}\n`);
+let made = 0;
+for (const locale of LOCALES) {
+  const nav = navOf(locale);
+  const pages = nav.flatMap((group) => group.items.map((item) => read(locale, item.slug, item.title, group.title)));
+  for (const page of pages) write(localePath(locale, markdownOf(page.slug)), `${page.markdown}\n`);
+  const intro = ['# ReboFiles', '', `> ${INTRO[locale].about}`, '', INTRO[locale].each(`${SITE}${localePath(locale, '/llms-full.txt')}`)];
+  const list = nav.flatMap((group) => [
+    '',
+    `## ${group.title}`,
+    '',
+    ...pages.filter((page) => page.group === group.title).map((page) => `- [${page.title}](${SITE}${localePath(locale, markdownOf(page.slug))}): ${page.description}`),
+  ]);
+  write(localePath(locale, '/llms.txt'), `${[...intro, ...list].join('\n')}\n`);
+  const full = pages.map((page) => `<!-- ${SITE}${localePath(locale, hrefOf(page.slug))} -->\n\n${page.markdown}`);
+  write(localePath(locale, '/llms-full.txt'), `${[intro.slice(0, 3).join('\n'), ...full].join('\n\n---\n\n')}\n`);
+  made += pages.length;
+}
 
-const full = pages.map((page) => `<!-- ${SITE}${hrefOf(page.slug)} -->\n\n${page.markdown}`);
-writeFileSync(join(OUT, 'llms-full.txt'), `${[intro.slice(0, 3).join('\n'), ...full].join('\n\n---\n\n')}\n`);
-
-console.log(`llms.txt, llms-full.txt and ${pages.length} Markdown pages in out/`);
+console.log(`llms.txt, llms-full.txt and ${made} Markdown pages in out/, in ${LOCALES.join(', ')}`);

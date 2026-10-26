@@ -22,6 +22,7 @@ import {
   splitName,
   versionNumber,
 } from '@rebofiles/core';
+import { refusalText } from './refusals';
 import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
 import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
@@ -99,6 +100,11 @@ export interface DriveOptions {
   className?: string;
   /** Called after every change made from the drive, for what else in the page shows it to ask again. */
   onChange?: () => void;
+  /**
+   * What others change shown as it happens, from the server's `/events`: true unless said. False for a drive that is
+   * told otherwise, as <FileDrive> is by its provider, which watches for the whole page.
+   */
+  live?: boolean;
 }
 
 /** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
@@ -145,6 +151,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const prefix = `rf${++mounts}`;
   // The settings of the server, once they come: a person's own first, then what the application said, then the drive's.
   let settings: SettingsAnswer | null = null;
+  /** What went wrong, in the language of the drive. */
+  const said = (error: unknown) => refusalText(error, languageNow());
   const languageNow = (): 'en' | 'es' | 'zh' => settings?.mine.language ?? options.language ?? settings?.drive.language ?? 'en';
   const themeNow = () => settings?.mine.theme ?? options.theme ?? settings?.drive.theme ?? 'light';
   let t: Translate = translator(options.texts ?? TEXTS[languageNow()]);
@@ -581,7 +589,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       await run();
       say(t('undone'));
     } catch (error) {
-      say(error instanceof Error ? error.message : String(error));
+      say(said(error));
     }
     changed();
   };
@@ -603,13 +611,28 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const onSeen = () => document.visibilityState === 'visible' && askShared();
   document.addEventListener('visibilitychange', onSeen);
   const sharedTimer = setInterval(onSeen, 60_000);
+  // What others change, as it happens: everything asked again a moment after, once for changes that come together.
+  let liveTimer: ReturnType<typeof setTimeout> | undefined;
+  const unwatch =
+    options.live === false || !client.watch
+      ? () => undefined
+      : client.watch(() => {
+          clearTimeout(liveTimer);
+          liveTimer = setTimeout(() => {
+            if (!alive) return;
+            revision++;
+            lookIn.forget();
+            askShared();
+            render();
+          }, 250);
+        });
   /** Does it, says what went wrong in the toast rather than in the console, and asks everything again. */
   const attempt = async (work: () => Promise<unknown>, done?: string) => {
     try {
       await work();
       if (done) say(done);
     } catch (error) {
-      say(error instanceof RequestError ? error.message : String(error));
+      say(said(error));
     } finally {
       changed();
     }
@@ -690,7 +713,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         went.push(entry);
       } catch (error) {
         failed++;
-        why = error instanceof Error ? error.message : String(error);
+        why = said(error);
       }
     }
     if (done !== 'movedMany') picked = new Set();
@@ -723,7 +746,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     try {
       options.onOpen(entry, await client.url(entry.id, { inline: true }));
     } catch (error) {
-      say((error as Error).message);
+      say(said(error));
     }
   };
   /** In a tab of its own, as the browser shows it: from the viewer, for what it cannot show or to keep beside. */
@@ -735,7 +758,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       if (opened) opened.location.href = url;
     } catch (error) {
       opened?.close();
-      say((error as Error).message);
+      say(said(error));
     }
   };
 
@@ -776,7 +799,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         made.set(path, folderMade.id);
       }
     } catch (error) {
-      say(error instanceof Error ? error.message : String(error));
+      say(said(error));
     }
     changed();
     const byFolder = new Map<string, File[]>();
@@ -957,10 +980,60 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     return snippet ? h('span', { class: 'rf-name-lines' }, h('span', null, entry.name), h('small', { class: 'rf-snippet' }, snippet)) : h('span', null, entry.name);
   };
 
+  // A folder of many: only what is in sight is in the page, and a little around it, with the room of the rest kept
+  // above and below, so the scroll bar is as long as all of it. Their heights are measured as they are shown.
+  const VIRTUAL_FROM = 200;
+  const AROUND = 4;
+  const sight = { top: 0, height: 0, width: 0, row: 41, card: 190, of: '' };
+  let sightFrame = 0;
+  /** The rows of a grid, as its CSS lays them: cards of 150 pixels at least, 12 between, 12 at each side. */
+  const columnsIn = (width: number) => Math.max(1, Math.floor((width - 24 + 12) / (150 + 12)));
+  const measure = (box: HTMLElement) => {
+    const row = box.querySelector<HTMLElement>('.rf-row, .rf-card');
+    const height = row ? row.getBoundingClientRect().height + (layout === 'grid' ? 12 : 0) : 0;
+    const before = { ...sight };
+    sight.top = box.scrollTop;
+    sight.height = box.clientHeight;
+    sight.width = box.clientWidth;
+    if (height > 0) layout === 'grid' ? (sight.card = height) : (sight.row = height);
+    return before.top !== sight.top || before.height !== sight.height || before.width !== sight.width || before.row !== sight.row || before.card !== sight.card;
+  };
+  /** What of `count` is in sight, with how much room goes before and after it: all of it, for a few. */
+  const inSight = (count: number, index: number) => {
+    if (count < VIRTUAL_FROM) return { from: 0, to: count, before: 0, after: 0, scroll: undefined as number | undefined };
+    const each = layout === 'grid' ? columnsIn(sight.width || 600) : 1;
+    const tall = layout === 'grid' ? sight.card : sight.row;
+    const rows = Math.ceil(count / each);
+    const height = sight.height || 600;
+    let scroll: number | undefined;
+    // The one current, moved to with the keyboard, brought into sight first: it must be in the page to be told of.
+    const key = `${selected}|${layout}`;
+    if (index >= 0 && key !== sight.of) {
+      sight.of = key;
+      const at = Math.floor(index / each) * tall;
+      if (at < sight.top) scroll = sight.top = at;
+      else if (at + tall > sight.top + height) scroll = sight.top = at + tall - height;
+    }
+    const first = Math.max(0, Math.floor(sight.top / tall) - AROUND);
+    const last = Math.min(rows, Math.ceil((sight.top + height) / tall) + AROUND);
+    return { from: first * each, to: Math.min(count, last * each), before: first * tall, after: Math.max(0, rows - last) * tall, scroll };
+  };
+
   function items(entries: Entry[], loading: boolean, error: Error | null, empty: string) {
-    if (error) return h('div', { class: 'rf-empty rf-error', role: 'alert' }, error.message);
+    if (error) return h('div', { class: 'rf-empty rf-error', role: 'alert' }, said(error));
     if (!loading && entries.length === 0) return h('div', { class: 'rf-empty' }, h('div', null, icon('folder', 40), h('div', null, empty)));
     const index = entries.findIndex((entry) => entry.id === selected);
+    const shown = inSight(entries.length, index);
+    const visible = entries.slice(shown.from, shown.to);
+    const many = entries.length >= VIRTUAL_FROM;
+    afterRender.push(() => {
+      const box = element.querySelector<HTMLElement>('.rf-items');
+      if (!box || !many) return;
+      if (shown.scroll !== undefined) box.scrollTop = shown.scroll;
+      // Measured once it is in the page: other heights than were thought, or another size, lay it out again.
+      if (measure(box)) render();
+    });
+    const room = (key: string, height: number) => (height > 0 ? h('div', { key, class: 'rf-room', 'aria-hidden': 'true', style: `height:${height}px` }) : null);
     const draggable = section !== 'trash';
     const onKeydown = (event: KeyboardEvent) => {
       const box = element.querySelector('.rf-items');
@@ -1028,6 +1101,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           'data-id': entry.id,
           role: 'option',
           'aria-selected': picked.has(entry.id),
+          // Where it is among all, for a screen reader, when only some are in the page.
+          'aria-setsize': many ? entries.length : undefined,
+          'aria-posinset': many ? entries.indexOf(entry) + 1 : undefined,
           'data-current': entry.id === selected,
           draggable: draggable ? 'true' : 'false',
           onClick: (event: MouseEvent) => (event.shiftKey ? pickRange(entries, entry.id, event.ctrlKey || event.metaKey) : event.ctrlKey || event.metaKey ? toggle(entry.id) : select(entry.id)),
@@ -1065,10 +1141,19 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         'aria-activedescendant': selected && index >= 0 ? `${prefix}-${selected}` : undefined,
         onKeydown,
         onFocus: () => index < 0 && entries[0] && select(entries[0].id),
+        onScroll: (event: Event) => {
+          if (!many || sightFrame) return;
+          const box = event.currentTarget as HTMLElement;
+          sightFrame = requestAnimationFrame(() => {
+            sightFrame = 0;
+            if (measure(box)) render();
+          });
+        },
       },
       layout === 'list'
         ? [
-            entries.map((entry) =>
+            room('before', shown.before),
+            visible.map((entry) =>
               item(
                 entry,
                 'rf-row',
@@ -1078,11 +1163,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
               ),
             ),
+            room('after', shown.after),
           ]
         : h(
             'div',
-            { class: 'rf-grid' },
-            entries.map((entry) => {
+            { class: 'rf-grid', style: many ? `padding-top:${shown.before + 4}px;padding-bottom:${shown.after + 12}px` : undefined },
+            visible.map((entry) => {
               const kind = kindOf(entry);
               const url = kind === 'image' ? urlOf(entry as FileEntry, 320) : null;
               return item(
@@ -1268,7 +1354,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         });
       else say(t('zipped', { name: job.name }));
     } catch (error) {
-      say(job.stop.signal.aborted || (error as Error).name === 'AbortError' ? t('zipStopped') : error instanceof Error ? error.message : String(error));
+      say(job.stop.signal.aborted || (error as Error).name === 'AbortError' ? t('zipStopped') : said(error));
     } finally {
       zipping = null;
       render();
@@ -2004,7 +2090,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       // Asked again, as what a setting changes, the space one may keep, is shown elsewhere.
       changed();
     } catch (error) {
-      settingsNote = { text: (error as Error).message, error: true };
+      settingsNote = { text: said(error), error: true };
     }
     render();
   };
@@ -2337,7 +2423,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                       ? t('upStopped')
                       : item.sent > 0
                         ? t('uploadCut', { name: item.name, pct: pct(item.sent, item.size) })
-                        : `${item.name}: ${item.error}`;
+                        : `${item.name}: ${item.refused ? said(new RequestError(0, item.refused, item.error ?? '')) : item.error}`;
       return h(
         'li',
         { key: `up${item.id}`, class: `rf-up rf-up-${item.state}` },
@@ -2416,7 +2502,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             await client.rename(entry.id, name);
             say(t('renamedTo', { name }), () => client.rename(entry.id, entry.name));
           } catch (error) {
-            say(error instanceof RequestError ? error.message : String(error));
+            say(said(error));
           }
           changed();
         });
@@ -2789,6 +2875,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       clearTimeout(searchTimer);
       clearTimeout(retryTimer);
       clearInterval(sharedTimer);
+      clearTimeout(liveTimer);
+      unwatch();
       document.removeEventListener('visibilitychange', onSeen);
       document.removeEventListener('mousedown', closeMenu);
       element.replaceChildren();

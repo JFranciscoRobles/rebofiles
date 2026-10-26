@@ -80,6 +80,16 @@ export interface Storage {
    */
   downloadUrl(key: string, name: string, type: string, base: string, inline?: boolean): Promise<string>;
   remove(keys: string[]): Promise<void>;
+  /**
+   * The bytes kept under `key`, from `from` to `to` (not included), or all of them: what the server's `inspect` reads of
+   * a file once it arrived. Without it, there is no `inspect`.
+   */
+  read?(key: string, range?: { from: number; to: number }): Promise<Uint8Array>;
+  /**
+   * Uploads started before `before` and neither finished nor given up, taken away: a page closed halfway leaves its
+   * parts, which cost space and are listed nowhere. How many there were. The server calls it now and then.
+   */
+  sweepUploads?(before: Date): Promise<number>;
   /** The requests to addresses of its own, for a storage the browser cannot reach; undefined for any other. */
   serve?(request: Request, path: string): Promise<Response | undefined>;
 }

@@ -50,6 +50,17 @@ good places to start.
 - A signature is tested against AWS's own examples.
 - What a person does in the drive is tested in Chrome, in
   `apps/playground/test`, by the roles and names a screen reader is told.
+- The hooks of React are tested in `packages/react/test`, on happy-dom,
+  against the drive kept in the page.
+- An example of `examples/` is served on a port and asked over HTTP by
+  `examples/test`; the documentation shows the file as it is.
+
+Every push to main and every pull request runs the lint, the types, the
+tests, the builds of the packages and of the site (with its SEO), and the
+tests in Chrome (`.github/workflows/ci.yml`); a second job runs the test of two
+processes on a real Postgres. The desktop application is built and tested on a
+Mac, Windows and Linux by `.github/workflows/desktop.yml`, by hand or when a
+pull request touches it.
 
 ## Publishing
 
@@ -58,15 +69,22 @@ code in files of its own, its types beside them, and a `package.json` of its
 own in `dist/`, which is what goes to npm. The `package.json` beside the
 sources stays the one the repository uses.
 
+Every package goes at the same version, with [Changesets](https://github.com/changesets/changesets)
+in `fixed` mode: whatever a change touches, all six move together.
+
 ```bash
-npm run build:packages                          # dist/ of every package
-npm publish ./packages/core/dist                # then server, drive, react, mcp, in that order
+npx changeset                   # with a change: which packages, patch, minor or major, and what it is
+npm run version                 # the versions raised from the changesets, and the lock with them
+npm run release -- --dry-run    # built, and what would be published, in order
+npm run release                 # core, server, drive, react, mcp, sync: each dist/ not on npm at its version
 ```
 
-Before a release: `npm test`, `npm run typecheck`, `npm run lint`; the
-version of every package moved together; the heading of **Unreleased** in
-`CHANGELOG.md` turned into the version and its date; `PUBLISHED` turned on in
-`apps/site/lib/home.ts`.
+`.github/workflows/release.yml` does the last two by hand only, with the
+secret `NPM_TOKEN` and provenance; nothing is published by a push.
+
+Before a release: what the changesets said written under **Unreleased** in
+`CHANGELOG.md`, in its words, and the heading turned into the version and its
+date; `PUBLISHED` turned on in `apps/site/lib/home.ts`.
 
 ## Files
 

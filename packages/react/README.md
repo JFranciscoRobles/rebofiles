@@ -109,6 +109,9 @@ function Folder({ id }: { id: string | null }) {
 | `useUploads({ check })` | Files sent three at a time, in parts, with what has gone of each, how fast and how long it has left (`uploads`, `summary`); `retry`, `stop`, `stopAll`, `dismiss`, `clear`. With `check: true`, each looked for in the drive first and asked about (`decide`). |
 | `useSettings()` | The drive's settings and the person's own, and `save`, `saveMine`. |
 
+Every hook asks again when someone else changes the drive, a moment after,
+from the server's `/events` (`<DriveProvider live={false}>` for none).
+
 ## Settings of your own
 
 `useSettings()` gives the drive as the one asking sees it, the drive's and

@@ -1,0 +1,35 @@
+# A release, only when run by hand: the versions raised by the changesets
+# (`npm run version`) must be on main already. Builds the six packages and
+# publishes each `dist/` that is not on npm at its version, with provenance.
+# Needs the secret NPM_TOKEN. `dry-run` says what it would publish.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only say what would be published
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npx changeset status
+      - run: npm run lint && npm run typecheck && npm test
+      - run: npm run release -- ${{ inputs.dry-run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

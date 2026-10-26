@@ -3,6 +3,7 @@
 import * as app from './pages/app';
 import * as files from './pages/files';
 import * as reference from './pages/reference';
+import * as running from './pages/running';
 import * as schema from './pages/schema';
 import * as server from './pages/server';
 import * as start from './pages/start';
@@ -25,17 +26,22 @@ export const DOC_PAGES: Record<string, DocPage> = {
   uploads: files.uploads,
   previews: files.previews,
   search: files.search,
+  live: running.live,
   versions: files.versions,
   zip: files.zip,
   word: files.word,
   server: server.server,
+  frameworks: running.frameworks,
   authorize: server.authorize,
   storage: server.storage,
+  'checking-uploads': running.checkingUploads,
   metadata: server.metadata,
   schema: schema.schema,
   sharing: server.sharing,
   activity: server.activity,
   desktop: server.desktop,
+  sync: running.sync,
+  production: running.production,
   assistants: together.assistants,
   packages: reference.packages,
   components: reference.components,

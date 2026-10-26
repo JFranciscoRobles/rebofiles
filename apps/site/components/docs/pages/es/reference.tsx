@@ -13,13 +13,21 @@ import { CLIENT_CODE, GROUPS, Milestones, RouteTable, Rows, clientId, packageId 
 const to = (slug: string) => docHref('es', slug);
 const { CLIENT, HOOKS, PACKAGE_DOCS, PROPS } = referenceIn('es');
 const SOURCE = 'apps/site/components/docs/pages/es/reference.tsx';
-const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = { Reading: 'Leer', Changing: 'Cambiar', Uploads: 'Subidas', Sharing: 'Compartir', Files: 'Archivos', Settings: 'Ajustes' };
+const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = {
+  Reading: 'Leer',
+  Changing: 'Cambiar',
+  Uploads: 'Subidas',
+  Sharing: 'Compartir',
+  Files: 'Archivos',
+  Settings: 'Ajustes',
+  Live: 'En vivo',
+};
 const ROUTE_WORDS: [string, string, string, string] = ['Rutas', 'Rutas de un enlace', 'Ruta', 'Qué hace'];
 const IN_ENGLISH = <Callout title="En inglés:">lo medido y la hoja de ruta se escriben una vez, en inglés, como en ROADMAP.md.</Callout>;
 
 export const packages: DocPage = {
   title: 'Paquetes',
-  description: 'Cinco paquetes, cada uno para una cosa, en la misma versión: cuál instalar, dónde corre cada uno, qué da cada uno, y las aplicaciones del repositorio.',
+  description: 'Seis paquetes, cada uno para una cosa, en la misma versión: cuál instalar, dónde corre cada uno, qué da cada uno, y las aplicaciones del repositorio.',
   source: SOURCE,
   lead: <>Todos los paquetes están en la misma versión, {VERSION}, y cambian juntos. Ninguno tiene más dependencias que core y, donde se dice, Rebodocs como dependencia opcional.</>,
   sections: [
@@ -162,8 +170,9 @@ export const routesPage: DocPage = {
   source: 'packages/server/src/api.ts',
   lead: (
     <>
-      Bajo la <C>base</C> del handler, <C>/api/files</C> en estas páginas. Se leen del comentario del principio de <C>packages/server/src/api.ts</C> al construir este sitio, así que dicen lo que hace
-      el código, en inglés. Los cuerpos son JSON; un rechazo es <C>&#123; error, message &#125;</C> con su estado.
+      Bajo la <C>base</C> del handler, <C>/api/files</C> en estas páginas. Se leen del comentario del principio de <C>packages/server/src/api.ts</C> al construir este sitio, así que están todas las
+      del código; lo que hace cada una va traducido aquí. Los cuerpos son JSON; un rechazo es <C>&#123; error, message &#125;</C> con su estado: el <C>message</C> en inglés, y el drive lo dice en el
+      idioma de cada persona por su <C>error</C>.
     </>
   ),
   sections: [
@@ -173,7 +182,7 @@ export const routesPage: DocPage = {
       badge: 'Sesión',
       color: 'blue',
       lead: 'Cada una pregunta a identify quién pregunta y a authorize si puede.',
-      body: <RouteTable through="session" words={ROUTE_WORDS} />,
+      body: <RouteTable through="session" words={ROUTE_WORDS} locale="es" />,
     },
     {
       id: 'through-a-link',
@@ -181,7 +190,7 @@ export const routesPage: DocPage = {
       badge: 'Enlaces',
       color: 'pink',
       lead: 'No preguntan a ninguno: el enlace es el permiso. Un enlace con contraseña la pide en cada una.',
-      body: <RouteTable through="link" words={ROUTE_WORDS} />,
+      body: <RouteTable through="link" words={ROUTE_WORDS} locale="es" />,
     },
   ],
 };

@@ -326,7 +326,10 @@ export const languages: DocPage = {
           <P>
             <C>texts</C> 接受一个与 <C>TEXTS.en</C> 键相同的对象；TypeScript 会提示缺少哪些键。值中可以包含 <C>{'{n}'}</C>、<C>{'{name}'}</C> 等占位符，填充方式与英文相同。
           </P>
-          <Callout title="服务器返回的错误">是英文的：网盘会按原样显示。它们的代码（RequestError.code）在所有语言中都相同，方便你换成自己的文字。</Callout>
+          <Callout title="服务器返回的错误">
+            以英文返回，并带有具体的名称和数字。在西班牙文和中文中，网盘按其代码（<C>RequestError.code</C>）用自己的文字显示；自定义界面可使用 <C>refusalText(error, language)</C>
+            。你的应用自己的代码（来自自定义的 <C>Refused</C>）按服务器原文显示。
+          </Callout>
           <Callout title="Rebodocs 支持英文和西班牙文。">在中文界面下，网盘是中文的，但其中 Rebodocs 的缩放栏和编辑器仍为英文，直到 Rebodocs 提供中文。</Callout>
         </>
       ),

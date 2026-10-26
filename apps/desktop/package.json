@@ -1,7 +1,7 @@
 {
   "name": "@rebofiles/desktop",
   "version": "0.1.0",
-  "description": "The drive in a window of its own, on a Mac first: Tauri around the page of @rebofiles/drive, against a ReboFiles server.",
+  "description": "The drive in a window of its own, and a folder of the computer kept as one of the drive: Tauri around the page of @rebofiles/drive and the engine of @rebofiles/sync, against a ReboFiles server.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -15,7 +15,8 @@
   "dependencies": {
     "@rebodocs/core": "^0.11.0",
     "@rebodocs/editor": "^0.11.0",
-    "@rebofiles/drive": "0.1.0"
+    "@rebofiles/drive": "0.1.0",
+    "@rebofiles/sync": "0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"

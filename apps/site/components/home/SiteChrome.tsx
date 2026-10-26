@@ -83,7 +83,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
         <a href={REPO} className="hover:text-ink">
           GitHub
         </a>
-        <a href="/llms.txt" className="hover:text-ink" title={d.footer.llms}>
+        <a href={localePath(locale, '/llms.txt')} className="hover:text-ink" title={d.footer.llms}>
           llms.txt
         </a>
         <span className="flex flex-col gap-1 sm:ml-auto sm:items-end">

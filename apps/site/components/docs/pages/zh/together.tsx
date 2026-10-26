@@ -1,7 +1,7 @@
 // 协作：AI 助手以其用户的权限在网盘中工作。
 
-import { TOOLS } from '@rebofiles/mcp';
 import { C, Callout, Code, type DocPage, List, P, RefTable } from '../../ui';
+import { toolsIn } from '../../routesI18n';
 import { CLAUDE, DocumentTools, HTTP, STDIO, toolId } from '../together';
 
 export const assistants: DocPage = {
@@ -59,12 +59,12 @@ export const assistants: DocPage = {
       title: '全部工具',
       badge: '工具',
       color: 'purple',
-      lead: '与服务器向助手描述的一致（英文）。',
+      lead: '每个工具的作用（已译出）。服务器向助手描述时使用英文，所有模型都能读懂。',
       body: (
         <RefTable
           label="网盘的工具"
           name="工具"
-          rows={TOOLS.map((tool) => ({ id: toolId(tool.name), name: tool.name, type: tool.annotations.readOnlyHint ? '只读' : '写入', does: tool.description }))}
+          rows={toolsIn('zh').map((tool) => ({ id: toolId(tool.name), name: tool.name, type: tool.annotations.readOnlyHint ? '只读' : '写入', does: tool.description }))}
         />
       ),
     },

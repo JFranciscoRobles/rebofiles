@@ -36,6 +36,8 @@ export const bytesOf = (size: number, seed = 1) => Uint8Array.from({ length: siz
 export function memoryS3({ listPage = 1000 } = {}) {
   const objects = new Map<string, Uint8Array>();
   const uploads = new Map<string, Map<number, Uint8Array>>();
+  /** Of each upload in parts, its key and when it started: a test may set it back, to make it old. */
+  const started = new Map<string, { key: string; at: Date }>();
   const seen: { method: string; url: URL }[] = [];
   let next = 0;
   const fetch = async (address: string | URL | Request, init: RequestInit = {}): Promise<Response> => {
@@ -52,7 +54,16 @@ export function memoryS3({ listPage = 1000 } = {}) {
     if (method === 'POST' && q.has('uploads')) {
       const id = `u${++next}`;
       uploads.set(id, new Map());
+      started.set(id, { key, at: new Date() });
       return new Response(`<InitiateMultipartUploadResult><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
+    }
+    if (method === 'GET' && q.has('uploads')) {
+      const prefix = q.get('prefix') ?? '';
+      const listed = [...started]
+        .filter(([id, { key }]) => uploads.has(id) && key.startsWith(prefix))
+        .map(([id, { key, at }]) => `<Upload><Key>${key}</Key><UploadId>${id}</UploadId><Initiated>${at.toISOString()}</Initiated></Upload>`)
+        .join('');
+      return new Response(`<ListMultipartUploadsResult><IsTruncated>false</IsTruncated>${listed}</ListMultipartUploadsResult>`);
     }
     if (method === 'PUT' && q.has('uploadId')) {
       uploads.get(q.get('uploadId')!)!.set(Number(q.get('partNumber')), body);
@@ -99,7 +110,10 @@ export function memoryS3({ listPage = 1000 } = {}) {
     // As Cloudflare does: an answer it may compress says no length, and a HEAD of a text it compresses.
     if (method === 'HEAD') return new Response(null, { headers: sent.get('accept-encoding') === 'identity' ? { 'content-length': String(objects.get(key)!.length) } : {} });
     if (method === 'DELETE') return objects.delete(key), new Response(null, { status: 204 });
+    // A range, as `bytes=from-to`, both in it.
+    const range = /^bytes=(\d+)-(\d+)$/.exec(sent.get('range') ?? '');
+    if (range) return new Response(objects.get(key)!.slice(Number(range[1]), Number(range[2]) + 1), { status: 206 });
     return new Response(objects.get(key)!.slice());
   };
-  return { fetch: fetch as typeof globalThis.fetch, objects, uploads, seen };
+  return { fetch: fetch as typeof globalThis.fetch, objects, uploads, started, seen };
 }

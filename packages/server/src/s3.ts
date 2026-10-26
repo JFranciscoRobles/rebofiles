@@ -157,6 +157,34 @@ export function s3Storage(options: S3Options): Storage {
       });
     },
 
+    async read(key, range) {
+      const answer = await ask('GET', at(key), undefined, range ? { range: `bytes=${range.from}-${range.to - 1}` } : {});
+      if (answer.status === 404) throw new Error(`The bucket has nothing at ${key}.`);
+      return new Uint8Array(await answer.arrayBuffer());
+    },
+
+    async sweepUploads(before) {
+      // Listed a thousand a page, under the prefix only: a bucket shared with others keeps their uploads too.
+      let swept = 0;
+      for (let marker = { key: '', id: '' }; ; ) {
+        const query = new URLSearchParams({ uploads: '', prefix: options.prefix ?? '', ...(marker.key ? { 'key-marker': marker.key, 'upload-id-marker': marker.id } : {}) });
+        const text = await (await ask('GET', `${root}?${query}`)).text();
+        for (const [, upload] of text.matchAll(/<Upload>([\s\S]*?)<\/Upload>/g)) {
+          const key = /<Key>([^<]*)</.exec(upload)?.[1] ?? '';
+          const id = /<UploadId>([^<]*)</.exec(upload)?.[1] ?? '';
+          const started = Date.parse(/<Initiated>([^<]*)</.exec(upload)?.[1] ?? '');
+          if (!key || !id || !(started < before.getTime())) continue;
+          const url = new URL(root + key.replace(/&amp;/g, '&'));
+          url.searchParams.set('uploadId', id);
+          await ask('DELETE', url.toString());
+          swept++;
+        }
+        if (!/<IsTruncated>true</.test(text)) return swept;
+        marker = { key: /<NextKeyMarker>([^<]*)</.exec(text)?.[1] ?? '', id: /<NextUploadIdMarker>([^<]*)</.exec(text)?.[1] ?? '' };
+        if (!marker.key) return swept;
+      }
+    },
+
     async remove(keys) {
       const xmlText = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       for (let from = 0; from < keys.length; from += DELETE_BATCH) {

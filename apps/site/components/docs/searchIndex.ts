@@ -2,7 +2,6 @@
 // routes, tools and packages of the reference. Made when the site is built;
 // the browser only filters it.
 
-import { TOOLS } from '@rebofiles/mcp';
 import type { Locale } from '@/lib/i18n';
 import { docHref, navOf } from '@/lib/site';
 import { hookId, propId } from './pages/app';
@@ -12,6 +11,7 @@ import { toolId } from './pages/together';
 import { referenceIn } from './referenceI18n';
 import { docPageOf } from './registry';
 import { routeId, routes } from './routes';
+import { routeIn, toolsIn } from './routesI18n';
 
 export interface SearchEntry {
   kind: 'Page' | 'Section' | 'Package' | 'Component' | 'Prop' | 'Hook' | 'Function' | 'Route' | 'Tool';
@@ -53,8 +53,9 @@ export function searchIndex(locale: Locale = 'en'): SearchEntry[] {
     entries.push({ kind: 'Prop', title: option.name, detail: `createDriveHandler · ${option.type}`, href: `${hrefOf('server')}#${optionId(option.name)}`, keywords: plain(option.does) });
   for (const hook of HOOKS) entries.push({ kind: 'Hook', title: hook.name, detail: hook.short, href: `${hrefOf('hooks')}#${hookId(hook.name)}`, keywords: plain(hook.gives) });
   for (const method of CLIENT) entries.push({ kind: 'Function', title: `client.${method.name}`, detail: plain(method.does), href: `${hrefOf('client')}#${clientId(method.name)}` });
-  for (const route of routes()) entries.push({ kind: 'Route', title: `${route.method} ${route.path}`, detail: plain(route.does), href: `${hrefOf('routes')}#${routeId(route)}` });
-  for (const tool of TOOLS) entries.push({ kind: 'Tool', title: tool.name, detail: `MCP · ${tool.description.split(/(?<=[.:])\s/)[0]}`, href: `${hrefOf('assistants')}#${toolId(tool.name)}` });
+  for (const route of routes()) entries.push({ kind: 'Route', title: `${route.method} ${route.path}`, detail: plain(routeIn(locale, route)), href: `${hrefOf('routes')}#${routeId(route)}` });
+  for (const tool of toolsIn(locale))
+    entries.push({ kind: 'Tool', title: tool.name, detail: `MCP · ${tool.description.split(/(?<=[.:])\s/)[0]}`, href: `${hrefOf('assistants')}#${toolId(tool.name)}` });
   for (const pkg of PACKAGE_DOCS) entries.push({ kind: 'Package', title: pkg.name, detail: pkg.what, href: `${hrefOf('packages')}#${packageId(pkg.name)}` });
   return entries;
 }

@@ -13,13 +13,13 @@ import { CLIENT_CODE, GROUPS, Milestones, RouteTable, Rows, clientId, packageId 
 const to = (slug: string) => docHref('zh', slug);
 const { CLIENT, HOOKS, PACKAGE_DOCS, PROPS } = referenceIn('zh');
 const SOURCE = 'apps/site/components/docs/pages/zh/reference.tsx';
-const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = { Reading: '读取', Changing: '修改', Uploads: '上传', Sharing: '共享', Files: '文件', Settings: '设置' };
+const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = { Reading: '读取', Changing: '修改', Uploads: '上传', Sharing: '共享', Files: '文件', Settings: '设置', Live: '实时' };
 const ROUTE_WORDS: [string, string, string, string] = ['路由', '链接的路由', '路由', '作用'];
 const IN_ENGLISH = <Callout title="英文内容：">实测数据和路线图只用英文编写一次，与 ROADMAP.md 相同。</Callout>;
 
 export const packages: DocPage = {
   title: '包',
-  description: '五个包，各司其职，版本统一：该安装哪个、各自运行在哪里、各自提供什么，以及仓库中的应用。',
+  description: '六个包，各司其职，版本统一：该安装哪个、各自运行在哪里、各自提供什么，以及仓库中的应用。',
   source: SOURCE,
   lead: <>所有包都处于同一版本 {VERSION}，并一起更新。除了 core 以及注明的可选对等依赖 Rebodocs 之外，它们没有其他依赖。</>,
   sections: [
@@ -162,8 +162,8 @@ export const routesPage: DocPage = {
   source: 'packages/server/src/api.ts',
   lead: (
     <>
-      位于处理器的 <C>base</C> 之下，本文档中为 <C>/api/files</C>。构建本网站时从 <C>packages/server/src/api.ts</C> 开头的注释中读取，因此与代码的行为一致（英文）。请求和响应体均为 JSON；拒绝时返回{' '}
-      <C>&#123; error, message &#125;</C> 及相应状态码。
+      位于处理器的 <C>base</C> 之下，本文档中为 <C>/api/files</C>。构建本网站时从 <C>packages/server/src/api.ts</C> 开头的注释中读取，因此包含代码中的全部路由；每条路由的作用在此译出。请求和响应体均为
+      JSON；拒绝时返回 <C>&#123; error, message &#125;</C> 及相应状态码：<C>message</C> 为英文，云盘会根据 <C>error</C> 用每个人的语言显示。
     </>
   ),
   sections: [
@@ -173,7 +173,7 @@ export const routesPage: DocPage = {
       badge: '会话',
       color: 'blue',
       lead: '每条路由都会询问 identify 是谁在请求，并询问 authorize 是否允许。',
-      body: <RouteTable through="session" words={ROUTE_WORDS} />,
+      body: <RouteTable through="session" words={ROUTE_WORDS} locale="zh" />,
     },
     {
       id: 'through-a-link',
@@ -181,7 +181,7 @@ export const routesPage: DocPage = {
       badge: '链接',
       color: 'pink',
       lead: '两者都不询问：链接本身就是权限。带密码的链接会在每次请求时要求提供密码。',
-      body: <RouteTable through="link" words={ROUTE_WORDS} />,
+      body: <RouteTable through="link" words={ROUTE_WORDS} locale="zh" />,
     },
   ],
 };

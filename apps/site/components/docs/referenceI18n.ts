@@ -38,9 +38,13 @@ const es: Words = {
     textDocument: 'Lo que tiene escrito, enviado al subir, para que una búsqueda lo encuentre. `textOfDocx`.',
     onOpenDocument: 'Da a un .docx un botón “Abrir en Rebodocs”, llamado con una dirección desde la que leerlo.',
     onChange: 'Tras cada cambio hecho desde el drive, para lo demás de la página que lo muestra (mountDrive; en React, el provider avisa a los hooks).',
+    live: 'Lo que cambian otros, mostrado en el momento, desde `/events` del servidor. `true` si no se dice; en React, el del provider.',
   },
   hooks: {
-    DriveProvider: ['El cliente y las palabras, para cada hook que tenga debajo.', '`base`, `client`, `headers`, `language`, `texts`; un <FileDrive> dentro usa los mismos.'],
+    DriveProvider: [
+      'El cliente y las palabras, para cada hook que tenga debajo.',
+      '`base`, `client`, `headers`, `language`, `texts`, `live`; un <FileDrive> dentro usa los mismos. Cada hook vuelve a pedir cuando otro cambia el drive.',
+    ],
     useEntries: ['Una carpeta, Recientes, la papelera, Compartido conmigo o una búsqueda.', '`entries`, `path`, `folder`, `loading`, `error`, `refresh`: se vuelve a pedir tras cada cambio.'],
     useEntry: ['Una entrada tal como está ahora, y dónde está.', '`entry`, `path`, `trashed`, `loading`, `error`.'],
     useActions: [
@@ -87,6 +91,7 @@ const es: Words = {
     settings: 'Los ajustes del drive, los propios, y si uno puede cambiar los del drive.',
     saveSettings: 'Los del drive, para quien pueda configurarlo.',
     saveMySettings: 'El idioma y el tema propios.',
+    watch: 'Lo que cambia cualquiera, en el momento: las carpetas y entradas de cada cambio que uno puede ver. Vuelve solo tras un corte. Devuelve lo que lo detiene.',
   },
   server: {
     storage: 'Dónde están los bytes: `s3Storage(s3OptionsFrom(process.env))` o `diskStorage({ folder, secret })`.',
@@ -100,6 +105,9 @@ const es: Words = {
     settings: 'Los valores por defecto hasta que alguien los cambie: idioma, tema, color de marca, imágenes, `quota`, `trashDays`.',
     cors: 'Páginas de otros orígenes que pueden usar las rutas: la ventana de escritorio, una página de otro dominio.',
     onShare: 'Cada compartición guardada, con quién, por quién y si es la primera: para avisar a la persona.',
+    beforeUpload: 'Se pregunta antes de dar direcciones a una subida, con su nombre, tipo, tamaño y carpeta: lanza un `Refused`, o devuelve false, para rechazarla.',
+    inspect: 'Se pregunta cuando llegaron los bytes, antes de listar el archivo, con un `read` de ellos: `checkType()`, `clamav()` o el tuyo. Un rechazo quita los bytes.',
+    live: 'Los cambios dichos en `/events` en el momento; los de otro proceso sobre el mismo store, en `poll` ms (2000). `false` para ninguno.',
     now: 'El reloj, para tests.',
     newId: 'Los ids de las entradas nuevas; UUID aleatorios si no se da.',
   },
@@ -112,7 +120,10 @@ const es: Words = {
       'En cualquier sitio, sin DOM',
     ],
     '@rebofiles/mcp': ['Herramientas para un asistente de IA, por HTTP o stdio, con los permisos del usuario; con Rebodocs, sus documentos de Word editados, cada cambio una versión.', 'Node 22.12+'],
-    '@rebofiles/desktop': ['Una carpeta del disco mantenida como una carpeta del drive. La aplicación de Tauri en la que va ya está aquí, en apps/desktop.', 'Primero Mac'],
+    '@rebofiles/sync': [
+      'Una carpeta del disco igual que una carpeta del drive, en los dos sentidos: cambios enviados y traídos, conflictos guardados dos veces, movimientos seguidos. En la aplicación de escritorio, y como comando.',
+      'Node 22.12+, o una app de escritorio',
+    ],
   },
 };
 
@@ -140,9 +151,13 @@ const zh: Words = {
     textDocument: '文档中的文字，在上传时发送，供搜索使用。`textOfDocx`。',
     onOpenDocument: '为 .docx 添加“在 Rebodocs 中打开”按钮，调用时会传入读取它的地址。',
     onChange: '每次在网盘中做出改动后调用，供页面中其他显示这些内容的部分更新（mountDrive；在 React 中由 provider 通知各个 hooks）。',
+    live: '实时显示他人所做的更改，来自服务器的 `/events`。默认为 `true`；在 React 中由 provider 决定。',
   },
   hooks: {
-    DriveProvider: ['客户端与文字，供其下的每个 hook 使用。', '`base`、`client`、`headers`、`language`、`texts`；放在其中的 <FileDrive> 也使用相同的设置。'],
+    DriveProvider: [
+      '客户端与文字，供其下的每个 hook 使用。',
+      '`base`、`client`、`headers`、`language`、`texts`、`live`；放在其中的 <FileDrive> 也使用相同的设置。他人更改网盘时，每个 hook 都会重新获取。',
+    ],
     useEntries: ['一个文件夹、最近、回收站、与我共享，或一次搜索。', '`entries`、`path`、`folder`、`loading`、`error`、`refresh`：每次改动后重新获取。'],
     useEntry: ['某个条目的当前状态及其位置。', '`entry`、`path`、`trashed`、`loading`、`error`。'],
     useActions: ['修改网盘的操作，完成后通知每个 hook。', '`createFolder`、`rename`、`move`、`moveToTrash`、`restore`、`deleteForever`、`emptyTrash`、`restoreVersion`、`upload`、`url`。'],
@@ -186,6 +201,7 @@ const zh: Words = {
     settings: '网盘的设置、自己的设置，以及自己是否可以修改网盘的设置。',
     saveSettings: '保存网盘的设置，供有权配置的人使用。',
     saveMySettings: '保存自己的语言和主题。',
+    watch: '实时获知任何人所做的更改：每次更改中自己可见的文件夹和条目。断开后会自动重连。返回用于停止的函数。',
   },
   server: {
     storage: '文件内容存放的位置：`s3Storage(s3OptionsFrom(process.env))` 或 `diskStorage({ folder, secret })`。',
@@ -199,6 +215,9 @@ const zh: Words = {
     settings: '在有人修改之前使用的默认值：语言、主题、品牌色、图片、`quota`、`trashDays`。',
     cors: '允许使用这些路由的其他来源页面：桌面窗口、其他域名的页面。',
     onShare: '每次保存共享时调用，附带共享对象、共享人以及是否为首次共享：用于通知对方。',
+    beforeUpload: '在为上传分配地址之前调用，附带名称、类型、大小和文件夹：抛出 `Refused` 或返回 false 即可拒绝。',
+    inspect: '字节到达后、文件列出之前调用，附带读取字节的 `read`：`checkType()`、`clamav()` 或你自己的检查。拒绝时会删除这些字节。',
+    live: '在 `/events` 实时告知更改；同一存储上其他进程的更改在 `poll` 毫秒（2000）内告知。设为 `false` 则关闭。',
     now: '时钟，用于测试。',
     newId: '新条目的 id；默认为随机 UUID。',
   },
@@ -208,7 +227,7 @@ const zh: Words = {
     '@rebofiles/server': ['路由、authorize()、签名地址、存放在 S3 或磁盘上的文件内容，以及存放在内存、SQLite 或 Postgres 中的元数据。', 'Node 22.12+'],
     '@rebofiles/core': ['以纯函数形式提供的网盘模型：目录树、名称、回收站、版本、共享、搜索、动态记录。零依赖。', '任意环境，无 DOM'],
     '@rebofiles/mcp': ['供 AI 助手使用的工具，通过 HTTP 或 stdio，权限与用户本人一致；配合 Rebodocs 编辑其中的 Word 文档，每次修改都是一个版本。', 'Node 22.12+'],
-    '@rebofiles/desktop': ['让磁盘上的文件夹像网盘文件夹一样被管理。它所在的 Tauri 应用已经在 apps/desktop 中。', '首先支持 Mac'],
+    '@rebofiles/sync': ['让磁盘上的文件夹与网盘文件夹双向保持一致：发送和接收更改，冲突时两份都保留，跟随移动。用于桌面应用，也可作为命令行使用。', 'Node 22.12+，或桌面应用'],
   },
 };
 

@@ -103,6 +103,17 @@ export interface TextFound {
   snippet: string;
 }
 
+/** What a page watching is told of a change, as the server says it at `/events`. */
+export interface DriveEvent {
+  /** Who made it, when the server that tells it made it; null for one it saw in its store, made by another. */
+  by: string | null;
+  at: string;
+  /** The folders where something came, went or changed, that the one watching may list: null is the top. */
+  folders: (EntryId | null)[];
+  /** The entries changed, or made, that the one watching may read. */
+  entries: EntryId[];
+}
+
 /** Where to read a file from, until when, and the size of the smaller picture it is when it is one. */
 export interface FileAddress {
   url: string;
@@ -203,7 +214,68 @@ export function createDriveClient(options: ClientOptions) {
     });
   }
 
+  /** The events of the server as they come, each `event:` and `data:` of server-sent events, until it ends or is stopped. */
+  async function readEvents(signal: AbortSignal, onEvent: (name: string, data: string) => void, onOpen: () => void): Promise<number> {
+    const answer = await send(`${base}/events`, { headers: { ...(await options.headers?.()), accept: 'text/event-stream' }, signal });
+    if (!answer.ok || !answer.body) return answer.status;
+    onOpen();
+    const reader = answer.body.pipeThrough(new TextDecoderStream()).getReader();
+    let held = '';
+    let name = 'message';
+    let data: string[] = [];
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return 200;
+      held += value;
+      let end = held.indexOf('\n');
+      while (end >= 0) {
+        const line = held.slice(0, end).replace(/\r$/, '');
+        held = held.slice(end + 1);
+        if (line === '') {
+          if (data.length) onEvent(name, data.join('\n'));
+          (name = 'message'), (data = []);
+        } else if (line.startsWith('event:')) name = line.slice(6).trim();
+        else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
+        end = held.indexOf('\n');
+      }
+    }
+  }
+
   const api = {
+    /**
+     * What changes in the drive as it happens, by anyone: `onChange` is told where (the folders) and what (the
+     * entries), of what the one asking may see. Comes back by itself after a cut, a little later each time;
+     * `onState` is told whether it is watching. A server that does not tell changes (404) is not asked again. The
+     * function it returns stops it.
+     */
+    watch(onChange: (event: DriveEvent) => void, how: { onState?: (watching: boolean) => void } = {}): () => void {
+      const stopped = new AbortController();
+      void (async () => {
+        let wait = 1000;
+        while (!stopped.signal.aborted) {
+          let status = 0;
+          try {
+            status = await readEvents(
+              stopped.signal,
+              (name, data) => {
+                if (name !== 'change') return;
+                try {
+                  onChange(JSON.parse(data) as DriveEvent);
+                } catch {}
+              },
+              () => ((wait = 1000), how.onState?.(true)),
+            );
+          } catch {}
+          if (stopped.signal.aborted) return;
+          how.onState?.(false);
+          if (status === 404 || status === 501) return;
+          await pause(wait, stopped.signal).catch(() => undefined);
+          // Signed out: asked again, but seldom.
+          wait = status === 401 || status === 403 ? 60_000 : Math.min(30_000, wait * 2);
+        }
+      })();
+      return () => stopped.abort();
+    },
     list: (folder: EntryId | null) => ask<Listing>('GET', `/entries${q({ folder: folder ?? undefined })}`),
     entry: (id: EntryId) => ask<{ entry: Entry; path: FolderEntry[]; trashed: boolean }>('GET', `/entries/${encodeURIComponent(id)}`),
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
