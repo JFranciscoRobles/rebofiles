@@ -35,23 +35,26 @@ export const sameName = (a: string, b: string): boolean => fold(a) === fold(b);
 
 const fold = (name: string): string => name.normalize('NFC').toLowerCase();
 
-/** The entry of `parent` named `name`, outside the trash; `except` is left out, for a rename. */
-export function takenBy(drive: Drive, parent: EntryId | null, name: string, except?: EntryId): EntryId | null {
+/**
+ * The entry of `parent` named `name`, outside the trash; `except` is left out, for a rename. The top is each
+ * owner's, so there only the entries of `owner` count: a name someone else has at the top is not taken, nor told.
+ */
+export function takenBy(drive: Drive, parent: EntryId | null, name: string, except?: EntryId, owner?: string): EntryId | null {
   for (const entry of drive.entries.values()) {
-    if (entry.parent === parent && entry.id !== except && !entry.trashed && sameName(entry.name, name)) return entry.id;
+    if (entry.parent === parent && entry.id !== except && !entry.trashed && sameName(entry.name, name) && (parent !== null || owner === undefined || entry.owner === owner)) return entry.id;
   }
   return null;
 }
 
-/** `name` when it is free in `parent`; otherwise the first of "name (2).ext", "name (3).ext"… that is. */
-export function uniqueName(drive: Drive, parent: EntryId | null, name: string, except?: EntryId): string {
-  if (!takenBy(drive, parent, name, except)) return name;
+/** `name` when it is free in `parent`; otherwise the first of "name (2).ext", "name (3).ext"… that is. At the top, among the names of `owner`. */
+export function uniqueName(drive: Drive, parent: EntryId | null, name: string, except?: EntryId, owner?: string): string {
+  if (!takenBy(drive, parent, name, except, owner)) return name;
   const { base, ext } = splitName(name);
   const numbered = /^(.*) \((\d+)\)$/.exec(base);
   const stem = numbered ? numbered[1] : base;
   for (let n = numbered ? Number(numbered[2]) + 1 : 2; ; n++) {
     const next = `${stem} (${n})${ext}`;
-    if (!takenBy(drive, parent, next, except)) return next;
+    if (!takenBy(drive, parent, next, except, owner)) return next;
   }
 }
 

@@ -28,10 +28,11 @@ function target(drive: Drive, parent: EntryId | null): void {
   if (isTrashed(drive, parent)) throw new DriveError('in-trash', 'That folder is in the trash');
 }
 
-function free(drive: Drive, parent: EntryId | null, name: string, except: EntryId | undefined, options: NameOptions): string {
+/** `owner` is whose the entry is: at the top, only their names count. */
+function free(drive: Drive, parent: EntryId | null, name: string, except: EntryId | undefined, owner: string, options: NameOptions): string {
   checkName(name);
-  if (!takenBy(drive, parent, name, except)) return name;
-  if (options.ifTaken === 'keep-both') return uniqueName(drive, parent, name, except);
+  if (!takenBy(drive, parent, name, except, owner)) return name;
+  if (options.ifTaken === 'keep-both') return uniqueName(drive, parent, name, except, owner);
   throw new DriveError('name-taken', `There is already a "${name}" there`);
 }
 
@@ -51,7 +52,7 @@ export function createFolder(drive: Drive, folder: NewFolder, context: Context):
   const entry: FolderEntry = {
     kind: 'folder',
     id: folder.id,
-    name: free(drive, folder.parent, folder.name, undefined, { ifTaken: 'keep-both' }),
+    name: free(drive, folder.parent, folder.name, undefined, context.by, { ifTaken: 'keep-both' }),
     parent: folder.parent,
     owner: context.by,
     created: context.at,
@@ -74,7 +75,7 @@ export function addFile(drive: Drive, file: NewFile, context: Context): Drive {
   const entry: FileEntry = {
     kind: 'file',
     id: file.id,
-    name: free(drive, file.parent, file.name, undefined, { ifTaken: 'keep-both' }),
+    name: free(drive, file.parent, file.name, undefined, context.by, { ifTaken: 'keep-both' }),
     parent: file.parent,
     owner: context.by,
     created: context.at,
@@ -90,7 +91,7 @@ export function rename(drive: Drive, id: EntryId, name: string, context: Context
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
   if (name === entry.name) return drive;
-  return put(drive, { ...entry, name: free(drive, entry.parent, name, id, options), modified: context.at, modifiedBy: context.by });
+  return put(drive, { ...entry, name: free(drive, entry.parent, name, id, entry.owner, options), modified: context.at, modifiedBy: context.by });
 }
 
 export function move(drive: Drive, id: EntryId, to: EntryId | null, context: Context, options: NameOptions = {}): Drive {
@@ -99,7 +100,7 @@ export function move(drive: Drive, id: EntryId, to: EntryId | null, context: Con
   if (to === entry.parent) return drive;
   target(drive, to);
   if (to !== null && isWithin(drive, to, id)) throw new DriveError('into-itself', `${entry.name} cannot go inside itself`);
-  return put(drive, { ...entry, parent: to, name: free(drive, to, entry.name, id, options), modified: context.at, modifiedBy: context.by });
+  return put(drive, { ...entry, parent: to, name: free(drive, to, entry.name, id, entry.owner, options), modified: context.at, modifiedBy: context.by });
 }
 
 /** Into the trash, with what is inside it. It keeps its folder, to go back to it. */
@@ -119,7 +120,7 @@ export function restore(drive: Drive, id: EntryId, context: Context): Drive {
   if (!entry.trashed) throw new DriveError('not-in-trash', `${entry.name} is not in the trash`);
   const parent = entry.parent !== null && drive.entries.get(entry.parent)?.kind === 'folder' && !isTrashed(drive, entry.parent) ? entry.parent : null;
   const { trashed: _, ...rest } = entry;
-  return put(drive, { ...rest, parent, name: uniqueName(drive, parent, entry.name, id), modified: context.at, modifiedBy: context.by } as Entry);
+  return put(drive, { ...rest, parent, name: uniqueName(drive, parent, entry.name, id, entry.owner), modified: context.at, modifiedBy: context.by } as Entry);
 }
 
 export interface Removed {

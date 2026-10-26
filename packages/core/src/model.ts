@@ -19,6 +19,27 @@ export interface Version {
   restoredFrom?: string;
 }
 
+/** What a person shared with may do, the least first. The owner may do everything, and is no role. */
+export type Role = 'viewer' | 'commenter' | 'editor';
+
+/** An entry shared with someone, or with everyone signed in (`with: '*'`), and what they may do with it and what is inside it. */
+export interface Share {
+  with: string;
+  role: Role;
+  by: string;
+  at: string;
+}
+
+/** An address to read an entry and what is inside it without signing in, until `expires`. Taken back by removing it. */
+export interface Link {
+  id: string;
+  role: 'viewer';
+  /** ISO 8601. */
+  expires: string;
+  by: string;
+  at: string;
+}
+
 /** Put in the trash: when, by whom. The entry keeps its folder, to go back to it. */
 export interface Trashed {
   at: string;
@@ -36,6 +57,9 @@ interface Base {
   modifiedBy: string;
   /** Only on the entry put in the trash itself; what is inside it is in the trash through it (see `isTrashed`). */
   trashed?: Trashed;
+  /** Who else it is shared with; what is inside it is shared through it (see `accessOf`). */
+  shares?: readonly Share[];
+  links?: readonly Link[];
 }
 
 export interface FolderEntry extends Base {

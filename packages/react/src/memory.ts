@@ -39,6 +39,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'in-trash': 409,
   'not-in-trash': 409,
   'no-version': 404,
+  'invalid-share': 400,
 };
 
 export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
