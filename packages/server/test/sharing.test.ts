@@ -180,6 +180,46 @@ describe('links, through the routes', () => {
     expect((await d.ana.ask('POST', `/api/files/entries/${clients.id}/links`, { days: 0 })).status).toBe(400);
   });
 
+  it('with a password, ask for it at every request and keep only what scrypt makes of it', async () => {
+    const d = drive();
+    const { clients, contract } = await anasClients(d);
+    expect((await d.ana.ask('POST', `/api/files/entries/${clients.id}/links`, { password: 'abc' })).status).toBe(400);
+    const made = await d.ana.ask('POST', `/api/files/entries/${clients.id}/links`, { password: 'open sesame' });
+    expect(made.body.entry.links).toMatchObject([{ locked: true }]);
+    expect(JSON.stringify(made.body)).not.toContain('open sesame');
+    const path = `http://drive.test/api/files/links/${encodeURIComponent(made.body.token as string)}`;
+    const asking = (password?: string, rest = '') => d.handle(new Request(path + rest, password ? { headers: { 'x-link-password': password } } : undefined));
+
+    const none = await asking();
+    expect([none.status, ((await none.json()) as { error: string }).error]).toEqual([401, 'link-password']);
+    const wrong = await asking('open barley');
+    expect([wrong.status, ((await wrong.json()) as { error: string }).error]).toEqual([401, 'link-password-wrong']);
+    expect((await asking(undefined, `/download?id=${contract.id}`)).status).toBe(401);
+    expect(names(((await (await asking('open sesame')).json()) as { entries: Entry[] }).entries)).toEqual(['Northwind']);
+    expect((await asking('open sesame', `/download?id=${contract.id}`)).status).toBe(200);
+  });
+
+  it('of one use, work for the download that takes it, a while longer, and then no more', async () => {
+    // Near the clock's own time, as the token of a link is checked against it.
+    let at = Date.now();
+    const d = drive({ now: () => new Date(at) });
+    const { clients, contract } = await anasClients(d);
+    const made = await d.ana.ask('POST', `/api/files/entries/${clients.id}/links`, { once: true });
+    const token = encodeURIComponent(made.body.token as string);
+    // Looking, and seeing a file in the page, take nothing.
+    expect((await anonymous(d, `/links/${token}`)).status).toBe(200);
+    expect((await anonymous(d, `/links/${token}/download?id=${contract.id}&inline=1`)).status).toBe(200);
+    expect((await d.ana.ask('GET', `/api/files/entries/${clients.id}`)).body.entry.links![0]).not.toHaveProperty('used');
+
+    // An archive takes it; the addresses of its files come after, and still do.
+    expect((await anonymous(d, `/links/${token}/zip`)).status).toBe(200);
+    at += 60_000;
+    expect((await anonymous(d, `/links/${token}/urls?ids=${contract.id}`)).status).toBe(200);
+    expect((await d.ana.ask('GET', `/api/files/entries/${clients.id}`)).body.entry.links![0]).toMatchObject({ uses: 1, used: 1 });
+    at += 15 * 60_000;
+    expect((await anonymous(d, `/links/${token}`)).status).toBe(404);
+  });
+
   it('are not taken for another token of the server', async () => {
     const d = drive();
     const asked = await d.ana.ask('POST', '/api/files/uploads', { name: 'a.txt', parent: null, size: 1 });

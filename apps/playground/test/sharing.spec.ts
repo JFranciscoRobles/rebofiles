@@ -46,7 +46,7 @@ test('a link reads the folder without signing in, until it is taken back', async
   await item(page, 'Team').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
   const dialog = page.getByRole('dialog', { name: 'Share “Team”' });
-  await dialog.getByRole('button', { name: 'Create a link for 7 days' }).click();
+  await dialog.getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
   const address = await page.evaluate(() => navigator.clipboard.readText());
   expect(address).toMatch(/\?link=/);
@@ -62,4 +62,36 @@ test('a link reads the folder without signing in, until it is taken back', async
   await someone.reload();
   await expect(someone.getByRole('alert')).toHaveText('This link does not work any more.');
   await someone.close();
+});
+
+test('a link with a password asks for it before showing anything', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/?as=ana');
+  await item(page, 'Team').click();
+  await details(page).getByRole('button', { name: 'Share' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Share “Team”' });
+  await dialog.getByRole('combobox', { name: 'How long the link lasts' }).selectOption('1');
+  await dialog.getByRole('textbox', { name: 'Password' }).fill('abc');
+  await expect(dialog.getByText('A password of four characters or more.')).toBeVisible();
+  await dialog.getByRole('textbox', { name: 'Password' }).fill('open sesame');
+  await dialog.getByRole('checkbox', { name: 'One download only' }).check();
+  await dialog.getByRole('button', { name: 'Create link' }).click();
+  await expect(page.getByRole('status')).toHaveText('Link copied');
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Password' }).filter({ hasText: 'One download' })).toBeVisible();
+  const address = await page.evaluate(() => navigator.clipboard.readText());
+
+  const someone = await context.browser()!.newPage();
+  await someone.goto(address);
+  await expect(someone.getByText('This link asks for a password.')).toBeVisible();
+  await expect(someone.getByRole('button', { name: 'from-bea.txt', exact: true })).toBeHidden();
+  await someone.getByRole('textbox', { name: 'Password' }).fill('open barley');
+  await someone.getByRole('button', { name: 'Open' }).click();
+  await expect(someone.getByRole('alert')).toHaveText('That is not the password.');
+  await someone.getByRole('textbox', { name: 'Password' }).fill('open sesame');
+  await someone.getByRole('button', { name: 'Open' }).click();
+  await expect(someone.getByRole('button', { name: 'from-bea.txt', exact: true })).toBeVisible();
+  await someone.close();
+
+  await dialog.getByRole('button', { name: /^Remove · Until/ }).click();
+  await expect(dialog.getByText('No links.')).toBeVisible();
 });

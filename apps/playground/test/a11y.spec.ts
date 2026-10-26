@@ -83,7 +83,7 @@ test('dark: the list, the grid, a file selected, and sharing it', async ({ page 
   expect.soft(await axe(page)).toEqual([]);
   await details(page).getByRole('button', { name: 'Share' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('textbox').fill('bea');
+  await dialog.getByRole('textbox', { name: 'Who, by their id' }).fill('bea');
   await dialog.getByRole('button', { name: 'Share', exact: true }).click();
   await expect(dialog.getByRole('combobox', { name: 'Role · bea' })).toBeVisible();
   expect.soft(await axe(page)).toEqual([]);
@@ -107,7 +107,7 @@ test('a link, opened signed out', async ({ page, context }) => {
   await details(page).getByRole('button', { name: 'Share' }).click();
   await page
     .getByRole('dialog')
-    .getByRole('button', { name: /Create a link/ })
+    .getByRole('button', { name: 'Create link' })
     .click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
   const address = await page.evaluate(() => navigator.clipboard.readText());

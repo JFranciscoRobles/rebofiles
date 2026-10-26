@@ -30,7 +30,11 @@ export interface SharedLinkOptions {
 export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions): { destroy(): void } {
   const t = translator(options.texts ?? TEXTS[options.language ?? 'en']);
   const locale = options.language ?? 'en';
-  const link = createLinkClient({ base: options.base ?? '/api/files', token: options.token });
+  // A link with a password asks for it first; it is kept for this page only, and sent with every request.
+  let password: string | undefined;
+  let asking: 'ask' | 'wrong' | null = null;
+  let typed = '';
+  const link = createLinkClient({ base: options.base ?? '/api/files', token: options.token, password: () => password });
   let listing: LinkListing | null = null;
   let error: string | null = null;
   let alive = true;
@@ -39,10 +43,46 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
   const show = (folder?: EntryId) => {
     const n = ++asked;
     link.list(folder).then(
-      (found) => n === asked && ((listing = found), (error = null), render()),
-      (failed: unknown) => n === asked && ((error = failed instanceof RequestError && failed.status === 404 ? t('linkGone') : String((failed as Error).message ?? failed)), render()),
+      (found) => n === asked && ((listing = found), (error = null), (asking = null), render()),
+      (failed: unknown) => {
+        if (n !== asked) return;
+        if (failed instanceof RequestError && failed.status === 401) {
+          asking = failed.code === 'link-password-wrong' ? 'wrong' : 'ask';
+          password = undefined;
+        } else error = failed instanceof RequestError && failed.status === 404 ? t('linkGone') : String((failed as Error).message ?? failed);
+        render();
+      },
     );
   };
+
+  /** The form asking for the password, before anything of the link is shown. */
+  const passwordForm = () =>
+    h(
+      'form',
+      {
+        class: 'rf-pass',
+        onSubmit: (event: Event) => {
+          event.preventDefault();
+          if (!typed) return;
+          password = typed;
+          typed = '';
+          show();
+        },
+      },
+      h('p', { id: 'rf-pass-hint' }, t('linkAsks')),
+      h('input', {
+        type: 'password',
+        autocomplete: 'current-password',
+        'aria-label': t('linkPassword'),
+        'aria-describedby': 'rf-pass-hint',
+        'aria-invalid': asking === 'wrong' ? 'true' : undefined,
+        value: typed,
+        autofocus: true,
+        onInput: (event: Event) => (typed = (event.target as HTMLInputElement).value),
+      }),
+      asking === 'wrong' && h('p', { class: 'rf-error', role: 'alert' }, t('linkWrong')),
+      h('button', { type: 'submit', class: 'rf-btn rf-primary' }, t('linkOpen')),
+    );
 
   const open = async (file: Entry, save = false) => {
     // A window opened before the address is known, so the browser takes it as the click's.
@@ -104,55 +144,57 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
         h(
           'main',
           { class: 'rf-main' },
-          error
-            ? h('div', { class: 'rf-empty rf-error', role: 'alert' }, error)
-            : [
-                h(
-                  'div',
-                  { class: 'rf-head' },
+          asking
+            ? passwordForm()
+            : error
+              ? h('div', { class: 'rf-empty rf-error', role: 'alert' }, error)
+              : [
                   h(
                     'div',
-                    { class: 'rf-crumbs' },
-                    // A link to a file has no folders to go back up: the file is its only row.
-                    listing?.root.kind === 'folder' &&
-                      listing.path.map((step, i) =>
-                        h(
-                          'span',
-                          { key: step.id, style: 'display: contents' },
-                          i > 0 && icon('chevron', 16),
+                    { class: 'rf-head' },
+                    h(
+                      'div',
+                      { class: 'rf-crumbs' },
+                      // A link to a file has no folders to go back up: the file is its only row.
+                      listing?.root.kind === 'folder' &&
+                        listing.path.map((step, i) =>
                           h(
-                            'button',
-                            { type: 'button', class: 'rf-crumb', 'aria-current': step.id === listing?.folder.id ? 'page' : undefined, onClick: () => show(i === 0 ? undefined : step.id) },
-                            step.name,
+                            'span',
+                            { key: step.id, style: 'display: contents' },
+                            i > 0 && icon('chevron', 16),
+                            h(
+                              'button',
+                              { type: 'button', class: 'rf-crumb', 'aria-current': step.id === listing?.folder.id ? 'page' : undefined, onClick: () => show(i === 0 ? undefined : step.id) },
+                              step.name,
+                            ),
                           ),
                         ),
-                      ),
+                    ),
+                    listing?.folder.kind === 'folder' && zipButton(listing.folder, true),
                   ),
-                  listing?.folder.kind === 'folder' && zipButton(listing.folder, true),
-                ),
-                h(
-                  'ul',
-                  { class: 'rf-items rf-link-rows', 'aria-label': t('name') },
-                  listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('emptyFolder')),
-                  rows.map((entry) =>
-                    h(
-                      'li',
-                      { key: entry.id, class: 'rf-row' },
+                  h(
+                    'ul',
+                    { class: 'rf-items rf-link-rows', 'aria-label': t('name') },
+                    listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('emptyFolder')),
+                    rows.map((entry) =>
                       h(
-                        'button',
-                        { type: 'button', class: 'rf-name', onClick: () => (entry.kind === 'folder' ? show(entry.id) : void open(entry)) },
-                        h('span', { class: `rf-tile rf-k-${kindOf(entry)}`, 'aria-hidden': 'true' }, entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry)),
-                        h('span', null, entry.name),
+                        'li',
+                        { key: entry.id, class: 'rf-row' },
+                        h(
+                          'button',
+                          { type: 'button', class: 'rf-name', onClick: () => (entry.kind === 'folder' ? show(entry.id) : void open(entry)) },
+                          h('span', { class: `rf-tile rf-k-${kindOf(entry)}`, 'aria-hidden': 'true' }, entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry)),
+                          h('span', null, entry.name),
+                        ),
+                        h('span', null, formatDate(entry.modified, locale)),
+                        h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
+                        entry.kind === 'file'
+                          ? h('button', { type: 'button', class: 'rf-btn rf-text', 'aria-label': `${t('download')} · ${entry.name}`, onClick: () => void open(entry, true) }, icon('download', 16))
+                          : zipButton(entry, false),
                       ),
-                      h('span', null, formatDate(entry.modified, locale)),
-                      h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
-                      entry.kind === 'file'
-                        ? h('button', { type: 'button', class: 'rf-btn rf-text', 'aria-label': `${t('download')} · ${entry.name}`, onClick: () => void open(entry, true) }, icon('download', 16))
-                        : zipButton(entry, false),
                     ),
                   ),
-                ),
-              ],
+                ],
         ),
       ),
     );

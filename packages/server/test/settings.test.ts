@@ -45,7 +45,14 @@ describe('the settings', () => {
 
     expect((await bea.ask('PUT', '/api/files/settings', { language: 'es' })).status).toBe(403);
     const changed = await ana.ask('PUT', '/api/files/settings', { language: 'es', brand: '#1D4ED8', images: { sizes: [2000, 100, 400, 900], format: 'original' } });
-    expect(changed.body.drive).toEqual({ language: 'es', theme: 'light', brand: '#1d4ed8', images: { sizes: [100, 400, 900, 2000], format: 'original', quality: 0.82, enabled: true }, quota: null, trashDays: null });
+    expect(changed.body.drive).toEqual({
+      language: 'es',
+      theme: 'light',
+      brand: '#1d4ed8',
+      images: { sizes: [100, 400, 900, 2000], format: 'original', quality: 0.82, enabled: true },
+      quota: null,
+      trashDays: null,
+    });
     // A change is over what was there: what is left out stays.
     expect(((await ana.ask('PUT', '/api/files/settings', { theme: 'auto' })).body.drive as { language: string }).language).toBe('es');
 

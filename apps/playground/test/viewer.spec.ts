@@ -142,7 +142,9 @@ test('a Word document lying down is shown whole in its thumbnail', async ({ page
   const upright = importDocx(sampleDocx());
   const lying = exportDocx({ ...upright, page: { ...upright.page, width: upright.page.height, height: upright.page.width } });
   await page.goto('/?as=lying');
-  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'plan.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(lying) });
+  await page
+    .locator('input[type=file]:not([webkitdirectory])')
+    .setInputFiles({ name: 'plan.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from(lying) });
   await item(page, 'plan.docx').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).locator('.rf-doc-thumb.rf-wide img.rf-doc-pic')).toBeVisible({ timeout: 15_000 });
 });

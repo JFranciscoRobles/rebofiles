@@ -50,6 +50,14 @@ export interface Link {
   role: 'viewer';
   /** ISO 8601. */
   expires: string;
+  /** Opened only with its password, which the server keeps apart from the drive. */
+  locked?: boolean;
+  /** How many times what it reads may be downloaded through it: 1 for a link of one use; no limit when left out. */
+  uses?: number;
+  /** How many times it has been. */
+  used?: number;
+  /** ISO 8601: when its last use was taken. It works a while longer, for the rest of that download, then no more. */
+  spent?: string;
   by: string;
   at: string;
 }

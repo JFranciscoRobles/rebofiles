@@ -93,12 +93,13 @@ export function sharedWith(drive: Drive, user: string): Entry[] {
 }
 
 /** A link to read an entry, and what is inside it, until `expires`. */
-export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string }, context: Context): Drive {
+export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string; locked?: boolean; uses?: number }, context: Context): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
   if (!(link.expires > context.at)) throw new DriveError('invalid-share', 'A link has to expire after it is made');
   if (entry.links?.some((l) => l.id === link.id)) throw new DriveError('duplicate-id', `There is already a link ${link.id}`);
-  const made: Link = { id: link.id, role: 'viewer', expires: link.expires, by: context.by, at: context.at };
+  if (link.uses !== undefined && !(Number.isInteger(link.uses) && link.uses >= 1)) throw new DriveError('invalid-share', 'A link is used once or more');
+  const made: Link = { id: link.id, role: 'viewer', expires: link.expires, by: context.by, at: context.at, ...(link.locked ? { locked: true } : {}), ...(link.uses ? { uses: link.uses } : {}) };
   return put(drive, { ...entry, links: [...(entry.links ?? []), made] });
 }
 
@@ -110,13 +111,41 @@ export function removeLink(drive: Drive, id: EntryId, linkId: string): Drive {
   return put(drive, (links.length ? { ...rest, links } : rest) as Entry);
 }
 
-/** The entry a link reads, while it is there, has not expired and is not in the trash; null otherwise. */
+/** How long a link whose uses are all taken still works: for the files of the download that took the last, an archive's many among them. */
+export const LINK_GRACE = 15 * 60_000;
+
+/** The entry a link reads, while it is there, has not expired, has uses left (or took its last a moment ago) and is not in the trash; null otherwise. */
 export function linked(drive: Drive, linkId: string, now: string): Entry | null {
   for (const entry of drive.entries.values()) {
     const link = entry.links?.find((l) => l.id === linkId);
-    if (link) return link.expires > now && !isTrashed(drive, entry.id) ? entry : null;
+    if (link) return link.expires > now && !linkSpent(link, now) && !isTrashed(drive, entry.id) ? entry : null;
   }
   return null;
+}
+
+/** Whether a link has had all its uses, and the while after the last is over. */
+export const linkSpent = (link: Link, now: string) => link.uses !== undefined && (link.used ?? 0) >= link.uses && (!link.spent || Date.parse(link.spent) + LINK_GRACE <= Date.parse(now));
+
+/** The link itself, of the entry it is on. */
+export function linkOf(drive: Drive, linkId: string): Link | undefined {
+  for (const entry of drive.entries.values()) {
+    const link = entry.links?.find((l) => l.id === linkId);
+    if (link) return link;
+  }
+  return undefined;
+}
+
+/** A link used once more, at `at`: what it reads downloaded through it. Its last use marks when; past that, using it changes nothing. */
+export function useLink(drive: Drive, linkId: string, at: string): Drive {
+  for (const entry of drive.entries.values()) {
+    const link = entry.links?.find((l) => l.id === linkId);
+    if (!link) continue;
+    if (link.uses === undefined || (link.used ?? 0) >= link.uses) return drive;
+    const used = (link.used ?? 0) + 1;
+    const next: Link = { ...link, used, ...(used >= link.uses ? { spent: at } : {}) };
+    return put(drive, { ...entry, links: entry.links!.map((l) => (l.id === linkId ? next : l)) });
+  }
+  return drive;
 }
 
 const put = (drive: Drive, entry: Entry): Drive => ({ entries: new Map(drive.entries).set(entry.id, entry) });

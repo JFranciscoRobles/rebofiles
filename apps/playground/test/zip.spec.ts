@@ -62,7 +62,7 @@ test('a link to a folder downloads it whole as a .zip, without signing in', asyn
   await page.getByRole('button', { name: 'My files' }).first().click();
   await item(page, 'Expediente').click();
   await page.getByRole('complementary', { name: 'Details' }).getByRole('button', { name: 'Share' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Create a link for 7 days' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Create link' }).click();
   await expect(page.getByRole('status')).toHaveText('Link copied');
   const address = await page.evaluate(() => navigator.clipboard.readText());
 

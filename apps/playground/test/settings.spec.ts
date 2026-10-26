@@ -150,4 +150,3 @@ test('a quota and days of the trash, from Storage, and the space used in the sid
   const saved = (await (await page.request.get('/api/files/settings')).json()).drive;
   expect([saved.quota, saved.trashDays]).toEqual([536870912, 30]);
 });
-

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { EVERYONE, accessOf, addFile, addLink, allows, createFolder, emptyTrash, linked, move, moveToTrash, removeLink, rename, restore, share, sharedWith, trash, unshare } from '../src';
+import {
+  EVERYONE,
+  accessOf,
+  addFile,
+  addLink,
+  allows,
+  createFolder,
+  emptyTrash,
+  linked,
+  linkOf,
+  move,
+  moveToTrash,
+  removeLink,
+  rename,
+  restore,
+  share,
+  sharedWith,
+  trash,
+  unshare,
+  useLink,
+} from '../src';
 import { ana, demoDrive, luis, v } from './drive';
 
 const bea = { by: 'bea', at: '2026-10-03T09:00:00.000Z' };
@@ -130,6 +150,21 @@ describe('links', () => {
     drive = removeLink(drive, 'clients', 'l1');
     expect(linked(drive, 'l1', now)).toBeNull();
     expect(drive.entries.get('clients')?.links).toBeUndefined();
+  });
+
+  it('of a number of uses, work until the last is taken and a quarter of an hour after', () => {
+    let drive = addLink(demoDrive(), 'clients', { id: 'l1', expires: '2026-10-10T00:00:00.000Z', uses: 2, locked: true }, ana);
+    expect(linkOf(drive, 'l1')).toMatchObject({ uses: 2, locked: true });
+    drive = useLink(drive, 'l1', now);
+    expect(linkOf(drive, 'l1')).toMatchObject({ used: 1 });
+    expect(linkOf(drive, 'l1')).not.toHaveProperty('spent');
+    drive = useLink(drive, 'l1', now);
+    expect(linkOf(drive, 'l1')).toMatchObject({ used: 2, spent: now });
+    // More uses after the last change nothing.
+    expect(useLink(drive, 'l1', '2026-10-05T00:10:00.000Z')).toBe(drive);
+    expect(linked(drive, 'l1', '2026-10-05T00:14:59.000Z')?.id).toBe('clients');
+    expect(linked(drive, 'l1', '2026-10-05T00:15:00.000Z')).toBeNull();
+    expect(() => addLink(demoDrive(), 'clients', { id: 'l2', expires: '2026-10-10T00:00:00.000Z', uses: 0.5 }, ana)).toThrow('once or more');
   });
 
   it('must expire after they are made', () => {

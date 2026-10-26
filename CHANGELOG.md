@@ -183,6 +183,17 @@ minor version (0.x.0) may change the API; such changes are listed under
   the space one uses, of how much (`GET /usage`, `usageOf`). The trash is
   looked at now and then as requests come (`purgeTrash`), the bytes going
   with what goes.
+- **Links with a password, or for one download.** Sharing a link, one
+  chooses how long it lasts (a day, a week, a month), a password, and
+  whether it is good for one download only (`createLink(id, days, {
+  password, once })`). The server keeps only what scrypt makes of the
+  password, apart from the drive, and asks for it at every request
+  (`x-link-password`; `link-password`, `link-password-wrong`, a moment late
+  against guessing); the page of the link asks for it first. A link of one
+  download is taken by downloading a file or an archive of it, not by
+  looking or seeing a file in the page, and still works a quarter of an hour
+  after, for the files of that download (`uses`, `used`, `spent`,
+  `useLink`, `LINK_GRACE`). The dialog marks each link with what it has.
 - **Folders of the computer, uploaded as they were.** Dropped on the drive,
   or chosen with "Upload a folder", a folder goes up with all that is in it:
   its folders made top down, the empty ones too, "(2)" for a name taken, and

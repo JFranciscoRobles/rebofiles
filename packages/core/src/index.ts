@@ -56,4 +56,4 @@ export {
 export { type PackedFile, type Packed, packOf } from './pack';
 export { type SearchOptions, search } from './search';
 export { type Changes, changes } from './changes';
-export { type Action, type Access, EVERYONE, allows, accessOf, share, unshare, sharedWith, addLink, removeLink, linked } from './sharing';
+export { type Action, type Access, EVERYONE, allows, accessOf, share, unshare, sharedWith, addLink, removeLink, linked, linkOf, useLink, linkSpent, LINK_GRACE } from './sharing';

@@ -216,7 +216,9 @@ export function createDriveClient(options: ClientOptions) {
     /** No longer shared with them; anyone may leave what was shared with themselves. */
     unshare: (id: EntryId, user: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/shares/${encodeURIComponent(user)}`),
     /** A link to read it without signing in, for `days`; the token is what goes in its address. */
-    createLink: (id: EntryId, days?: number) => ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days }),
+    /** A link for `days`, opened only with `password` when one is given, and good for one download when `once`. */
+    createLink: (id: EntryId, days?: number, how: { password?: string; once?: boolean } = {}) =>
+      ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days, password: how.password, once: how.once }),
     /** The token of a link made before: the same every time. */
     linkToken: async (id: EntryId, link: string) => (await ask<{ token: string }>('GET', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`)).token,
     removeLink: (id: EntryId, link: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`),
@@ -359,11 +361,13 @@ export interface LinkListing {
 }
 
 /** What a link reads, for someone not signed in: its folders and an address to read each file from. */
-export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch }) {
+export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch; password?: () => string | undefined }) {
   const base = `${options.base.replace(/\/$/, '')}/links/${encodeURIComponent(options.token)}`;
   const send = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const ask = async <T>(path: string): Promise<T> => {
-    const answer = await send(base + path);
+    // A link's password goes with every request, in a header, as the server asks for it at every one.
+    const password = options.password?.();
+    const answer = await send(base + path, password ? { headers: { 'x-link-password': password } } : undefined);
     const said = (await answer.json().catch(() => ({}))) as { error?: string; message?: string };
     if (!answer.ok) throw new RequestError(answer.status, said.error ?? 'server', said.message ?? `The server answered ${answer.status}.`);
     return said as T;

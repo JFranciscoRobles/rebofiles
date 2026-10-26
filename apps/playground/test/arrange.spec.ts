@@ -5,7 +5,11 @@ import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
 
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
-const names = (page: Page) => page.getByRole('listbox').getByRole('option').evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent));
+const names = (page: Page) =>
+  page
+    .getByRole('listbox')
+    .getByRole('option')
+    .evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent));
 
 async function some(page: Page, who: string) {
   await page.goto(`/?as=${who}`);
@@ -36,7 +40,12 @@ test('in order by a column, the other way at a second click, kept for the next v
   await page.getByRole('combobox', { name: 'Kind of file' }).selectOption('all');
   await page.getByRole('button', { name: 'Grid' }).click();
   await page.getByRole('combobox', { name: 'Order' }).selectOption('name:-1');
-  expect(await page.getByRole('listbox').getByRole('option').evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent))).toEqual(['c-large.png', 'b-medium.txt', 'a-small.txt']);
+  expect(
+    await page
+      .getByRole('listbox')
+      .getByRole('option')
+      .evaluateAll((all) => all.map((one) => one.querySelector('.rf-name span:last-child')?.textContent)),
+  ).toEqual(['c-large.png', 'b-medium.txt', 'a-small.txt']);
   await page.getByRole('combobox', { name: 'Order' }).selectOption('name:1');
   await page.getByRole('button', { name: 'List' }).click();
 });

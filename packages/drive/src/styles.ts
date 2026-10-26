@@ -220,8 +220,8 @@ export const CSS = `
 .rf-dialog::backdrop { background: rgba(var(--rf-shade),.4); }
 .rf-dialog form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .rf-dialog h2 { margin: 0; font-size: 18px; font-weight: 700; }
-.rf-dialog input[type='text'] { font: inherit; background: var(--rf-bg); color: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rf-border-strong); outline: none; }
-.rf-dialog input[type='text']:focus { border-color: var(--rf-brand); box-shadow: 0 0 0 3px var(--rf-focus); }
+.rf-dialog input[type='text'], .rf-dialog input[type='password'], .rf-pass input { font: inherit; background: var(--rf-bg); color: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rf-border-strong); outline: none; }
+.rf-dialog input[type='text']:focus, .rf-dialog input[type='password']:focus, .rf-pass input:focus { border-color: var(--rf-brand); box-shadow: 0 0 0 3px var(--rf-focus); }
 .rf-dialog .rf-row-end { display: flex; justify-content: flex-end; gap: 8px; }
 .rf-folders { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; border: 1px solid var(--rf-border); border-radius: 12px; }
 .rf-folders button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; background: none; text-align: left; border-bottom: 1px solid var(--rf-divider); font: inherit; color: inherit; cursor: pointer; }
@@ -236,6 +236,11 @@ export const CSS = `
 .rf-shares .rf-grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-share-add { display: flex; gap: 8px; }
 .rf-share-add input[type='text'] { flex: 1; min-width: 0; }
+.rf-link-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.rf-link-add input[type='password'] { flex: 1; min-width: 140px; }
+.rf-tag { display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 999px; font-size: 12px; background: var(--rf-hover); color: var(--rf-text); }
+.rf-check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.rf-pass { display: flex; flex-direction: column; gap: 10px; max-width: 320px; margin: 48px auto; }
 .rf-select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rf-border-strong); background: var(--rf-bg); color: inherit; }
 .rf-gear { margin-left: auto; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 0; background: none; color: var(--rf-muted); cursor: pointer; }
 .rf-gear:hover { background: var(--rf-hover); color: var(--rf-ink); }

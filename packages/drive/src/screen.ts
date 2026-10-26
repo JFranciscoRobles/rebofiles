@@ -84,7 +84,7 @@ type Dialog =
   | { kind: 'folder'; name: string }
   | { kind: 'rename'; entry: Entry; name: string }
   | { kind: 'move'; entries: Entry[]; at: EntryId | null }
-  | { kind: 'share'; entry: Entry; who: string; role: Role }
+  | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean }
   | { kind: 'delete'; entries: Entry[] }
   | { kind: 'empty' }
   | null;
@@ -1354,13 +1354,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   /** Who an entry is shared with and as what, and its links: each change made at once, the dialog staying open. */
-  function shareDialog(of: Entry, who: string, role: Role) {
+  function shareDialog(of: Entry, who: string, role: Role, made: { days?: number; password?: string; once?: boolean } = {}) {
     const found = detail(of.id);
     const entry = found.current && found.value ? found.value.entry : of;
     const label = t('shareTitle', { name: of.name });
     const address = options.linkAddress ?? defaultAddress;
     const copy = async (token: string) => navigator.clipboard.writeText(address(token));
-    const setShare = (change: Partial<{ who: string; role: Role }>) => {
+    const setShare = (change: Partial<{ who: string; role: Role; days: number; password: string; once: boolean }>) => {
       if (dialog?.kind === 'share') Object.assign(dialog, change);
       render();
     };
@@ -1419,11 +1419,18 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               { class: 'rf-shares' },
               entry.links.map((link) => {
                 const until = t('linkUntil', { date: formatDate(link.expires, locale) });
+                const spent = link.uses !== undefined && (link.used ?? 0) >= link.uses;
                 return h(
                   'li',
                   { key: link.id },
                   icon('link', 16),
-                  h('span', { class: 'rf-grow' }, until),
+                  h(
+                    'span',
+                    { class: 'rf-grow' },
+                    until,
+                    link.locked && h('span', { class: 'rf-tag' }, t('linkLocked')),
+                    link.uses !== undefined && h('span', { class: 'rf-tag' }, spent ? t('linkSpent') : t('linkOnce')),
+                  ),
                   button(t('copyLink'), () => void attempt(async () => copy(await client.linkToken(of.id, link.id)), t('linkCopied')), {
                     class: 'rf-link',
                     'aria-label': `${t('copyLink')} · ${until}`,
@@ -1433,7 +1440,40 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               }),
             )
           : h('p', { class: 'rf-hint' }, t('noLinks')),
-        button(withIcon('link', t('createLink', { n: 7 })), () => void attempt(async () => copy((await client.createLink(of.id, 7)).token), t('linkCopied')), { class: 'rf-btn' }),
+        h(
+          'div',
+          { class: 'rf-link-add' },
+          h(
+            'select',
+            { class: 'rf-select', 'aria-label': t('linkLasts'), value: String(made.days ?? 7), onChange: (event: Event) => setShare({ days: Number((event.target as HTMLSelectElement).value) }) },
+            [1, 7, 30].map((n) => h('option', { key: String(n), value: String(n) }, n === 1 ? t('linkDay') : t('linkDays', { n }))),
+          ),
+          h('input', {
+            type: 'password',
+            autocomplete: 'new-password',
+            'aria-label': t('linkPassword'),
+            placeholder: t('linkPasswordOptional'),
+            value: made.password ?? '',
+            onInput: (event: Event) => setShare({ password: (event.target as HTMLInputElement).value }),
+          }),
+          h(
+            'label',
+            { class: 'rf-check' },
+            h('input', { type: 'checkbox', checked: Boolean(made.once), onChange: (event: Event) => setShare({ once: (event.target as HTMLInputElement).checked }) }),
+            t('linkOnceLabel'),
+          ),
+        ),
+        made.password && made.password.length < 4 && h('p', { class: 'rf-hint' }, t('linkPasswordShort')),
+        button(
+          withIcon('link', t('createLink')),
+          () =>
+            void attempt(async () => {
+              const link = await client.createLink(of.id, made.days ?? 7, { password: made.password || undefined, once: made.once });
+              await copy(link.token);
+              setShare({ password: '', once: false });
+            }, t('linkCopied')),
+          { class: 'rf-btn', disabled: Boolean(made.password && made.password.length < 4) },
+        ),
         actionsRow(button(t('done'), closeDialog, { class: 'rf-btn rf-primary' })),
       ),
     );
@@ -2102,7 +2142,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       case 'move':
         return moveDialog(dialog.entries, dialog.at);
       case 'share':
-        return shareDialog(dialog.entry, dialog.who, dialog.role);
+        return shareDialog(dialog.entry, dialog.who, dialog.role, dialog);
       case 'delete': {
         const gone = dialog.entries;
         const text = gone.length === 1 ? t('confirmDelete', { name: gone[0].name }) : t('confirmDeleteMany', { n: gone.length });

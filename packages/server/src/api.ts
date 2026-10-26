@@ -32,7 +32,7 @@
 //   GET    /shared                        what others shared with the one asking
 //   POST   /entries/:id/shares            { with, role }: shared, or given another role
 //   DELETE /entries/:id/shares/:with      no longer shared with them
-//   POST   /entries/:id/links             { days }: a link to read it without signing in, and its address
+//   POST   /entries/:id/links             { days, password, once }: a link to read it without signing in, and its address
 //   GET    /entries/:id/links/:link       the address of a link again
 //   DELETE /entries/:id/links/:link       taken back
 //
@@ -44,7 +44,21 @@
 //   GET    /links/:token/zip?ids=…        what an archive of some of it (all, unless said) holds
 //   GET    /links/:token/urls?ids=…       the addresses of some of its files
 
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const derive = promisify(scrypt) as (password: string, salt: Buffer, length: number) => Promise<Buffer>;
+/** A password as it is kept: its salt and what scrypt makes of it, never itself. */
+async function sealPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  return `${salt.toString('hex')}:${(await derive(password, salt, 32)).toString('hex')}`;
+}
+async function passwordIs(kept: unknown, given: string): Promise<boolean> {
+  if (typeof kept !== 'string' || !kept.includes(':')) return false;
+  const [salt, hash] = kept.split(':');
+  const made = await derive(given, Buffer.from(salt, 'hex'), 32);
+  return timingSafeEqual(made, Buffer.from(hash, 'hex'));
+}
 import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
 import type { MetadataStore } from './metadata';
@@ -247,7 +261,7 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
       const own = await options.storage.serve?.(request, path);
       if (own) return own;
 
-      if (path.startsWith('/links/')) return await viaLink(path, url);
+      if (path.startsWith('/links/')) return await viaLink(path, url, request);
 
       const user = await options.identify(request);
       if (!user) throw new Refused(401, 'signed-out', 'Sign in first.');
@@ -593,10 +607,14 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           );
 
         case 'POST /entries/:id/links': {
-          const asked = await body<{ days?: number }>();
+          const asked = await body<{ days?: number; password?: string; once?: boolean }>();
           const days = asked.days === undefined ? 7 : Number(asked.days);
           if (!(days > 0 && days <= LINK_DAYS)) throw new Refused(400, 'bad-days', `A link lasts from a day to ${LINK_DAYS} days.`);
-          const made = { id: newId(), expires: new Date(Date.parse(now()) + days * 86_400_000).toISOString() };
+          const password = typeof asked.password === 'string' && asked.password ? asked.password : undefined;
+          if (password && password.length < 4) throw new Refused(400, 'bad-password', 'A password of four characters or more.');
+          const made = { id: newId(), expires: new Date(Date.parse(now()) + days * 86_400_000).toISOString(), locked: !!password, uses: asked.once ? 1 : undefined };
+          // Kept before the link is there, so it is never there without it.
+          if (password) await setSetting(`link:${made.id}`, await sealPassword(password));
           return Response.json(
             await change(async (drive) => {
               await allow(user, 'share', core.getEntry(drive, id), drive);
@@ -638,13 +656,28 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
   };
 
   /** What a link reads: the entry it was made for and what is inside it, to anyone who has its address, while it lasts. */
-  async function viaLink(path: string, url: URL): Promise<Response> {
+  async function viaLink(path: string, url: URL, request: Request): Promise<Response> {
     const [, , token = '', rest] = path.split('/');
     const sealed = openToken<LinkToken>(options.secret, decodeURIComponent(token));
     const drive = await load();
     const root = sealed?.purpose === 'link' ? core.linked(drive, sealed.link, now()) : null;
     // One answer for a link changed, out of date, taken back or in the trash: which, is not for whoever holds it.
     if (!root) throw new Refused(404, 'no-link', 'This link does not work any more.');
+    const link = core.linkOf(drive, sealed!.link)!;
+    // A link with a password: asked for at every request, kept apart from the drive, compared in constant time.
+    if (link.locked) {
+      const given = request.headers.get('x-link-password');
+      if (!given) throw new Refused(401, 'link-password', 'This link asks for its password.');
+      if (!(await passwordIs(await getSetting(`link:${link.id}`), given))) {
+        // A moment before each wrong one, against guessing.
+        await new Promise((done) => setTimeout(done, 400));
+        throw new Refused(401, 'link-password-wrong', 'That is not the password.');
+      }
+    }
+    /** One more use of a link that has a number of them: a file of it, or an archive of it, downloaded. Seeing a file in the page is not one. */
+    const spend = async () => {
+      if (link.uses !== undefined && (link.used ?? 0) < link.uses) await change(async (current) => ({ drive: core.useLink(current, link.id, now()), answer: null }));
+    };
     const inside = (id: string | null) => {
       const entry = id ? core.getEntry(drive, id) : root;
       if (!core.isWithin(drive, entry.id, root.id) || core.isTrashed(drive, entry.id)) throw new Refused(404, 'no-link', 'That is not in what this link reads.');
@@ -658,7 +691,9 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
     if (rest === 'download') {
       const file = inside(url.searchParams.get('id'));
       if (file.kind !== 'file') throw new Refused(400, 'not-a-file', `${file.name} is a folder.`);
-      return Response.json({ url: await options.storage.downloadUrl(file.versions[0].key, file.name, file.type, base, url.searchParams.get('inline') === '1') });
+      const inline = url.searchParams.get('inline') === '1';
+      if (!inline) await spend();
+      return Response.json({ url: await options.storage.downloadUrl(file.versions[0].key, file.name, file.type, base, inline) });
     }
     // An archive of some of what it reads, or of all of it, and the addresses of its files a few at a time.
     const asked = () => (url.searchParams.get('ids') ?? '').split(',').filter(Boolean);
@@ -666,10 +701,12 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
       const ids = asked().length ? asked() : [root.id];
       for (const id of ids) inside(id);
       if (ids.reduce((sum, id) => sum + core.subtree(drive, id).length, 0) > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
+      await spend();
       return Response.json(core.packOf(drive, ids, (entry) => core.isWithin(drive, entry.id, root.id)));
     }
     if (rest === 'urls') {
       const ids = asked().slice(0, URLS_AT_ONCE);
+      if (url.searchParams.get('inline') !== '1') await spend();
       const urls: Record<string, Address> = {};
       for (const id of ids) {
         const entry = drive.entries.get(id);

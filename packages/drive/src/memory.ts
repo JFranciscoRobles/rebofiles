@@ -145,9 +145,10 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     share: (entryId, who, role) => change((current) => one(core.share(current, entryId, who, role, context()), entryId)),
     unshare: (entryId, who) => change((current) => one(core.unshare(current, entryId, who), entryId)),
     // No server to sign it: a link's token is its id, and nothing outside the page reads it.
-    createLink: (entryId, days = 7) =>
+    // A password is not kept here: with no server, there is no one to ask for it.
+    createLink: (entryId, days = 7, how = {}) =>
       change((current) => {
-        const link = { id: id(), expires: new Date(Date.parse(context().at) + days * 86_400_000).toISOString() };
+        const link = { id: id(), expires: new Date(Date.parse(context().at) + days * 86_400_000).toISOString(), locked: Boolean(how.password), uses: how.once ? 1 : undefined };
         const next = core.addLink(current, entryId, link, context());
         return { drive: next, answer: { entry: core.getEntry(next, entryId), token: link.id } };
       }),
