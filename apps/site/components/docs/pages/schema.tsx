@@ -47,23 +47,150 @@ CREATE TABLE rebofiles_entries_text (
 );
 CREATE INDEX rebofiles_entries_text_words ON rebofiles_entries_text USING gin (words);`;
 
-const SQLITE = `CREATE TABLE rebofiles_entries (id TEXT PRIMARY KEY, parent TEXT, entry TEXT NOT NULL);
-CREATE INDEX rebofiles_entries_parent ON rebofiles_entries (parent);
+const PRISMA = `// What \`prisma db pull\` reads from the tables ReboFiles made, named as an application names its models.
+// \`prisma migrate diff\` between it and the database: an empty migration.
 
-CREATE TABLE rebofiles_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+/// A folder or a file of the drive: the whole entry, as @rebofiles/core has it, in \`entry\`.
+model DriveEntry {
+  id     String  @id
+  parent String?
+  entry  Json
 
-CREATE TABLE rebofiles_revision (id INTEGER PRIMARY KEY CHECK (id = 1), n INTEGER NOT NULL);
-INSERT OR IGNORE INTO rebofiles_revision (id, n) VALUES (1, 0);
+  @@index([parent], map: "rebofiles_entries_parent")
+  @@map("rebofiles_entries")
+}
 
-CREATE TABLE rebofiles_activity (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT, entry TEXT NOT NULL, parent TEXT, origin TEXT, line TEXT NOT NULL
-);
-CREATE INDEX rebofiles_activity_entry  ON rebofiles_activity (entry, seq);
-CREATE INDEX rebofiles_activity_parent ON rebofiles_activity (parent, seq);
-CREATE INDEX rebofiles_activity_origin ON rebofiles_activity (origin, seq);
+/// The drive's settings, each person's, the passwords of links: by name.
+model DriveSetting {
+  name  String @id
+  value Json
 
--- SQLite's own full-text search: without minding case or accents.
-CREATE VIRTUAL TABLE rebofiles_text USING fts5(id UNINDEXED, version UNINDEXED, body, tokenize = 'unicode61 remove_diacritics 2');`;
+  @@map("rebofiles_entries_settings")
+}
+
+/// One row, one number: one more at every change. The table has CHECK (id = 1), which Prisma does not model.
+model DriveRevision {
+  id Int    @id
+  n  BigInt
+
+  @@map("rebofiles_entries_revision")
+}
+
+/// What was done, a line each.
+model DriveActivity {
+  seq    BigInt  @id @default(autoincrement())
+  entry  String
+  parent String?
+  origin String?
+  line   Json
+
+  @@index([entry, seq], map: "rebofiles_entries_activity_entry")
+  @@index([parent, seq], map: "rebofiles_entries_activity_parent")
+  @@index([origin, seq], map: "rebofiles_entries_activity_origin")
+  @@map("rebofiles_entries_activity")
+}
+
+/// What is written in each file, to find it by.
+model DriveText {
+  id      String                  @id
+  version String
+  body    String
+  words   Unsupported("tsvector")
+
+  @@index([words], map: "rebofiles_entries_text_words", type: Gin)
+  @@map("rebofiles_entries_text")
+}`;
+
+const ONE_POOL = `// lib/db.ts: one pool, for your Prisma and for the drive.
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+import { PrismaClient } from '@/lib/generated/prisma/client';
+
+export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+export const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+
+// app/api/files/[...path]/route.ts
+import { byRoles, createDriveHandler, postgresMetadata, s3OptionsFrom, s3Storage } from '@rebofiles/server';
+import { pool } from '@/lib/db';
+
+const handle = createDriveHandler({
+  storage: s3Storage(s3OptionsFrom(process.env)),
+  metadata: await postgresMetadata(pool), // a pool: each change holds a lock of the database
+  identify, authorize: byRoles, secret: process.env.REBOFILES_SECRET!, base: '/api/files',
+});`;
+
+const BASELINE = `# The tables are there already, made by ReboFiles: add the models, then tell Prisma they exist.
+npx prisma db pull                      # or paste the models above into schema.prisma
+mkdir -p prisma/migrations/0_rebofiles
+npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > prisma/migrations/0_rebofiles/migration.sql
+npx prisma migrate resolve --applied 0_rebofiles
+
+# From then on, migrate dev leaves them as they are: its next migration about them is empty.
+npx prisma migrate dev`;
+
+const FRESH = `# A new database: your migrations make the tables first, ReboFiles finds them when it starts.
+npx prisma migrate deploy`;
+
+const PRISMA_QUERIES = `import { Prisma } from '@/lib/generated/prisma/client';
+import type { Entry } from '@rebofiles/core';
+import { prisma } from '@/lib/db';
+
+// Ana's files and folders.
+const anas = await prisma.driveEntry.findMany({ where: { entry: { path: ['owner'], equals: 'ana' } } });
+const names = anas.map((row) => (row.entry as unknown as Entry).name);
+
+// What is in a folder; the folders at the top.
+const inside = await prisma.driveEntry.findMany({ where: { parent: folderId } });
+const top = await prisma.driveEntry.findMany({ where: { parent: null, entry: { path: ['kind'], equals: 'folder' } } });
+
+// What was done to it, and in it.
+const lines = await prisma.driveActivity.findMany({
+  where: { OR: [{ entry: folderId }, { parent: folderId }] },
+  orderBy: { seq: 'desc' },
+  take: 20,
+});
+
+// A person's own settings.
+const mine = await prisma.driveSetting.findUnique({ where: { name: 'person:ana' } });
+
+// The bytes each person keeps: what JSON paths cannot say, in SQL.
+const bytes = await prisma.$queryRaw<{ owner: string; bytes: number }[]>(Prisma.sql\`
+  SELECT entry->>'owner' AS owner, sum((v->>'size')::bigint)::float8 AS bytes
+  FROM rebofiles_entries, jsonb_array_elements(entry->'versions') v
+  GROUP BY 1\`);
+
+// Files by what is written in them: words is Unsupported("tsvector"), so in SQL too.
+const found = await prisma.$queryRaw<{ id: string; body: string }[]>(Prisma.sql\`
+  SELECT id, body FROM rebofiles_entries_text WHERE words @@ to_tsquery('simple', \${'payment & 30'})\`);`;
+
+/** Every field of an entry, as packages/core/src/model.ts has it: [field, type, what it is]. */
+const ENTRY_FIELDS: [string, string, string][] = [
+  ['kind', "'file' | 'folder'", 'What it is.'],
+  ['id', 'string', 'Its id, a UUID unless newId says otherwise; also the column id.'],
+  ['name', 'string', 'As the person reads it, extension included; never twice in a folder, whatever the case or the accents.'],
+  ['parent', 'string | null', 'The folder it is in; null at the top. Also the column parent.'],
+  ['owner', 'string', 'The id identify() gave whoever made it; at the top, whose My files it is in.'],
+  ['created', 'ISO 8601', 'When it was made or first uploaded.'],
+  ['modified, modifiedBy', 'ISO 8601, string', 'Its last change of name, place or bytes, and by whom. A colour or a share does not count.'],
+  ['type', 'string', 'Of a file: its media type, as the upload said it (application/pdf, image/png).'],
+  ['versions', 'Version[]', 'Of a file: its versions, the newest first, never empty. versions[0] is the file as it is now.'],
+  ['color', 'FolderColor', 'Of a folder: red, orange, yellow, green, teal, blue, purple, pink or gray; left out for the drive’s own.'],
+  ['trashed', '{ at, by }', 'Only on what was put in the trash itself; what is inside it is in the trash through it.'],
+  ['shares', 'Share[]', 'Who else it is shared with: { with, role, by, at }, with "*" for everyone signed in.'],
+  ['links', 'Link[]', 'Its links: { id, role, expires, locked?, uses?, used?, spent?, by, at }.'],
+];
+
+const VERSION_FIELDS: [string, string, string][] = [
+  ['id', 'string', 'Its id.'],
+  ['key', 'string', 'Where its bytes are in the bucket: the file’s id and its own, "<file>/<version>". Never a path.'],
+  ['size', 'number', 'In bytes, as the server checked them when the upload finished.'],
+  ['at, by', 'ISO 8601, string', 'When it was uploaded, and by whom.'],
+  ['sha256', 'string', 'The SHA-256 of its bytes in hex, as the page said it (files of up to 64 MiB): to tell the same file uploaded again.'],
+  ['placeholder', 'string', 'Of a picture or a Word document: a data: URL of a few hundred bytes, shown blurred while it comes.'],
+  ['renditions', 'Rendition[]', 'Smaller copies: { size, width, height, key, type, bytes }, the key "<file>/<version>@<size>".'],
+  ['restoredFrom', 'string', 'Of one made by bringing back an old version: which.'],
+  ['note', 'string', 'A word on it, when one was given.'],
+];
 
 const FILE = `{
   "kind": "file",
@@ -145,7 +272,7 @@ export const myStore: MetadataStore = {
 
 export const schema: DocPage = {
   title: 'Database schema',
-  description: 'The tables @rebofiles/server makes in Postgres and SQLite, what is in each row, the settings it keeps, why it is laid out so, and queries of your own.',
+  description: 'The tables @rebofiles/server makes in Postgres and SQLite, every field of a file, the settings it keeps, the models and migrations for Prisma ORM, and queries of your own.',
   source: 'apps/site/components/docs/pages/schema.tsx',
   lead: (
     <>
@@ -153,14 +280,14 @@ export const schema: DocPage = {
       the first time it starts, so there is nothing to run by hand: this page is for knowing what is there.
     </>
   ),
-  tip: 'tip: five tables, and nothing to migrate by hand',
+  tip: 'tip: five tables, nothing to migrate by hand — and models for Prisma',
   sections: [
     {
       id: 'the-tables',
       title: 'The tables',
       badge: 'Overview',
       color: 'blue',
-      lead: 'Five, named after the table of the entries: rebofiles_entries unless postgresMetadata is given { table }. SQLite has the same, named rebofiles_*.',
+      lead: 'Five, named after the table of the entries: rebofiles_entries unless postgresMetadata is given { table }. sqliteMetadata makes the same in one file, named rebofiles_*, the text in a table of SQLite’s full-text search (FTS5).',
       body: (
         <Table
           label="Tables"
@@ -183,14 +310,6 @@ export const schema: DocPage = {
       color: 'green',
       lead: 'As postgresMetadata makes them, under a lock of the database so two processes starting at once do not both try.',
       body: <Code lang="sql" code={POSTGRES} file="postgresMetadata(pool)" />,
-    },
-    {
-      id: 'on-sqlite',
-      title: 'On SQLite',
-      badge: 'SQLite',
-      color: 'yellow',
-      lead: 'As sqliteMetadata makes them, in one file, with Node’s own node:sqlite. JSON is kept as TEXT.',
-      body: <Code lang="sql" code={SQLITE} file="sqliteMetadata('drive.sqlite')" />,
     },
     {
       id: 'an-entry',
@@ -216,6 +335,24 @@ export const schema: DocPage = {
               </>,
             ]}
           />
+        </>
+      ),
+    },
+    {
+      id: 'the-fields-of-a-file',
+      title: 'The fields of a file',
+      badge: 'Metadata',
+      color: 'yellow',
+      lead: 'The metadata of each file and folder is the column entry of rebofiles_entries: there is no other table of files. Every field of it:',
+      body: (
+        <>
+          <Table label="Fields of an entry" columns={['Field', 'Type', 'What it is']} code={[0]} rows={ENTRY_FIELDS.map(([field, type, what]) => [field, <C key={field}>{type}</C>, what])} />
+          <P>And of each of its versions:</P>
+          <Table label="Fields of a version" columns={['Field', 'Type', 'What it is']} code={[0]} rows={VERSION_FIELDS.map(([field, type, what]) => [field, <C key={field}>{type}</C>, what])} />
+          <Callout title="Not kept, yet:">
+            the width and height of the original picture (only of its smaller copies), what a camera writes in a picture (EXIF), the length of a video or a song, and the pages of a document. A table
+            of your own beside it can hold them, by the id of the file.
+          </Callout>
         </>
       ),
     },
@@ -274,6 +411,63 @@ export const schema: DocPage = {
           ]}
         />
       ),
+    },
+    {
+      id: 'with-prisma',
+      title: 'With Prisma ORM',
+      badge: 'Prisma',
+      color: 'yellow',
+      lead: 'For an application that keeps its own tables with Prisma 7: the drive’s, as models of its schema.prisma, to read them with Prisma and to keep its migrations from touching them.',
+      body: (
+        <>
+          <Code lang="prisma" code={PRISMA} file="prisma/schema.prisma" />
+          <List
+            items={[
+              <>
+                <C>@@map</C> keeps the tables’ own names; with <C>postgresMetadata(pool, &#123; table: 'acme_files' &#125;)</C>, map to those instead.
+              </>,
+              <>
+                <C>words</C> is a <C>tsvector</C>, which Prisma reads as <C>Unsupported</C>: the model of the text is read in SQL, and written only by the drive.
+              </>,
+              <>
+                <C>prisma db pull</C> warns of the <C>CHECK (id = 1)</C> of the revision: it stays in the table, Prisma only does not model it.
+              </>,
+            ]}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'one-pool',
+      title: 'One pool for Prisma and the drive',
+      badge: 'Prisma',
+      color: 'green',
+      lead: 'Prisma 7 talks to Postgres through @prisma/adapter-pg, which takes a pg.Pool: give the same one to postgresMetadata.',
+      body: <Code code={ONE_POOL} />,
+    },
+    {
+      id: 'migrations-with-prisma',
+      title: 'Migrations with Prisma',
+      badge: 'Prisma',
+      color: 'purple',
+      lead: 'Prisma Migrate takes tables it does not know for drift, and offers to reset the database, everything in it gone: put the drive’s tables in the schema, and mark them as made.',
+      body: (
+        <>
+          <Code lang="bash" code={BASELINE} />
+          <Code lang="bash" code={FRESH} />
+          <Callout title="Either way round works.">
+            ReboFiles makes its tables with <C>IF NOT EXISTS</C> and its one row of the revision with <C>ON CONFLICT DO NOTHING</C>: tables Prisma made first are taken as they are.
+          </Callout>
+        </>
+      ),
+    },
+    {
+      id: 'queries-with-prisma',
+      title: 'Queries with Prisma',
+      badge: 'Prisma',
+      color: 'pink',
+      lead: 'Read the drive with Prisma’s client and JSON paths, and in SQL for what they cannot say. Change it through the drive’s routes, so the revision goes up and the tree stays whole.',
+      body: <Code code={PRISMA_QUERIES} />,
     },
     {
       id: 'queries-of-your-own',
