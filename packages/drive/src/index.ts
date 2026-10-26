@@ -23,5 +23,7 @@ export { type Texts, type Translate, TEXTS, translator, formatSize, formatDate }
 export { type Kind, type DocumentPreview, kindOf, badgeOf } from './kinds';
 export { CSS } from './styles';
 export { type MadeRendition, renditionsOf, makesRenditions } from './images';
+export { type ZipItem, type ZipSink, type ZipOptions, writeZip, blobSink, streamSink, crc32 } from './zip';
+export { type ZipProgress, type ZipDownload, type ZipDownloadOptions, downloadZip } from './download';
 export { type DriveOptions, type MountedDrive, mountDrive } from './screen';
 export { type SharedLinkOptions, mountSharedLink } from './link';

@@ -15,6 +15,7 @@ import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator }
 import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
+import { downloadZip } from './download';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
@@ -845,23 +846,51 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       await new Promise((done) => setTimeout(done, 250));
     }
   };
+  /** A .zip being made, of what was picked: how far it is, and what stops it. */
+  let zipping: { name: string; read: number; size: number; stop: AbortController } | null = null;
+  const zipDownload = async (entries: Entry[]) => {
+    if (zipping) return;
+    // Named after the one, or after where they are.
+    const name = entries.length === 1 ? entries[0].name : `${t('filesZip')} ${new Date().toISOString().slice(0, 10)}`;
+    const job = { name: `${name}.zip`, read: 0, size: 0, stop: new AbortController() };
+    zipping = job;
+    render();
+    try {
+      const done = await downloadZip(
+        client,
+        entries.map((entry) => entry.id),
+        {
+          name,
+          signal: job.stop.signal,
+          onProgress: ({ read, size }) => {
+            job.read = read;
+            job.size = size;
+            render();
+          },
+        },
+      );
+      say(done.missed.length ? t('zipMissed', { name: job.name, n: done.missed.length }) : t('zipped', { name: job.name }));
+    } catch (error) {
+      say(job.stop.signal.aborted || (error as Error).name === 'AbortError' ? t('zipStopped') : error instanceof Error ? error.message : String(error));
+    } finally {
+      zipping = null;
+      render();
+    }
+  };
+
   /** What can be done to all that is picked at once. */
   const pickedActions = (many: Entry[], wide = false): Child[] => {
     const cls = (extra = '') => `rf-btn${wide ? '' : ' rf-small'}${extra}`;
     // In the bar, the words go on a narrow screen and the icons stay, the words still their names.
     const labelled = (name: IconName, text: string): Child => (wide ? withIcon(name, text) : [icon(name, 16), h('span', { class: 'rf-btn-text' }, text)]);
-    const files = many.filter((entry) => entry.kind === 'file');
     return section === 'trash'
       ? [
           button(labelled('restore', t('restore')), () => void each(many, (entry) => client.restore(entry.id), 'restoredMany'), { class: cls(' rf-primary'), title: t('restore') }),
           button(labelled('trash', t('deleteForever')), () => ((dialog = { kind: 'delete', entries: many }), render()), { class: cls(' rf-text rf-danger'), title: t('deleteForever') }),
         ]
       : [
-          files.length > 0 &&
-            button(labelled('download', files.length === many.length ? t('download') : t('downloadFiles', { n: files.length })), () => void attempt(() => downloadEach(files)), {
-              class: cls(),
-              title: t('download'),
-            }),
+          // All of it in one .zip, folders with what is in them.
+          button(labelled('download', t('downloadZip')), () => void zipDownload(many), { class: cls(), title: t('downloadZip') }),
           button(labelled('move', t('move')), () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render()), { class: cls(), title: t('move') }),
           button(labelled('trash', t('moveToTrash')), () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), { class: cls(' rf-text rf-danger'), title: t('moveToTrash') }),
         ];
@@ -945,7 +974,9 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   button(withIcon('doc', t('openInRebodocs')), () => void attempt(async () => options.onOpenDocument?.(file, await client.url(file.id, { inline: true }))), {
                     class: 'rf-btn rf-docs rf-wide',
                   }),
-                file && button(withIcon('download', t('download')), () => void attempt(download), { class: 'rf-btn' }),
+                file
+                  ? button(withIcon('download', t('download')), () => void attempt(download), { class: 'rf-btn' })
+                  : button(withIcon('download', t('downloadZip')), () => void zipDownload([entry]), { class: 'rf-btn' }),
                 button(withIcon(file ? 'eye' : 'external', t('open')), () => void open(entry), { class: 'rf-btn' }),
                 button(withIcon('pencil', t('rename')), () => ((dialog = { kind: 'rename', entry, name: entry.name }), render()), { class: 'rf-btn' }),
                 button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entries: [entry], at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
@@ -1925,32 +1956,49 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         'div',
         { class: 'rf-status', inert: Boolean(settingsPart || viewing) },
         h('span', { class: 'rf-grow' }, count, storage && h('span', { class: 'rf-where' }, ` · ${storage}`)),
-        sending
+        zipping
           ? [
-              h('span', null, t('uploading', { name: sending.name, pct: Math.round((sending.sent / Math.max(1, sending.size)) * 100) })),
+              h('span', null, t('zipping', { name: zipping.name, pct: Math.round((zipping.read / Math.max(1, zipping.size)) * 100) })),
               h(
                 'span',
                 {
                   class: 'rf-bar',
                   role: 'progressbar',
-                  'aria-label': sending.name,
+                  'aria-label': zipping.name,
                   'aria-valuemin': '0',
                   'aria-valuemax': '100',
-                  'aria-valuenow': String(Math.round((sending.sent / Math.max(1, sending.size)) * 100)),
+                  'aria-valuenow': String(Math.round((zipping.read / Math.max(1, zipping.size)) * 100)),
                 },
-                h('span', { style: `width: ${(sending.sent / Math.max(1, sending.size)) * 100}%` }),
+                h('span', { style: `width: ${(zipping.read / Math.max(1, zipping.size)) * 100}%` }),
               ),
+              button(t('cancel'), () => zipping?.stop.abort(), { class: 'rf-retry' }),
             ]
-          : failed
+          : sending
             ? [
+                h('span', null, t('uploading', { name: sending.name, pct: Math.round((sending.sent / Math.max(1, sending.size)) * 100) })),
                 h(
                   'span',
-                  { class: 'rf-error', role: 'alert' },
-                  failed.sent > 0 ? t('uploadCut', { name: failed.name, pct: Math.round((failed.sent / Math.max(1, failed.size)) * 100) }) : `${failed.name}: ${failed.error}`,
+                  {
+                    class: 'rf-bar',
+                    role: 'progressbar',
+                    'aria-label': sending.name,
+                    'aria-valuemin': '0',
+                    'aria-valuemax': '100',
+                    'aria-valuenow': String(Math.round((sending.sent / Math.max(1, sending.size)) * 100)),
+                  },
+                  h('span', { style: `width: ${(sending.sent / Math.max(1, sending.size)) * 100}%` }),
                 ),
-                failed.retry && h('button', { type: 'button', class: 'rf-retry', onClick: failed.retry }, t('tryAgain')),
               ]
-            : null,
+            : failed
+              ? [
+                  h(
+                    'span',
+                    { class: 'rf-error', role: 'alert' },
+                    failed.sent > 0 ? t('uploadCut', { name: failed.name, pct: Math.round((failed.sent / Math.max(1, failed.size)) * 100) }) : `${failed.name}: ${failed.error}`,
+                  ),
+                  failed.retry && h('button', { type: 'button', class: 'rf-retry', onClick: failed.retry }, t('tryAgain')),
+                ]
+              : null,
       ),
       toast && h('div', { class: 'rf-toast', role: 'status' }, toast),
       dialogs(),

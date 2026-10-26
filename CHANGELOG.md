@@ -175,6 +175,18 @@ minor version (0.x.0) may change the API; such changes are listed under
   after it and kept with its version (`renditions`); the original stays as it
   came. The grid and the preview show them; `url(id, { size })` and
   `download?size=` give the smallest that shows a picture at a size.
+- **Download as .zip.** Several picked, or a folder from its details, go
+  in one .zip made in the page: the server says what goes in it and at
+  which path (`POST /zip`, `packOf` in core), asking `authorize` for each
+  entry, and the bytes come straight from where they are, their addresses
+  asked for a few at a time so a long one does not outlive them. Written as
+  it comes (`writeZip`), nothing of a file held whole: text deflated by the
+  browser's CompressionStream, what is compressed already kept as it is,
+  names in UTF-8, ZIP64 past 4 GiB or 65,535 files. Past 500 MB, where the
+  browser can, it is written to a file the person chooses as it is made.
+  Its progress in the status bar, with Cancel; a file that cannot be read is
+  left out and said. No dependency. Checked against R2, and with unzip,
+  Python's zipfile and macOS' ditto.
 - **The drive held in memory.** The server reads the drive whole once and
   holds it, reading it again only when the store's revision changed, by this
   process or another: a number in a row of its own in SQLite and Postgres,
@@ -234,6 +246,7 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **An address to show a file is good for one to two hours**, from the start
   of its hour, instead of 15 minutes, so the browser can keep what it read.
   One to download a file is still good for 15 minutes.
+- **Downloading several downloads one .zip**, not each file in turn.
 - **A file opened is shown in the drive**, not in a new tab. Give `onOpen`
   to open it your own way, as before.
 - **The language and theme of `<FileDrive>`** are over the drive's settings

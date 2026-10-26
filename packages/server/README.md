@@ -83,7 +83,9 @@ is good for 15 minutes; one to show it in the page (`inline=1`) is signed
 from the start of the hour, the same all of it and good for two, with
 `Cache-Control: private, max-age=7200`, so a browser keeps a thumbnail it has
 read. Each answer says until when its address is good (`expires`), and
-`POST /urls { ids, inline, size }` gives those of many files at once.
+`POST /urls { ids, inline, size }` gives those of many files at once, and
+`POST /zip { ids }` what an archive of some entries holds, folders with
+what is in them, for the page to make it.
 
 ## What is in it
 

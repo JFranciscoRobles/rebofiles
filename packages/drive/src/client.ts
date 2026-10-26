@@ -5,7 +5,7 @@
 // server what arrived; and an upload left halfway is remembered, so the same
 // file uploaded again goes on from where it was.
 
-import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings, Role } from '@rebofiles/core';
+import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
 import { type MadeRendition, renditionsOf } from './images';
 
 export interface ClientOptions {
@@ -244,6 +244,9 @@ export function createDriveClient(options: ClientOptions) {
       for (const address of Object.values(urls)) address.url = absolute(address.url);
       return urls;
     },
+
+    /** What an archive of these holds: each file, each folder with what is in it, at their paths; what may not be read left out. */
+    pack: (ids: EntryId[]) => ask<Packed>('POST', '/zip', { ids }),
 
     /** The drive's settings, the one asking's own, and whether they may change the drive's. */
     settings: () => ask<SettingsAnswer>('GET', '/settings'),

@@ -85,3 +85,27 @@ describe('addresses', () => {
     vi.useRealTimers();
   });
 });
+
+describe('what an archive holds', () => {
+  it('each file and each folder with what is in it, what may not be read left out', async () => {
+    const s3 = memoryS3();
+    const handle = createDriveHandler({
+      storage: s3Storage({ endpoint: 'https://s3.test', bucket: 'bucket', accessKeyId: 'id', secretAccessKey: 'secret', fetch: s3.fetch }),
+      metadata: memoryMetadata(),
+      identify,
+      authorize: byRoles,
+      secret: 'u',
+      base: '/api/files',
+    });
+    const ana = client(handle, 'ana');
+    const bea = client(handle, 'bea');
+    const contracts = (await ana.ask('POST', '/api/files/folders', { name: 'Contracts', parent: null })).body.entry;
+    await ana.ask('POST', '/api/files/folders', { name: '2026', parent: contracts.id });
+    const deal = (await ana.upload(bytesOf(30), { name: 'deal.txt', parent: contracts.id, type: 'text/plain' }, s3.fetch)).body.entry;
+    const packed = (await ana.ask('POST', '/api/files/zip', { ids: [contracts.id] })).body as unknown as { files: { id: string; path: string; size: number }[]; folders: string[] };
+    expect(packed.folders).toEqual(['Contracts/', 'Contracts/2026/']);
+    expect(packed.files).toEqual([expect.objectContaining({ id: deal.id, path: 'Contracts/deal.txt', size: 30, type: 'text/plain' })]);
+    // Bea may read none of it.
+    expect((await bea.ask('POST', '/api/files/zip', { ids: [contracts.id, deal.id] })).body).toEqual({ files: [], folders: [] });
+  });
+});

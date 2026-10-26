@@ -22,6 +22,7 @@
 //   POST   /trash/empty
 //   GET    /entries/:id/download?version=&inline=1&size=  an address to read it from, or to show it in the page; with size, a smaller picture when there is one
 //   POST   /entries/:id/versions/:v/restore
+//   POST   /zip                           { ids }: what an archive of them holds, folders with what is in them, at their paths
 //   POST   /urls                          { ids, inline, size }: the addresses of many files at once, for a grid; until when each is good
 //   GET    /info                          where the bytes are, as a person reads it
 //   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
@@ -130,6 +131,9 @@ interface Address {
   width?: number;
   height?: number;
 }
+
+/** How many files and folders go in one archive. */
+const ZIP_AT_ONCE = 50_000;
 
 /** How many files' addresses are asked for in one request: a page of a grid, and more. */
 const URLS_AT_ONCE = 500;
@@ -498,6 +502,19 @@ export function createDriveHandler(options: DriveServerOptions): (request: Reque
           const wanted = url.searchParams.get('version');
           const size = url.searchParams.has('size') ? Number(url.searchParams.get('size')) : undefined;
           return Response.json(await addressOf(file, url.searchParams.get('inline') === '1', size, wanted ?? undefined));
+        }
+
+        case 'POST /zip': {
+          const asked = await body<{ ids?: unknown }>();
+          const ids = Array.isArray(asked.ids) ? asked.ids.filter((id): id is string => typeof id === 'string') : [];
+          const drive = await load();
+          // Each entry that would go in it asked about, as reading it would be: a folder to be listed, a file to be downloaded.
+          const candidates = new Map<EntryId, Entry>();
+          for (const id of ids) if (drive.entries.has(id)) for (const entry of core.subtree(drive, id)) candidates.set(entry.id, entry);
+          if (candidates.size > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
+          const allowed = new Set<EntryId>();
+          await Promise.all([...candidates.values()].map(async (entry) => (await options.authorize(user, entry.kind === 'file' ? 'download' : 'list', entry, drive)) && allowed.add(entry.id)));
+          return Response.json(core.packOf(drive, ids, (entry) => allowed.has(entry.id)));
         }
 
         case 'POST /urls': {

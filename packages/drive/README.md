@@ -54,6 +54,15 @@ their pages with `viewDocument: viewDocx` (from `@rebofiles/drive/rebodocs`,
 with `@rebodocs/editor` installed); ← and → go to the next. `onOpen` opens
 files your own way instead.
 
+## Download as .zip
+
+Several picked, or a folder, are downloaded as one .zip made in the page:
+`downloadZip(client, ids, { name, onProgress, signal })`. The server says
+what goes in it (`client.pack(ids)`), and each file's bytes go from where
+they are into the archive as they are read (`writeZip(items, sink)`), text
+deflated, ZIP64 when it is large. Past 500 MB, where the browser lets a page
+write a file, it is written to one the person chooses.
+
 ## Settings
 
 A button at the top of the drive opens its settings, a screen of their own
