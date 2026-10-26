@@ -2,63 +2,12 @@
 // handler, which asks a real drive's routes in the same process as the
 // person the request says. And over stdio, a line in and a line out.
 
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { byRoles, createDriveHandler, diskStorage, memoryMetadata } from '@rebofiles/server';
+import { describe, expect, it } from 'vitest';
 import { sampleDocx } from '../../../tools/sample-docx';
-import { PROTOCOL_VERSIONS, createMcpHandler, serveStdio } from '../src';
+import { PROTOCOL_VERSIONS, serveStdio } from '../src';
 import { parseArgs } from '../src/bin';
-
-let folder = '';
-beforeAll(async () => {
-  folder = await mkdtemp(join(tmpdir(), 'rebofiles-mcp-'));
-});
-afterAll(async () => {
-  await rm(folder, { recursive: true, force: true });
-});
-
-const ORIGIN = 'http://acme.test';
-
-/** What the tools give back as data, as much of it as the tests look at. */
-type Data = { id: string; name: string; type?: string; size?: number; folder: string | null; trashed?: boolean; versions: { id: string }[]; entries: { id: string; name: string }[] };
-
-/** A drive, its MCP beside it, and an assistant for each person, who says who it works for with a bearer token. */
-function setUp() {
-  const drive = createDriveHandler({
-    storage: diskStorage({ folder: join(folder, String(Math.random())), secret: 's' }),
-    metadata: memoryMetadata(),
-    identify: (request) => {
-      const token = request.headers.get('authorization')?.replace('Bearer ', '');
-      return token ? { id: token } : null;
-    },
-    authorize: byRoles,
-    secret: 'u',
-    base: '/api/files',
-  });
-  const mcp = createMcpHandler({ base: `${ORIGIN}/api/files`, fetch: (input, init) => drive(new Request(new URL(String(input), ORIGIN), init)) });
-  let next = 0;
-  const assistant = (who: string) => {
-    const rpc = async (method: string, params?: Record<string, unknown>) => {
-      const answer = await mcp(
-        new Request(`${ORIGIN}/api/mcp`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${who}` },
-          body: JSON.stringify({ jsonrpc: '2.0', id: ++next, method, params }),
-        }),
-      );
-      return (await answer.json()) as {
-        result?: Record<string, unknown> & { content: { text: string }[]; structuredContent: Data; isError: boolean };
-        error?: { code: number; message: string };
-      };
-    };
-    const call = async (name: string, args: Record<string, unknown> = {}) => (await rpc('tools/call', { name, arguments: args })).result!;
-    return { rpc, call };
-  };
-  return { mcp, drive, ana: assistant('ana'), bea: assistant('bea') };
-}
+import { DOCX_TYPE, ORIGIN, setUp, upload } from './setup';
 
 describe('the protocol', () => {
   it('says what it is, the version asked when it speaks it, and its tools', async () => {
@@ -67,7 +16,12 @@ describe('the protocol', () => {
     expect(init).toMatchObject({ protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'rebofiles' } });
     expect((await ana.rpc('initialize', { protocolVersion: '1999-01-01' })).result!.protocolVersion).toBe(PROTOCOL_VERSIONS[0]);
     const { tools } = (await ana.rpc('tools/list')).result as unknown as { tools: { name: string; annotations: { readOnlyHint: boolean } }[] };
-    expect(tools.map((t) => t.name)).toEqual([
+    // The drive's own, before Rebodocs' on its documents.
+    const own = tools.slice(
+      0,
+      tools.findIndex((t) => t.name === 'create_document'),
+    );
+    expect(own.map((t) => t.name)).toEqual([
       'list_folder',
       'search',
       'get_info',
@@ -77,13 +31,14 @@ describe('the protocol', () => {
       'create_folder',
       'create_text_file',
       'update_text_file',
+      'restore_version',
       'rename',
       'move',
       'move_to_trash',
       'restore',
     ]);
     expect(tools.find((t) => t.name === 'read_file')!.annotations.readOnlyHint).toBe(true);
-    expect(tools.some((t) => /delete|share$/.test(t.name))).toBe(false);
+    expect(own.some((t) => /delete|share$/.test(t.name))).toBe(false);
   });
 
   it('answers a ping, refuses what it does not know, and takes notifications without answering', async () => {
@@ -139,24 +94,7 @@ describe('the tools', () => {
   it('read a Word document with Rebodocs, and say what they do not read', async () => {
     const { ana, drive } = setUp();
     const docx = sampleDocx('Service agreement', ['Payment is due within thirty days.']);
-    // Up through the drive's routes, as a person would put it there.
-    const start = (await (
-      await drive(
-        new Request(`${ORIGIN}/api/files/uploads`, {
-          method: 'POST',
-          headers: { authorization: 'Bearer ana', 'content-type': 'application/json' },
-          body: JSON.stringify({ name: 'agreement.docx', parent: null, type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: docx.length }),
-        }),
-      )
-    ).json()) as { token: string; parts: { url: string }[] };
-    await drive(new Request(new URL(start.parts[0].url, `${ORIGIN}/api/files/`), { method: 'PUT', body: docx as Uint8Array<ArrayBuffer> }));
-    await drive(
-      new Request(`${ORIGIN}/api/files/uploads/finish`, {
-        method: 'POST',
-        headers: { authorization: 'Bearer ana', 'content-type': 'application/json' },
-        body: JSON.stringify({ token: start.token, parts: [{ number: 1, etag: '"1"' }] }),
-      }),
-    );
+    await upload(drive, 'ana', 'agreement.docx', DOCX_TYPE, docx);
     const [agreement] = (await ana.call('search', { query: 'agreement' })).structuredContent.entries;
     expect((await ana.call('read_file', { id: agreement.id })).content[0].text).toBe('Service agreement\nPayment is due within thirty days.');
 

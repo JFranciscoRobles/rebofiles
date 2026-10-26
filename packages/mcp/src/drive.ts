@@ -62,6 +62,7 @@ export function driveAt(options: DriveOptions) {
     move: (id: EntryId, parent: EntryId | null) => one('PATCH', at(id), { parent }),
     moveToTrash: (id: EntryId) => one('POST', `${at(id)}/trash`),
     restore: (id: EntryId) => one('POST', `${at(id)}/restore`),
+    restoreVersion: (id: EntryId, version: string) => one('POST', `${at(id)}/versions/${encodeURIComponent(version)}/restore`),
 
     /** The bytes of a file, or of one of its versions, read from where the server says. */
     async bytes(id: EntryId, version?: string): Promise<Uint8Array> {

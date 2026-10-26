@@ -5,7 +5,8 @@
 
 import type { Drive } from './drive';
 import { DriveRefusal } from './drive';
-import { TOOLS } from './tools';
+import { documentTools } from './documents';
+import { TOOLS, type Tool } from './tools';
 
 /** The versions of the protocol spoken, the latest first; a client asking for another is offered the latest. */
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -15,6 +16,15 @@ export const SERVER_INFO = { name: 'rebofiles', title: 'ReboFiles', version: '0.
 const INSTRUCTIONS =
   'The drive of the person you work for: their folders and files, and what others shared with them. Find things with search or list_folder, and use the ids they give. ' +
   'You may do what they may and nothing more. Nothing you do is permanent: what you put in the trash can be restored, and writing a file keeps what it was as a version.';
+
+const DOCUMENTS =
+  ' Word documents (.docx) are read and changed with the tools of Rebodocs, each given the id of the file as "document": every change is saved at once as a new version of it, which restore_version undoes. ' +
+  'Paragraphs go by number, as read_document shows them, and the numbers move when paragraphs are inserted or deleted: read again before using a number after such a change, or make several changes in one call with edit_document. ' +
+  'To change a text, give it exactly as it reads. To review a document without changing its text, use add_note.';
+
+/** The drive's tools, and Rebodocs' on its documents when it is installed: looked for once. */
+let all: Promise<Tool[]> | undefined;
+export const allTools = (): Promise<Tool[]> => (all ??= documentTools().then((documents) => [...TOOLS, ...documents]));
 
 export interface Message {
   jsonrpc: '2.0';
@@ -40,15 +50,15 @@ export async function answer(message: Message, drive: Drive): Promise<Answer | u
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
-        instructions: INSTRUCTIONS,
+        instructions: (await allTools()).length > TOOLS.length ? INSTRUCTIONS + DOCUMENTS : INSTRUCTIONS,
       });
     }
     case 'ping':
       return ok(id, {});
     case 'tools/list':
-      return ok(id, { tools: TOOLS.map(({ run: _, ...tool }) => tool) });
+      return ok(id, { tools: (await allTools()).map(({ run: _, ...tool }) => tool) });
     case 'tools/call': {
-      const tool = TOOLS.find((t) => t.name === params.name);
+      const tool = (await allTools()).find((t) => t.name === params.name);
       if (!tool) return failed(id, -32602, `There is no tool "${String(params.name)}".`);
       try {
         const { text, data } = await tool.run(drive, (params.arguments as Record<string, unknown>) ?? {});

@@ -42,7 +42,7 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 | [`@rebofiles/server`](packages/server) | The routes, `authorize()`, the bytes on S3 or the disk, the metadata in memory or SQLite. | Node 22.12+ |
 | [`@rebofiles/drive`](packages/drive) | The whole drive without a framework, mounted on an element, and the client of the routes. | Any browser |
 | [`@rebofiles/react`](packages/react) | `<FileDrive>`, and the hooks it is built from. | React 18+ |
-| [`@rebofiles/mcp`](packages/mcp) | Tools for an AI assistant, over HTTP or stdio, with the user's own rights. | Node 22.12+ |
+| [`@rebofiles/mcp`](packages/mcp) | Tools for an AI assistant, over HTTP or stdio, with the user's own rights; with Rebodocs, its Word documents edited, each change a version. | Node 22.12+ |
 
 `desktop` follows; see the roadmap.
 

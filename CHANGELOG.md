@@ -129,6 +129,16 @@ minor version (0.x.0) may change the API; such changes are listed under
   `authorize` decides for it as for them. `createMcpHandler` serves them over
   HTTP, `rebofiles-mcp` over stdio; the protocol is spoken without its SDK.
   The playground serves them at `/api/mcp`.
+- **Word documents of the drive, edited by an assistant.** With
+  `@rebodocs/mcp` installed beside `@rebofiles/mcp`, Rebodocs' tools are
+  served on the drive's `.docx` files, each given the id of one as
+  `document`: read it, fill a template, put a clause in its place, track a
+  change, add a note, compare with an earlier version, put in a picture of
+  the drive. Each change is saved at once as a new version of the file, as
+  the person, and is refused when someone saved another meanwhile;
+  `restore_version`, a new tool of the drive, undoes it, and
+  `create_document` starts one. Without Rebodocs the tools are the drive's
+  alone.
 - **A dark theme.** `theme="dark"`, or `"auto"` as the system is, on
   `<FileDrive>` and `<SharedLink>`; light unless said. Every colour of the
   drive is a custom property now, the kinds of file, shadows and the toast
@@ -139,6 +149,9 @@ minor version (0.x.0) may change the API; such changes are listed under
   longer read out at every step; a failed upload as an alert.
 
 ### Changed
+
+- **Rebodocs 0.11.** The optional peers on `@rebodocs/core` ask for 0.11.0
+  or later, the version `@rebodocs/mcp` is made with.
 
 - **My files is one's own.** At the top of the drive the server lists only
   what the one asking owns; what others share is in Shared with me. For one

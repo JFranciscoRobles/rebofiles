@@ -7,7 +7,7 @@
 // what the server refused as an error the model reads, not as a failure of
 // the protocol.
 
-import { type Entry, sizeOf, splitName } from '@rebofiles/core';
+import { type Entry, type FileEntry, sizeOf, splitName, versionNumber } from '@rebofiles/core';
 import type { Drive } from './drive';
 
 export interface Tool {
@@ -43,7 +43,7 @@ const line = (entry: Entry) =>
   `${entry.kind === 'folder' ? 'folder' : 'file'} "${entry.name}" (id ${entry.id}${entry.kind === 'file' ? `, ${sizeOf(entry)} bytes` : ''}, ${entry.owner}, ${entry.modified})`;
 const lines = (entries: Entry[], none: string) => (entries.length ? entries.map(line).join('\n') : none);
 
-const str = (args: Record<string, unknown>, name: string): string => {
+export const str = (args: Record<string, unknown>, name: string): string => {
   const value = args[name];
   if (typeof value !== 'string' || !value.trim()) throw new TypeError(`"${name}" is needed, as text.`);
   return value;
@@ -53,7 +53,7 @@ const optional = (args: Record<string, unknown>, name: string): string | null =>
 const TEXT_TYPES = /^(text\/|application\/(json|xml|yaml|x-yaml|javascript|csv))/;
 const TEXT_EXTENSIONS = new Set(['txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'log', 'html', 'css', 'js', 'ts', 'ini', 'toml']);
 const isText = (name: string, type: string) => TEXT_TYPES.test(type) || TEXT_EXTENSIONS.has(splitName(name).ext.slice(1).toLowerCase());
-const isDocx = (name: string, type: string) => type.includes('wordprocessingml') || splitName(name).ext.toLowerCase() === '.docx';
+export const isDocx = (name: string, type: string) => type.includes('wordprocessingml') || splitName(name).ext.toLowerCase() === '.docx';
 
 /** The text of a Word document, by Rebodocs' engine when it is installed. */
 async function docxText(bytes: Uint8Array): Promise<string | null> {
@@ -225,6 +225,23 @@ export const TOOLS: Tool[] = [
       if (!isText(entry.name, entry.type)) throw new TypeError(`"${entry.name}" is ${entry.type}, not a text file to write.`);
       const saved = await drive.upload(new TextEncoder().encode(String(args.text ?? '')), entry.type, { file: entry.id });
       return { text: `Saved version ${saved.versions.length} of "${saved.name}".`, data: brief(saved) };
+    },
+  },
+  {
+    name: 'restore_version',
+    title: 'Bring back a version',
+    description: 'An earlier version of a file becomes the file as it is now, as a new version: the one it was stays, so this too can be undone.',
+    inputSchema: {
+      type: 'object',
+      properties: { id, version: { type: 'string', description: 'The id of the version, from get_info.' } },
+      required: ['id', 'version'],
+      additionalProperties: false,
+    },
+    annotations: WRITE,
+    async run(drive, args) {
+      const restored = (await drive.restoreVersion(str(args, 'id'), str(args, 'version'))) as FileEntry;
+      const was = versionNumber(restored, restored.versions[0].restoredFrom ?? restored.versions[0].id);
+      return { text: `"${restored.name}" is as version ${was} was, now as version ${restored.versions.length}.`, data: brief(restored) };
     },
   },
   {

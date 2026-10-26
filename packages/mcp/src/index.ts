@@ -2,6 +2,7 @@
 
 export { type DriveOptions, DriveRefusal, driveAt } from './drive';
 export { type Tool, TOOLS, READ_LIMIT } from './tools';
-export { type Message, PROTOCOL_VERSIONS, answer } from './protocol';
+export { DOCX, DOCUMENT_LIMIT, documentTools } from './documents';
+export { type Message, PROTOCOL_VERSIONS, allTools, answer } from './protocol';
 export { type McpHandlerOptions, createMcpHandler } from './http';
 export { serveStdio } from './stdio';

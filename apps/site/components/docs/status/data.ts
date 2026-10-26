@@ -8,7 +8,7 @@ export const MEASURED = 'October 25, 2026';
 export const TESTS: { where: string; count: number; what: string }[] = [
   {
     where: 'packages/core',
-    count: 43,
+    count: 44,
     what: 'Names, the tree, renaming and moving, the trash, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me, links.',
   },
   {
@@ -23,8 +23,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/mcp',
-    count: 10,
-    what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may, Word documents read; and driven by the official SDK as a client.',
+    count: 19,
+    what: 'The protocol and every tool over HTTP and stdio, two people’s assistants each doing only what its person may; Rebodocs’ tools on the drive’s Word documents, each change a version, a viewer reading and an editor writing, a save made meanwhile not written over, and none of them without Rebodocs; and driven by the official SDK as a client.',
   },
   {
     where: 'npm run test:browser',
@@ -126,7 +126,11 @@ export const ROADMAP: Milestone[] = [
   {
     version: '0.4.0',
     name: 'Assistants',
-    items: [{ what: '@rebofiles/mcp, with authorize() asked for the assistant too', done: true }, { what: 'Claude in the demo' }, { what: 'Rebodocs’ MCP and ReboFiles’ together' }],
+    items: [
+      { what: '@rebofiles/mcp, with authorize() asked for the assistant too', done: true },
+      { what: 'Claude in the demo' },
+      { what: 'Rebodocs’ MCP and ReboFiles’ together: the drive’s Word documents edited, each change a version', done: true },
+    ],
   },
   { version: '0.5.0', name: 'Big files and other storage', items: [{ what: 'Uploads that resume after a cut, files of several gigabytes' }, { what: 'Google Cloud Storage and Azure Blob' }] },
   { version: '0.6.0', name: 'The desktop', items: [{ what: '@rebofiles/desktop: a folder of the disk kept like a folder of the drive' }, { what: 'The Tauri application, on a Mac first' }] },

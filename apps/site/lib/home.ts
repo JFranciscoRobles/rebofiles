@@ -58,7 +58,12 @@ export const PACKAGES: Package[] = [
   { name: '@rebofiles/react', what: 'The drive as a React component, or as headless hooks, with uploads and previews inside.', tag: 'React', color: 'green' },
   { name: '@rebofiles/server', what: 'The routes, authorize(), signed addresses, the bytes on S3 or a disk and the metadata in SQLite.', tag: 'Node', color: 'pink' },
   { name: '@rebofiles/desktop', what: 'A folder on disk kept like a folder of the drive, in a Tauri app.', tag: 'Desktop', color: 'purple', comes: '0.6' },
-  { name: '@rebofiles/mcp', what: 'Tools for an AI assistant to list, search, read, write, rename, move and trash files, with the user’s own rights.', tag: 'MCP', color: 'orange' },
+  {
+    name: '@rebofiles/mcp',
+    what: 'Tools for an AI assistant to list, search, read, write, rename, move and trash files, and with Rebodocs to edit Word documents, with the user’s own rights.',
+    tag: 'MCP',
+    color: 'orange',
+  },
 ];
 /** In the order of the install picker: the one an application installs first. */
 export const INSTALL_ORDER = ['@rebofiles/react', '@rebofiles/server', '@rebofiles/core'];

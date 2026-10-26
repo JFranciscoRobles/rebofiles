@@ -15,7 +15,7 @@
     "@rebofiles/drive": "0.1.0"
   },
   "peerDependencies": {
-    "@rebodocs/core": ">=0.10.0",
+    "@rebodocs/core": ">=0.11.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
