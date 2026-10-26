@@ -15,7 +15,7 @@
 //   POST   /uploads/finish                { token, parts: [{ number, etag }] }: the file, once its bytes are there
 //   POST   /uploads/resume                { token }: an upload cut, gone on with: what arrived, and where to send the rest
 //   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
-//   PATCH  /entries/:id                   { name } or { parent }, with { ifTaken: 'keep-both' } to add "(2)"
+//   PATCH  /entries/:id                   { name }, { parent } or { color }, with { ifTaken: 'keep-both' } to add "(2)"
 //   POST   /entries/:id/trash             into the trash
 //   POST   /entries/:id/restore           out of it
 //   DELETE /entries/:id                   gone for good, from the trash

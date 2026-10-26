@@ -43,8 +43,13 @@ The same rules:
 - **Each package's README** has the sections of Rebodocs' (Install, Usage,
   What is in it, The API, Status, License) and ends with **Where it can
   improve**.
-- **The status page** is `StatusPage.tsx` plus `data.ts`: the numbers come
-  from running the commands, with the date they were taken (`MEASURED`).
+- **The documentation** is laid out as Rebodocs': a bar with ⌘K, the pages
+  by group beside them, “On this page”, and the page before and after. Each
+  page is `apps/site/components/docs/pages/*.tsx`; the reference is
+  `reference.ts`, and the routes are read from the comment of
+  `packages/server/src/api.ts`. The status page is `status/data.ts`: the
+  numbers come from running the commands, with the date they were taken
+  (`MEASURED`).
 - **Rebodocs is optional.** `@rebodocs/core` is an optional peer dependency,
   for previews of DOCX; "Open in Rebodocs" is a callback the application
   gives (`onOpenDocument`), not an import.

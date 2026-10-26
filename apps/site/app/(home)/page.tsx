@@ -6,7 +6,7 @@ import { LiveDemo } from '@/components/home/LiveDemo';
 import { SiteFooter, SiteHeader, primary } from '@/components/home/SiteChrome';
 import { highlight } from '@/lib/highlight';
 import { PACKAGES, PASTEL_CLASS, PUBLISHED, type Pastel, TAGS, VERSION, npmOf, pastelAt } from '@/lib/home';
-import { DOCS, NPM_ORG, STATUS } from '@/lib/site';
+import { DOCS, GET_STARTED, NPM_ORG, STATUS } from '@/lib/site';
 import { TESTS } from '@/components/docs/status/data';
 
 const SAMPLES: [string, string, string][] = [
@@ -134,7 +134,7 @@ function Hero() {
         A file manager for the browser, on your own storage. Upload, organise and preview files, with folders, versions and a trash — in packages you take one at a time.
       </p>
       <p className="mt-8 flex flex-wrap justify-center gap-2.5 text-base">
-        <a href={DOCS} className={`rounded-xl px-5.5 py-3.5 ${primary}`}>
+        <a href={GET_STARTED} className={`rounded-xl px-5.5 py-3.5 ${primary}`}>
           Get started
         </a>
         <a href="#demo" className={`px-5.5 py-3.5 ${secondary}`}>
@@ -283,7 +283,7 @@ export default async function Home() {
                 tests pass; {PUBLISHED ? `the packages are on npm at ${VERSION}` : 'nothing is on npm yet'}. Open source under MIT.
               </p>
               <p className="mt-6.5 flex flex-wrap gap-2.5">
-                <a href={DOCS} className={`rounded-xl px-5 py-[13px] ${primary}`}>
+                <a href={GET_STARTED} className={`rounded-xl px-5 py-[13px] ${primary}`}>
                   Get started
                 </a>
                 <a href={STATUS} className="rounded-xl bg-white px-5 py-[13px] font-semibold text-ink transition-colors hover:bg-hover">

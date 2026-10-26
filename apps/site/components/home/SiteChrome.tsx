@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { VERSION } from '@/lib/home';
-import { DOCS, NPM_ORG, REBODOCS, REPO, STATUS } from '@/lib/site';
+import { DOCS, GET_STARTED, NPM_ORG, REBODOCS, REPO, STATUS } from '@/lib/site';
 
 const ghost = 'rounded-lg px-3 py-2 text-ink transition-colors hover:bg-hover';
 export const primary = 'bg-brand font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(14,124,82,0.22)]';
@@ -46,7 +46,7 @@ export function SiteHeader() {
         <a href={REPO} className={ghost}>
           GitHub
         </a>
-        <a href={DOCS} className={`ml-2 rounded-[10px] px-4 py-2.5 ${primary}`}>
+        <a href={GET_STARTED} className={`ml-2 rounded-[10px] px-4 py-2.5 ${primary}`}>
           Get started
         </a>
       </nav>

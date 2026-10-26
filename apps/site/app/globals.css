@@ -41,6 +41,29 @@
   --animate-pop-in: pop-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   --animate-wiggle: wiggle 0.5s ease;
   --animate-grow: grow 2.2s cubic-bezier(0.6, 0, 0.2, 1) 0.5s forwards;
+  --animate-enter: enter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+
+  /* What has just changed comes in from a little below. */
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(14, 124, 82, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(14, 124, 82, 0);
+    }
+  }
 
   @keyframes draw {
     to {
@@ -153,4 +176,30 @@ html {
 body {
   color: var(--color-ink);
   background: #fff;
+}
+
+/* A card that rises under the pointer. */
+.lift {
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.25s ease,
+    border-color 0.2s ease;
+}
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(47, 46, 43, 0.1);
+}
+
+/* The sheet and the search box of the documentation, as native dialogs. */
+dialog.sheet,
+dialog.palette {
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+dialog.sheet::backdrop,
+dialog.palette::backdrop {
+  background: rgba(47, 46, 43, 0.35);
 }
