@@ -198,7 +198,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
         return { drive: next, answer: core.getFile(next, fileId) };
       });
       // The smaller pictures, made in the page as the client of a server makes them, and kept beside.
-      const smaller = how.images ? await renditionsOf(file, how.images).catch(() => []) : [];
+      const smaller = how.images ? await (how.renditions ?? renditionsOf)(file, how.images).catch(() => []) : [];
       for (const r of smaller) {
         const key = `${made.id}/${versionId}@${r.size}`;
         blobs.set(key, r.blob);

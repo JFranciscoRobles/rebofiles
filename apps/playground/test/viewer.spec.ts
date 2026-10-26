@@ -38,11 +38,17 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   ]);
   await expect(item(page, 'e-config.json')).toBeVisible();
 
-  // A Word document's thumbnail is its first page, drawn: in the details, and in the grid.
+  // A Word document's thumbnail is a picture of its first page, made when it was uploaded and kept with it.
+  await expect
+    .poll(async () => {
+      const found = (await (await page.request.get('/api/files/search?q=agreement', { headers: { 'x-user': 'viewer' } })).json()).entries[0];
+      return found.versions[0].renditions?.map((r: { type: string }) => r.type);
+    })
+    .toEqual(['image/jpeg', 'image/jpeg']);
   await item(page, 'a-agreement.docx').click();
-  await expect(page.getByRole('complementary', { name: 'Details' }).locator('.rf-doc-thumb .dx-page')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('complementary', { name: 'Details' }).locator('img.rf-doc-pic')).toBeVisible();
   await page.getByRole('button', { name: 'Grid' }).click();
-  await expect(item(page, 'a-agreement.docx').locator('.rf-doc-thumb .dx-page')).toBeVisible();
+  await expect(item(page, 'a-agreement.docx').locator('img.rf-doc-pic')).toBeVisible();
   await page.getByRole('button', { name: 'List' }).click();
 
   await item(page, 'c-notes.md').dblclick();

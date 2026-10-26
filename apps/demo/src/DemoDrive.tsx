@@ -7,7 +7,7 @@
 import type { FileEntry } from '@rebofiles/core';
 import { answer, driveAt } from '@rebofiles/mcp';
 import { DriveProvider, FileDrive, type MemoryClient, createMemoryClient, useDrive } from '@rebofiles/react';
-import { previewDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { pictureOfDocx, previewDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { BASE, routesOver } from './routes';
 import { YOU, seed } from './seed';
@@ -42,7 +42,15 @@ function Demo({ client, defaultView, claudeActivity, language }: Required<DemoDr
   const [open, setOpen] = useState<{ file: FileEntry; url: string } | null>(null);
   return (
     <div style={{ position: 'relative', height: '100%' }}>
-      <FileDrive title="Acme Files" defaultView={defaultView} previewDocument={previewDocx} viewDocument={viewDocx} thumbDocument={thumbDocx} onOpenDocument={(file, url) => setOpen({ file, url })} />
+      <FileDrive
+        title="Acme Files"
+        defaultView={defaultView}
+        previewDocument={previewDocx}
+        viewDocument={viewDocx}
+        thumbDocument={thumbDocx}
+        pictureDocument={pictureOfDocx}
+        onOpenDocument={(file, url) => setOpen({ file, url })}
+      />
       {claudeActivity && <Claude client={client} language={language} />}
       {open && (
         <Suspense fallback={null}>

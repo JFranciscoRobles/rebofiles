@@ -146,8 +146,13 @@ minor version (0.x.0) may change the API; such changes are listed under
   them all fit on the screen (at the editor's least zoom, a quarter, for a
   long one), or one by one, each whole. Its thumbnail, in the grid and the
   details, is the top of its first page as Rebodocs draws it, large, its
-  side margins left out (`thumbDocument:
-  thumbDocx`), made once for each version. A picture is always whole on the
+  side margins left out. It is a picture made when the document is uploaded
+  (`pictureDocument: pictureOfDocx`): its first page drawn by Rebodocs'
+  editor, in an SVG with the editor's stylesheet, onto a canvas, in the two
+  sizes the grid and the details show, as JPEG (PNG when the settings keep
+  the original's type), and kept with its version as images' copies are. A
+  document uploaded before gets them the first time it is shown, drawn live
+  meanwhile (`thumbDocument: thumbDocx`), when the one looking may upload. A picture is always whole on the
   screen, with nothing to scroll; a click shows its real size. The arrows go to the files before and after;
   a tab of its own, when wanted, is a button away. New kinds: `video`,
   `audio`, and code among `text`.

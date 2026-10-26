@@ -6,7 +6,7 @@
 // file uploaded again goes on from where it was.
 
 import type { DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings, Role } from '@rebofiles/core';
-import { renditionsOf } from './images';
+import { type MadeRendition, renditionsOf } from './images';
 
 export interface ClientOptions {
   /** Where the routes are: `/api/files`. */
@@ -87,6 +87,8 @@ export interface UploadOptions {
   signal?: AbortSignal;
   /** Of a picture, the smaller ones to make of it in the page and send after it, as the drive's settings say. */
   images?: ImageSettings;
+  /** What makes those pictures, of a file that is not an image: the first page of a document, say. Of images, unless given. */
+  renditions?: (file: Blob, images: ImageSettings) => Promise<MadeRendition[]>;
   /** Not a file: a smaller picture of a version of one. */
   rendition?: { file: EntryId; version: string; size: number; width: number; height: number };
 }
@@ -309,7 +311,7 @@ export function createDriveClient(options: ClientOptions) {
       if (options.images && !options.rendition) {
         const version = entry.versions[0].id;
         try {
-          for (const made of await renditionsOf(file, options.images)) {
+          for (const made of await (options.renditions ?? renditionsOf)(file, options.images)) {
             entry = await api.upload(made.blob, { rendition: { file: entry.id, version, size: made.size, width: made.width, height: made.height }, signal });
           }
         } catch (error) {

@@ -14,6 +14,7 @@ import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
 import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, badgeOf, kindOf } from './kinds';
+import { type MadeRendition, renditionsOf } from './images';
 import { markdown, rowsOf } from './markdown';
 import { CSS } from './styles';
 
@@ -44,6 +45,12 @@ export interface DriveOptions {
   viewDocument?: (element: HTMLElement, bytes: Uint8Array) => ShownDocument | Promise<ShownDocument>;
   /** The first page of a Word document, drawn, for its thumbnail in the grid and the details: `thumbDocx` of `@rebofiles/drive/rebodocs`. */
   thumbDocument?: (bytes: Uint8Array) => Promise<HTMLElement>;
+  /**
+   * The first page of a Word document as a picture, its longest side `size` pixels: `pictureOfDocx` of
+   * `@rebofiles/drive/rebodocs`. Made when one is uploaded, and kept with it as its thumbnail, in the sizes of the
+   * drive's settings that the grid and the details show.
+   */
+  pictureDocument?: (bytes: Uint8Array, size: number, type: string, quality: number) => Promise<Blob>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -214,17 +221,63 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const pages = new Map<string, DocumentPreview | null>();
   /** The first page of each Word document as its engine draws it, for thumbnails: null while it is made, an Error when it could not be. */
   const thumbs = new Map<string, HTMLElement | null | Error>();
+  /** The sizes a thumbnail is shown at, in the grid and in the details, in pixels: twice as many as it covers. */
+  const THUMB_SIZES = [320, 640];
+  /** The pictures made of a file when it goes up: of an image, in the drive's sizes; of a Word document, its first page in those the drive shows. */
+  const picturesOf = async (file: Blob & { name?: string }, images: DriveSettings['images']): Promise<MadeRendition[]> => {
+    const document = options.pictureDocument;
+    const isDocx = /\.docx$/i.test(file.name ?? '') || file.type.includes('wordprocessingml');
+    if (!isDocx) return renditionsOf(file, images);
+    if (!document || !images.enabled || file.size > PREVIEW_LIMIT) return [];
+    const sizes = [...new Set(THUMB_SIZES.map((wanted) => images.sizes.find((size) => size >= wanted) ?? images.sizes[images.sizes.length - 1]))];
+    const type = images.format === 'original' ? 'image/png' : 'image/jpeg';
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const made: MadeRendition[] = [];
+    for (const size of sizes) {
+      const blob = await document(bytes, size, type, images.quality);
+      const bitmap = await createImageBitmap(blob);
+      made.push({ blob, size, width: bitmap.width, height: bitmap.height });
+      bitmap.close();
+    }
+    return made;
+  };
+  /**
+   * The pictures of a document uploaded before they were made, made now and kept with its version, so the next
+   * time it is shown nothing is drawn. Only by who may upload to it: for anyone else, nothing is kept.
+   */
+  const keepPictures = async (file: FileEntry, bytes: ArrayBuffer) => {
+    const images = settings?.settings.images;
+    if (!options.pictureDocument || !images?.enabled) return;
+    try {
+      const version = file.versions[0].id;
+      const made = await picturesOf(Object.assign(new Blob([bytes], { type: file.type }), { name: file.name }), images);
+      for (const picture of made) await client.upload(picture.blob, { rendition: { file: file.id, version, size: picture.size, width: picture.width, height: picture.height } });
+      if (made.length) changed();
+    } catch {
+      // Not theirs to change, or the storage refused: it is drawn each time, as before.
+    }
+  };
   /** The first page of a document, small, made once for each version; undefined where there is no way to make it. */
-  const docThumb = (file: FileEntry, fit: 'page' | 'width'): Child | undefined => {
+  const docThumb = (file: FileEntry, fit: 'page' | 'width', wanted = 640): Child | undefined => {
+    if (kindOf(file) !== 'docx') return undefined;
+    // The picture made of its first page when it was uploaded, when there is one: nothing to draw.
+    if (file.versions[0].renditions?.length) {
+      const src = urlOf(file, wanted);
+      return h('div', { key: `pic:${file.id}:${fit}`, class: `rf-doc-thumb rf-fit-${fit}`, 'aria-hidden': 'true' }, src && h('img', { class: 'rf-doc-pic', src, alt: '' }));
+    }
     const make = options.thumbDocument;
-    if (!make || kindOf(file) !== 'docx' || file.versions[0].size > PREVIEW_LIMIT) return undefined;
+    if (!make || file.versions[0].size > PREVIEW_LIMIT) return undefined;
     const key = `${file.id}:${file.versions[0].id}`;
     const url = urlOf(file);
     if (url && !thumbs.has(key)) {
       thumbs.set(key, null);
       fetch(url)
         .then((answer) => answer.arrayBuffer())
-        .then((bytes) => make(new Uint8Array(bytes)))
+        .then(async (bytes) => {
+          const page = await make(new Uint8Array(bytes));
+          void keepPictures(file, bytes);
+          return page;
+        })
         .then(
           (page) => (thumbs.set(key, page), render()),
           (error: Error) => (thumbs.set(key, error), render()),
@@ -407,7 +460,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           set(id, { state: 'sending', error: undefined, retry: undefined });
           const before = selected;
           try {
-            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: settings?.settings.images });
+            const entry = await client.upload(file, { parent, onProgress: ({ sent }) => set(id, { sent }), images: settings?.settings.images, renditions: picturesOf });
             set(id, { state: 'done', sent: file.size });
             // Shown once it is up, unless the person picked something else meanwhile.
             if (selected === before && picked.size <= 1 && !viewing) select(entry.id);
@@ -645,7 +698,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   'div',
                   { class: `rf-thumb rf-k-${kind}` },
                   tick(entry),
-                  url ? h('img', { src: url, alt: '', loading: 'lazy' }) : (entry.kind === 'file' && docThumb(entry, 'width')) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
+                  url ? h('img', { src: url, alt: '', loading: 'lazy' }) : (entry.kind === 'file' && docThumb(entry, 'width', 320)) || icon(entry.kind === 'folder' ? 'folder' : 'doc', 34),
                 ),
                 h('div', { class: 'rf-name' }, tile(entry), h('span', null, entry.name)),
               );

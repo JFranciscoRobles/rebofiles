@@ -152,6 +152,8 @@ export const CSS = `
 .rf-details h2 { margin: 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
 .rf-none { padding: 24px 16px; color: var(--rf-muted); }
 .rf-doc-thumb { position: absolute; inset: 0; overflow: hidden; background: #fff; }
+.rf-doc-pic { position: absolute; left: -12.5%; top: -4%; width: 125%; height: auto; }
+.rf-fit-page .rf-doc-pic { left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; }
 .rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
 .rf-thumb .rf-doc-thumb { inset: 8px 10px 0; border-radius: 6px 6px 0 0; }
 .rf-preview.rf-preview-doc { position: relative; height: 240px; }

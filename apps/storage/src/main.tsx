@@ -6,7 +6,7 @@
 // them, the drive's settings say.
 
 import { DriveProvider, FileDrive } from '@rebofiles/react';
-import { previewDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { pictureOfDocx, previewDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -16,7 +16,14 @@ const lang = params.get('lang');
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <DriveProvider base="/api/files" language={lang === 'es' || lang === 'en' ? lang : undefined}>
-      <FileDrive title="Bucket" defaultView={params.get('view') === 'grid' ? 'grid' : 'list'} previewDocument={previewDocx} viewDocument={viewDocx} thumbDocument={thumbDocx} />
+      <FileDrive
+        title="Bucket"
+        defaultView={params.get('view') === 'grid' ? 'grid' : 'list'}
+        previewDocument={previewDocx}
+        viewDocument={viewDocx}
+        thumbDocument={thumbDocx}
+        pictureDocument={pictureOfDocx}
+      />
     </DriveProvider>
   </StrictMode>,
 );

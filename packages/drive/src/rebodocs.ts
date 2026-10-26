@@ -140,3 +140,59 @@ export function thumbDocx(bytes: Uint8Array): Promise<HTMLElement> {
   making = made.catch(() => undefined);
   return made;
 }
+
+/** A blob as a data address, for what is drawn inside a picture, which may load nothing from elsewhere. */
+const dataUrl = (blob: Blob) =>
+  new Promise<string>((done, fail) => {
+    const reader = new FileReader();
+    reader.onload = () => done(String(reader.result));
+    reader.onerror = () => fail(reader.error);
+    reader.readAsDataURL(blob);
+  });
+
+/**
+ * The first page of a Word document as a picture, its longest side `size` pixels: what Rebodocs' editor draws,
+ * put in an SVG with the editor's stylesheet and drawn on a canvas. Its pictures go in it; a font the document
+ * carries is drawn in the one of the system nearest it. JPEG, or PNG when `type` says.
+ */
+export async function pictureOfDocx(bytes: Uint8Array, size: number, type = 'image/jpeg', quality = 0.85): Promise<Blob> {
+  const shell = await thumbDocx(bytes);
+  const width = Number(shell.dataset.width) || 816;
+  const height = Number(shell.dataset.height) || 1056;
+  // Its pictures as data, and anything drawn on a canvas as a picture: an SVG drawn as a picture reaches nothing outside.
+  for (const img of shell.querySelectorAll('img')) {
+    try {
+      img.src = await dataUrl(await (await fetch(img.src)).blob());
+    } catch {
+      img.remove();
+    }
+  }
+  for (const canvas of shell.querySelectorAll('canvas')) {
+    const img = document.createElement('img');
+    img.src = canvas.toDataURL();
+    img.style.cssText = canvas.style.cssText;
+    img.width = canvas.width;
+    canvas.replaceWith(img);
+  }
+  const css = [...document.querySelectorAll('style')]
+    .map((style) => style.textContent ?? '')
+    .filter((text) => text.includes('.dx-'))
+    .join('\n');
+  const page = shell.querySelector<HTMLElement>('.dx-page');
+  if (page) page.style.cssText += ';position:absolute;left:0;top:0;margin:0;box-shadow:none;transform:none';
+  const xhtml = new XMLSerializer().serializeToString(shell);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject x="0" y="0" width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;background:#fff;position:relative"><style>${css.replace(/]]>/g, '')}</style>${xhtml}</div></foreignObject></svg>`;
+  const picture = new Image();
+  picture.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await picture.decode();
+  const scale = size / Math.max(width, height);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext('2d')!;
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(picture, 0, 0, canvas.width, canvas.height);
+  return new Promise((done, fail) => canvas.toBlob((blob) => (blob ? done(blob) : fail(new Error('The page could not be drawn.'))), type, quality));
+}
