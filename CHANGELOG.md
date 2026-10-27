@@ -4,6 +4,18 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## 0.8.0 — 2026-10-27
+
+### Added
+
+- **Who is who.** `people: { search, names }` of the server: your directory,
+  for the field where something is shared to suggest people and groups as one
+  types (by name, by email, without accents), chosen with the arrows and
+  Enter or a click; and for the drive to show their names where it showed
+  ids: owners, shares, comments, activity. `GET /people?q=` and
+  `POST /people/names`; `client.people(query)` and `client.names(ids)`.
+  Without it, ids are shown and taken as typed, as before.
+
 ## 0.7.0 — 2026-10-27
 
 The first version on npm.

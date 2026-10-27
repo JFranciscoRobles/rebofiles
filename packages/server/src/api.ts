@@ -32,6 +32,8 @@
 //   GET    /info                          where the bytes are, as a person reads it
 //   GET    /usage                         the bytes the one asking keeps, and how many they may
 //   GET    /settings                      the drive's settings, the one asking's own, and whether they may change the drive's
+//   GET    /people?q=                     who matches what is typed, to share with (with `people`)
+//   POST   /people/names                  { ids }: how each of them is called (with `people.names`)
 //   PUT    /settings                      the drive's, for whoever may 'configure'
 //   PUT    /settings/mine                 { language, theme }: one's own
 //   GET    /entries/:id/activity?limit=   what was done to it, and in it of a folder, the newest first
@@ -122,6 +124,14 @@ export interface User {
   groups?: readonly string[];
 }
 
+/** Someone found to share with: a person by their id, or a group as `group:<id>`, and how they are called. */
+export interface Someone {
+  id: string;
+  name: string;
+  /** Said under the name: an email, a team. */
+  detail?: string;
+}
+
 export interface DriveServerOptions {
   storage: Storage;
   metadata: MetadataStore;
@@ -205,6 +215,17 @@ export interface DriveServerOptions {
    * the drive `days` before (15), and to `onExpiring`. `false` for none.
    */
   expiring?: false | { field?: string; days?: number; onExpiring?: (event: { entry: Entry; expires: string; days: number }) => void | Promise<void> };
+  /**
+   * Who is who, from the application: the people and groups (`group:sales`) that match what is typed where an entry is
+   * shared, and how each is called, for the drive to show names where it would show ids. Without it, the drive shows
+   * the ids and takes the one typed as it is.
+   */
+  people?: {
+    /** At most ten, the best first, of whoever may be shared with by `user`. */
+    search(query: string, user: User): Someone[] | Promise<Someone[]>;
+    /** The name of each of these ids, people's and `group:` ones; one not known left out. */
+    names?(ids: string[], user: User): Record<string, string> | Promise<Record<string, string>>;
+  };
   /**
    * A file that came through a request with the same bytes as one its owner has already, marked with the field `same`
    * (the id of that one), to be told in what came: by the SHA-256 the page of the link says. `false` for none.
@@ -1066,6 +1087,28 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           return Response.json({ used: core.usageOf(drive, user.id), quota: (await driveSettings()).quota });
         }
 
+        case 'GET /people': {
+          // Who matches what is typed, to share with: the application's to say.
+          if (!options.people) throw new Refused(404, 'no-people', 'This drive does not look people up.');
+          const query = (url.searchParams.get('q') ?? '').trim().slice(0, 100);
+          if (!query) return Response.json({ people: [] });
+          const found = await options.people.search(query, user);
+          return Response.json({
+            people: found
+              .filter((one) => typeof one?.id === 'string' && typeof one.name === 'string')
+              .slice(0, 10)
+              .map((one) => ({ id: one.id, name: one.name, ...(one.detail ? { detail: one.detail } : {}) })),
+          });
+        }
+        case 'POST /people/names': {
+          const asked = await body<{ ids?: unknown }>();
+          const ids = [...new Set((Array.isArray(asked.ids) ? asked.ids : []).filter((id): id is string => typeof id === 'string' && id.length <= 320))].slice(0, 200);
+          if (!options.people?.names || !ids.length) return Response.json({ names: {} });
+          const said = await options.people.names(ids, user);
+          const names: Record<string, string> = {};
+          for (const id of ids) if (typeof said[id] === 'string' && said[id]) names[id] = said[id].slice(0, 200);
+          return Response.json({ names });
+        }
         case 'GET /settings': {
           const drive = await load({});
           const kept = await getSetting('drive');
@@ -1078,7 +1121,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             canConfigure: await may(user, 'configure', null, drive),
             saved: kept !== undefined || options.settings !== undefined,
             you: user.id,
-            can: { remind: !!options.reminders, expiring: options.expiring !== false },
+            can: { remind: !!options.reminders, expiring: options.expiring !== false, people: !!options.people },
           });
         }
 

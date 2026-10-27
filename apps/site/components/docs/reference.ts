@@ -142,6 +142,8 @@ export const CLIENT: Method[] = [
     does: 'With someone, or everyone signed in as `*`, as viewer, commenter or editor; for `days`, for good with null, as before unless said.',
   },
   { group: 'Sharing', name: 'unshare', signature: 'unshare(id, who)', does: 'No longer; anyone may leave what was shared with them.' },
+  { group: 'Sharing', name: 'people', signature: 'people(query)', does: 'Who matches what is typed, people and groups, as the application finds them (`people` of the server).' },
+  { group: 'Sharing', name: 'names', signature: 'names(ids)', does: 'How each of these is called, people and `group:` ids; one not known left out.' },
   {
     group: 'Sharing',
     name: 'createLink',
@@ -251,6 +253,11 @@ export const SERVER_OPTIONS: ServerOption[] = [
   },
   { name: 'check', type: 'false | ({ entry, item, text }) => …', does: 'What is written in what came, against the `words` and `find` of its document: `checkWritten` unless yours; `false` for none.' },
   { name: 'expiring', type: 'false | { field, days, onExpiring }', does: 'The owner of a file whose field `expires` comes within `days` (15) told in the bell, and `onExpiring`; `false` for none.' },
+  {
+    name: 'people',
+    type: '{ search(query, user), names?(ids, user) }',
+    does: 'Who is who, from your directory: the people and groups that match what is typed where something is shared, and their names, shown in place of ids.',
+  },
   { name: 'logger', type: 'Logger', does: 'Where what went wrong and was not answered for is written: `pino()`, `console` unless given.' },
   { name: 'onRequest', type: '(done) => void', does: 'After every request, its route, status, time and who: for metrics, as `openTelemetry(meter)`.' },
   { name: 'limits', type: 'Limits | false', does: 'How many uploads, archives, text searches, wrong passwords of a link and requests each may make; a 429 past them.' },

@@ -176,7 +176,14 @@ export interface SettingsAnswer {
   /** Who is asking, as the server identified them: whose comments are their own. */
   you?: string;
   /** What the server does besides: remind whom a request was sent to, tell what stops being good. */
-  can?: { remind?: boolean; expiring?: boolean };
+  can?: { remind?: boolean; expiring?: boolean; people?: boolean };
+}
+
+/** Someone to share with, as the application finds them: a person, or a group as `group:<id>`. */
+export interface Someone {
+  id: string;
+  name: string;
+  detail?: string;
 }
 
 interface Part {
@@ -389,6 +396,10 @@ export function createDriveClient(options: ClientOptions) {
     searchText: async (query: string, limit = 50) =>
       (await ask<{ results: TextFound[] }>('GET', `/search/text?q=${encodeURIComponent(query)}&limit=${limit}`).catch(() => ({ results: [] as TextFound[] }))).results,
     /** The files with these bytes already in the drive, of what the one asking may read, by their SHA-256; none from a server without the route. */
+    /** Who matches what is typed, to share with, when the server is given `people`. */
+    people: async (query: string) => (await ask<{ people: Someone[] }>('GET', `/people?q=${encodeURIComponent(query)}`)).people,
+    /** How each of these is called, people's ids and `group:` ones; one not known left out. */
+    names: async (ids: string[]) => (ids.length ? (await ask<{ names: Record<string, string> }>('POST', '/people/names', { ids })).names : {}),
     duplicates: async (hashes: string[]) =>
       hashes.length ? (await ask<{ found: Record<string, Entry[]> }>('POST', '/duplicates', { hashes }).catch(() => ({ found: {} as Record<string, Entry[]> }))).found : {},
     /** How many of what is shared with the one asking is new since they last looked; 0 from a server without the route. */

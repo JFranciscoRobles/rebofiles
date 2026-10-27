@@ -29,6 +29,7 @@ export {
   type LinkClient,
   type LinkListing,
   type SettingsAnswer,
+  type Someone,
   type MemoryOptions,
   type MemoryClient,
   type Texts,

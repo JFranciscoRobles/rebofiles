@@ -1,7 +1,7 @@
 // What @rebofiles/server promises: the routes, the storages of the bytes, the
 // stores of the metadata, and how to put them on `node:http`.
 
-export { type Action, type User, type DriveServerOptions, type DriveEvent, type DriveHandler, createDriveHandler, everyone, byRoles, routeOf } from './api';
+export { type Action, type User, type Someone, type DriveServerOptions, type DriveEvent, type DriveHandler, createDriveHandler, everyone, byRoles, routeOf } from './api';
 export { type Mail, type SendMail, type Reminder, resend, reminderMail, mailReminders } from './mail';
 export { type WebhookBody, type WebhookOptions, everyChange, verifyWebhook, webhook } from './webhooks';
 export { type Logger, type RequestDone, type MeterLike, type Limit, type Limits, type Limiter, DEFAULT_LIMITS, consoleLogger, memoryLimiter, openTelemetry } from './observe';

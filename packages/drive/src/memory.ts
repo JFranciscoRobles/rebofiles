@@ -348,6 +348,9 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
     pack: (ids) => run(() => core.packOf(drive, ids)),
+    // No one to look up without a server: ids as they are typed.
+    people: async () => [],
+    names: async () => ({}),
     duplicates: async (hashes) => {
       const found: Record<string, Entry[]> = {};
       for (const [hash, files] of core.filesByHash(drive, hashes)) found[hash] = files;

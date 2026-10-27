@@ -783,6 +783,11 @@ ${Object.keys(FOLDERS)
   .rf-link-rows .rf-row > :nth-child(3) { display: revert; }
 }
 /* On a phone: the sections in a bar at the foot, a button that floats to add, what is chosen in a sheet from below. */
+.rf-who-found { list-style: none; margin: -6px 0 0; padding: 4px; border: 1px solid var(--rf-border); border-radius: 12px; background: var(--rf-bg); box-shadow: var(--rf-shadow-menu); max-height: 240px; overflow-y: auto; }
+.rf-who-found li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.rf-who-found li:hover, .rf-who-found li[aria-selected='true'] { background: var(--rf-hover); }
+.rf-who-found .rf-grow { display: flex; flex-direction: column; min-width: 0; }
+.rf-who-found small { color: var(--rf-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-sheet-grip, .rf-sheet-x, .rf-nav-short { display: none; }
 @media (max-width: 640px) {
   .rf-top { gap: 6px; padding: 10px 12px 6px; border-bottom: 0; }

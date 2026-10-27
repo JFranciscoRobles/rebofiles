@@ -11,6 +11,7 @@ export {
   type UploadProgress,
   type UploadMemory,
   type SettingsAnswer,
+  type Someone,
   type FileAddress,
   type TextFound,
   type LinkClient,

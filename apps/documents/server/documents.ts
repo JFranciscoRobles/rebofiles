@@ -81,6 +81,15 @@ const TEMPLATES = [
   },
 ];
 
+/** Who works here, as the application's own directory would say: to share with by name, and to show their names. */
+const PEOPLE = [
+  { id: 'carla', name: 'Carla Ruiz', detail: 'carla@acme.test' },
+  { id: 'beto', name: 'Beto Díaz', detail: 'beto@acme.test' },
+  { id: 'group:legal', name: 'Jurídico', detail: 'Equipo' },
+  { id: 'group:sales', name: 'Ventas', detail: 'Equipo' },
+];
+const plainText = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 export const handle = createDriveHandler({
   storage,
   metadata,
@@ -97,6 +106,10 @@ export const handle = createDriveHandler({
   onShare: ({ entry, with: who, role, by, first }) => console.log(`[share] ${by.id} ${first ? 'shared' : 'changed'} “${entry.name}” with ${who} as ${role}`),
   onComment: ({ entry, mentions, by }) => {
     if (mentions.length) console.log(`[comment] ${by.id} named ${mentions.join(', ')} on “${entry.name}”`);
+  },
+  people: {
+    search: (query) => PEOPLE.filter((one) => [one.name, one.detail, one.id].some((said) => plainText(said).includes(plainText(query)))),
+    names: (ids) => Object.fromEntries(PEOPLE.filter((one) => ids.includes(one.id)).map((one) => [one.id, one.name])),
   },
   settings: { company: 'Acme', requestTemplates: TEMPLATES },
   // Reminders, every so many days a request says, and at once from the drive: kept here, as a mail service would send them.

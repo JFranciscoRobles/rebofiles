@@ -35,7 +35,7 @@ import {
   versionNumber,
 } from '@rebofiles/core';
 import { refusalText } from './refusals';
-import { type DriveClient, RequestError, type SettingsAnswer, createDriveClient } from './client';
+import { type DriveClient, RequestError, type SettingsAnswer, type Someone, createDriveClient } from './client';
 import { brandStyle, contrastOnWhite } from './brand';
 import { type Child, first, h, morph } from './dom';
 import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator } from './i18n';
@@ -209,7 +209,21 @@ type Dialog =
   | { kind: 'review'; entry: FileEntry; reason: string }
   | { kind: 'rename'; entry: Entry; name: string }
   | { kind: 'move'; entries: Entry[]; at: EntryId | null }
-  | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean; lasts?: number; viewOnly?: boolean; watermark?: boolean }
+  | {
+      kind: 'share';
+      entry: Entry;
+      who: string;
+      role: Role;
+      days?: number;
+      password?: string;
+      once?: boolean;
+      lasts?: number;
+      viewOnly?: boolean;
+      watermark?: boolean;
+      /** Who matches what is typed, as the application found them; and the one of them chosen by the arrows. */
+      found?: Someone[];
+      pick?: number;
+    }
   | { kind: 'delete'; entries: Entry[] }
   | { kind: 'empty' }
   | null;
@@ -1099,7 +1113,37 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   };
   /** Who a share names, as a person reads it: everyone, a group by its name, or someone by their id. */
-  const whoName = (who: string) => (who === EVERYONE ? t('everyone') : isGroup(who) ? t('groupNamed', { name: who.slice(6) }) : who.startsWith('link:') ? t('throughLink') : who);
+  /**
+   * How each person and group is called, as the application says (`people.names` of the server): asked for as they
+   * are shown, those of one drawing together, and kept. Their id until it answers, or if it does not know them.
+   */
+  const peopleNames = new Map<string, string>();
+  /** The lookup of who matches what is typed where an entry is shared, waiting for the keys to stop. */
+  let lookingUp: ReturnType<typeof setTimeout> | undefined;
+  const toName = new Set<string>();
+  let namingTimer: ReturnType<typeof setTimeout> | undefined;
+  const askName = (who: string) => {
+    if (!settings?.can?.people || peopleNames.has(who) || toName.has(who)) return;
+    toName.add(who);
+    clearTimeout(namingTimer);
+    namingTimer = setTimeout(() => {
+      const ids = [...toName];
+      void client
+        .names(ids)
+        .catch(() => ({}) as Record<string, string>)
+        .then((names) => {
+          for (const id of ids) peopleNames.set(id, names[id] ?? id), toName.delete(id);
+          if (alive && ids.some((id) => names[id])) render();
+        });
+    }, 20);
+  };
+  const whoName = (who: string) => {
+    if (who === EVERYONE) return t('everyone');
+    if (who.startsWith('link:')) return t('throughLink');
+    askName(who);
+    const name = peopleNames.get(who);
+    return isGroup(who) ? t('groupNamed', { name: name && name !== who ? name : who.slice(6) }) : (name ?? who);
+  };
   const roleName = (role: Role) => t(role === 'viewer' ? 'roleViewer' : role === 'commenter' ? 'roleCommenter' : 'roleEditor');
   /** A kind as a person reads it, for putting entries of one kind together. */
   const typeLabel = (entry: Entry) => (entry.kind === 'folder' ? t('folder') : typeName(entry));
@@ -1404,7 +1448,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                       h('span', { class: 'rf-avatar rf-avatar-small', 'aria-hidden': 'true' }, entry.fields.from.slice(0, 1).toUpperCase()),
                       entry.fields.from,
                     )
-                  : h('span', null, entry.owner),
+                  : h('span', null, whoName(entry.owner)),
                 h('span', null, formatDate(entry.modified, locale)),
                 h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
               ),
@@ -1835,7 +1879,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   row(t('type'), file ? typeName(file) : t('folder'), file?.type),
                   file && row(t('size'), formatSize(file.versions[0].size, locale)),
                   !file && !inTrash && row(t('folderColor'), swatches([entry as FolderEntry], 'radio')),
-                  row(t('owner'), entry.owner),
+                  row(t('owner'), whoName(entry.owner)),
                   entry.hold ? row(t('onHold'), t('onHoldHint', { by: entry.hold.by }), entry.hold.reason) : null,
                   entry.shares?.length
                     ? row(
@@ -1901,7 +1945,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       return h(
         'li',
         { key: comment.id, class: `rf-comment${top ? '' : ' rf-reply'}${comment.resolved ? ' rf-resolved' : ''}` },
-        h('div', { class: 'rf-comment-head' }, h('strong', null, comment.by), h('small', null, `${formatDate(comment.at, locale)}${comment.edited ? ` · ${t('edited')}` : ''}`)),
+        h('div', { class: 'rf-comment-head' }, h('strong', null, whoName(comment.by)), h('small', null, `${formatDate(comment.at, locale)}${comment.edited ? ` · ${t('edited')}` : ''}`)),
         isEditing
           ? h(
               'form',
@@ -2005,7 +2049,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
   const activityText = (a: Activity) => {
-    const by = a.by === 'trash' ? t('theTrash') : a.by.startsWith('link:') ? t('throughLink') : a.by;
+    const by = a.by === 'trash' ? t('theTrash') : whoName(a.by);
     const values = { by, name: a.name, was: a.was ?? '', with: a.with ? whoName(a.with) : '', role: a.role ? roleName(a.role) : '' };
     const key = (
       {
@@ -3262,15 +3306,43 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   /** Who an entry is shared with and as what, and its links: each change made at once, the dialog staying open. */
-  function shareDialog(of: Entry, who: string, role: Role, made: { days?: number; password?: string; once?: boolean; lasts?: number; viewOnly?: boolean; watermark?: boolean } = {}) {
+  function shareDialog(
+    of: Entry,
+    who: string,
+    role: Role,
+    made: { days?: number; password?: string; once?: boolean; lasts?: number; viewOnly?: boolean; watermark?: boolean; found?: Someone[]; pick?: number } = {},
+  ) {
     const found = detail(of.id);
     const entry = found.current && found.value ? found.value.entry : of;
     const label = t('shareTitle', { name: of.name });
     const address = options.linkAddress ?? defaultAddress;
     const copy = async (token: string) => navigator.clipboard.writeText(address(token));
-    const setShare = (change: Partial<{ who: string; role: Role; days: number; password: string; once: boolean; lasts: number; viewOnly: boolean; watermark: boolean }>) => {
+    const setShare = (
+      change: Partial<{ who: string; role: Role; days: number; password: string; once: boolean; lasts: number; viewOnly: boolean; watermark: boolean; found: Someone[]; pick: number }>,
+    ) => {
       if (dialog?.kind === 'share') Object.assign(dialog, change);
       render();
+    };
+    const lookingFor = Boolean(settings?.can?.people);
+    const matches = made.found ?? [];
+    /** Who matches what is typed, asked a moment after the last key. */
+    const lookUp = (typed: string) => {
+      clearTimeout(lookingUp);
+      if (!typed.trim()) return;
+      lookingUp = setTimeout(
+        () =>
+          void client.people(typed.trim()).then(
+            (people) => dialog?.kind === 'share' && dialog.who === typed && setShare({ found: people, pick: people.length ? 0 : undefined }),
+            () => undefined,
+          ),
+        150,
+      );
+    };
+    /** One of those found, shared with: called as the application calls them from then on. */
+    const pickPerson = (one: Someone) => {
+      peopleNames.set(one.id, one.name);
+      setShare({ who: '', found: undefined, pick: undefined });
+      void attempt(() => client.share(of.id, one.id, role, made.lasts || null), t('shared', { who: one.name }));
     };
     // Emptied once shared, unless the next one was typed meanwhile.
     const add = (user: string) =>
@@ -3323,11 +3395,41 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           { class: 'rf-share-add' },
           h('input', {
             type: 'text',
-            'aria-label': t('addPerson'),
+            'aria-label': lookingFor ? t('addSomeone') : t('addPerson'),
             'aria-describedby': `${prefix}-who-hint`,
-            placeholder: t('addPerson'),
+            placeholder: lookingFor ? t('addSomeone') : t('addPerson'),
             value: who,
-            onInput: (event: Event) => setShare({ who: (event.target as HTMLInputElement).value }),
+            // Who matches what is typed, when the application looks people up: chosen by the arrows and Enter, or a click.
+            ...(lookingFor
+              ? {
+                  role: 'combobox',
+                  autocomplete: 'off',
+                  'aria-autocomplete': 'list',
+                  'aria-expanded': Boolean(matches.length),
+                  'aria-controls': `${prefix}-who-found`,
+                  'aria-activedescendant': matches.length && made.pick !== undefined ? `${prefix}-who-${made.pick}` : undefined,
+                }
+              : {}),
+            onInput: (event: Event) => {
+              const typed = (event.target as HTMLInputElement).value;
+              setShare({ who: typed, ...(typed.trim() ? {} : { found: undefined, pick: undefined }) });
+              if (lookingFor) lookUp(typed);
+            },
+            onKeydown: (event: KeyboardEvent) => {
+              if (!matches.length) return;
+              const at = made.pick ?? -1;
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                setShare({ pick: (at + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length });
+              } else if (event.key === 'Enter' && made.pick !== undefined) {
+                event.preventDefault();
+                pickPerson(matches[made.pick]);
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                setShare({ found: undefined, pick: undefined });
+              }
+            },
           }),
           roles(role, (next) => setShare({ role: next }), t('role')),
           h(
@@ -3337,7 +3439,28 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           ),
           h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: !who.trim() }, t('share')),
         ),
-        h('p', { class: 'rf-hint', id: `${prefix}-who-hint` }, t('addPersonHint')),
+        matches.length > 0 &&
+          h(
+            'ul',
+            { id: `${prefix}-who-found`, class: 'rf-who-found', role: 'listbox', 'aria-label': t('addSomeone') },
+            matches.map((one, i) =>
+              h(
+                'li',
+                {
+                  key: one.id,
+                  id: `${prefix}-who-${i}`,
+                  role: 'option',
+                  'aria-selected': i === made.pick,
+                  // The focus stays in the field.
+                  onMousedown: (event: MouseEvent) => event.preventDefault(),
+                  onClick: () => pickPerson(one),
+                },
+                h('span', { class: 'rf-avatar rf-avatar-small', 'aria-hidden': 'true' }, isGroup(one.id) ? icon('users', 12) : one.name.slice(0, 1).toUpperCase()),
+                h('span', { class: 'rf-grow' }, one.name, one.detail && h('small', null, one.detail)),
+              ),
+            ),
+          ),
+        h('p', { class: 'rf-hint', id: `${prefix}-who-hint` }, lookingFor ? t('addPersonHintPeople') : t('addPersonHint')),
         !entry.shares?.some((s) => s.with === EVERYONE) && button(`+ ${t('everyone')} · ${roleName(role)}`, () => void add(EVERYONE), { class: 'rf-link' }),
         h('h3', { class: 'rf-sub' }, t('links')),
         entry.links?.length
@@ -3727,7 +3850,12 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         { class: 'rf-view-bar' },
         button(icon('back', 18), closeView, { class: 'rf-btn rf-icon', 'aria-label': t('backToDrive'), title: t('backToDrive') }),
         h('span', { class: `rf-tile rf-k-${kind}`, 'aria-hidden': 'true' }, badgeOf(file)),
-        h('div', { class: 'rf-view-title' }, h('strong', null, file.name), h('span', null, `${formatSize(file.versions[0].size, locale)} · ${formatDate(file.modified, locale)} · ${file.modifiedBy}`)),
+        h(
+          'div',
+          { class: 'rf-view-title' },
+          h('strong', null, file.name),
+          h('span', null, `${formatSize(file.versions[0].size, locale)} · ${formatDate(file.modified, locale)} · ${whoName(file.modifiedBy)}`),
+        ),
         files.length > 1 && h('span', { class: 'rf-view-count', 'aria-live': 'polite' }, t('nOfM', { n: at + 1, m: files.length })),
         options.onOpenDocument &&
           kind === 'docx' &&

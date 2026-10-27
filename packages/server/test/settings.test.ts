@@ -47,7 +47,7 @@ describe('the settings', () => {
       canConfigure: false,
       saved: false,
       you: 'bea',
-      can: { remind: false, expiring: true },
+      can: { remind: false, expiring: true, people: false },
     });
     expect((await ana.ask('GET', '/api/files/settings')).body.canConfigure).toBe(true);
 

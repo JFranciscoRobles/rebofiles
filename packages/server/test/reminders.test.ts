@@ -82,7 +82,7 @@ describe.each([
 ])('reminders, %s', (_, store) => {
   it('remind whom a request was sent to every so many days, of what is still missing, until it has it all', async () => {
     const { ana, guest, sent, later, handle } = drive({ metadata: await store() });
-    expect((await ana.settings()).can).toEqual({ remind: true, expiring: true });
+    expect((await ana.settings()).can).toEqual({ remind: true, expiring: true, people: false });
     const box = await ana.createFolder('Northwind', null);
     const { token } = await ana.createLink(box.id, 30, {
       uploads: 'only',

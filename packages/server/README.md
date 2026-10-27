@@ -162,6 +162,15 @@ counted on it (`got`), closed when all came if it says so. `onReceived`,
 `PUT /entries/:id/review` and `onReview`, `GET /received`, `GET /requests`
 and `GET /admin/requests` for reminders.
 
+## Who is who
+
+`people: { search(query, user), names?(ids, user) }` is your directory: the
+people and groups (`group:sales`) that match what is typed where something
+is shared, at most ten, and how each is called. The drive shows their names
+where it would show ids, and the field to share with suggests them as one
+types (`GET /people?q=`, `POST /people/names`). Without it, ids are shown and
+taken as typed.
+
 ## Reminders, checks, what stops being good
 
 `reminders: mailReminders({ mail: resend({ apiKey, from }), url: (token) =>
