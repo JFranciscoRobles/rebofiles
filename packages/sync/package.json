@@ -1,6 +1,6 @@
 {
   "name": "@rebofiles/sync",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "description": "A folder of the disk kept as a folder of the drive, both ways: changes sent and taken, conflicts kept twice, moves followed. The engine runs anywhere; on Node, a folder and a command that keeps it.",
   "license": "MIT",
   "private": true,
@@ -13,8 +13,8 @@
     "rebofiles-sync": "./src/bin.ts"
   },
   "dependencies": {
-    "@rebofiles/core": "0.1.0",
-    "@rebofiles/drive": "0.1.0"
+    "@rebofiles/core": "0.7.0",
+    "@rebofiles/drive": "0.7.0"
   },
   "scripts": {
     "build": "node scripts/build.mjs"

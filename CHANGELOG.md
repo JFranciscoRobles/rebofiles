@@ -4,9 +4,31 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
-## Unreleased
+## 0.7.0 — 2026-10-27
+
+The first version on npm.
 
 ### Added
+
+- **Details asked besides files.** A request may ask its sender to write
+  something (`questions`: an RFC, an address), each needed or not; what they
+  write goes with each file and is kept as a field of it, and of their folder
+  with `perSender`. The page of the link asks it before anything goes, and the
+  server refuses a file without what is needed (`answers-missing`).
+- **The same file, come again.** A file that comes through a request with the
+  same bytes as one its owner has already is marked with the field `same`, and
+  Received says “You had it already”, a tap away from the one before.
+  `duplicates: false` of the server for none.
+- **Links only to see.** `viewOnly` on a link: what it shares is shown in its
+  page, and nothing is downloaded through it, one file or a .zip. `watermark`:
+  who opens it says their name first, shown across what they see with the day,
+  and kept on the link (`views`, the last 50), shown in the dialog of sharing.
+  Both offered when a link is made, unless `viewOnlyLinks: false`. They keep
+  honest people honest: what is seen reaches the browser.
+- **The drive on a phone.** Up to 640 pixels wide: the sections in a bar at the
+  foot, a button that floats to add, the filters in one row, two columns of
+  cards, and what is chosen in a sheet from below, its four most used actions
+  first.
 
 - **Templates of requests.** A request kept with a name (“Supplier sign-up”)
   and started from with a click in the dialog of a request, saved from it by
@@ -598,6 +620,12 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Fixed
 
+- **The page of a link** was given the entry it shares as the drive keeps it,
+  with whom it is shared, its other links (a request's email among them) and
+  its fields. It is given the entry without them.
+- **A tap on a file of the list** chose the first of the list when the list had
+  not the focus yet: it chooses the one tapped. Coming into the list by the
+  keyboard still chooses the first.
 - **The comparison and anything else beside a Rebodocs editor in the
   viewer** stay: the viewer of a document draws in a box of its own.
 - **Open in Rebodocs, from the viewer.** The viewer is closed first: open, it
