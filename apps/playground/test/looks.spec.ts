@@ -13,7 +13,7 @@ test('a folder takes a colour from its details or its menu, and the toast takes 
   await page.getByRole('button', { name: 'Upload' }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Painted');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
 
   await item(page, 'Painted').click();
   const colours = details(page).getByRole('radiogroup', { name: 'Colour' });

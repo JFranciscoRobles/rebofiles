@@ -7,7 +7,7 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["@rebofiles/demo", "@rebofiles/desktop", "@rebofiles/playground", "@rebofiles/site", "@rebofiles/storage"],
+  "ignore": ["@rebofiles/demo", "@rebofiles/documents", "@rebofiles/desktop", "@rebofiles/playground", "@rebofiles/site", "@rebofiles/storage"],
   "privatePackages": {
     "version": true,
     "tag": false

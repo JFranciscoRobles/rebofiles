@@ -19,7 +19,7 @@ test('picked with ⌘ and Shift, moved together into a folder, and put in the tr
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Archive');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(item(page, 'Archive')).toBeVisible();
 
   await item(page, 'a.txt').click();

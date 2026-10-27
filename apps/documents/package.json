@@ -1,0 +1,20 @@
+{
+  "name": "@rebofiles/documents",
+  "version": "0.1.0",
+  "description": "Word documents made, written and read in the drive: New document, Rebodocs' editor, and its viewer.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@rebodocs/core": "^0.12.0",
+    "@rebodocs/editor": "^0.12.0",
+    "@rebodocs/react": "^0.12.0",
+    "@rebodocs/viewer": "^0.12.0",
+    "@rebofiles/core": "0.1.0",
+    "@rebofiles/react": "0.1.0",
+    "@rebofiles/server": "0.1.0"
+  }
+}

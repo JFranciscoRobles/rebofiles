@@ -100,7 +100,7 @@ test('in order by type, by when made and by colour, and with the folders among t
     await page.getByRole('button', { name: 'Upload', exact: true }).click();
     await page.getByRole('menuitem', { name: 'New folder' }).click();
     await page.getByRole('textbox', { name: 'Folder name' }).fill(name);
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(item(page, name)).toBeVisible();
     if (colour) {
       await item(page, name).click({ button: 'right' });

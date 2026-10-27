@@ -19,7 +19,7 @@ test('picked files and a folder go in one .zip, the folder with what is in it', 
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Contratos');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, 'Contratos').dblclick();
   await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles({ name: 'año.txt', mimeType: 'text/plain', buffer: Buffer.from('dentro') });
   await expect(item(page, 'año.txt')).toBeVisible();
@@ -53,7 +53,7 @@ test('a link to a folder downloads it whole as a .zip, without signing in', asyn
   await page.getByRole('button', { name: 'Upload', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Expediente');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, 'Expediente').dblclick();
   await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([
     { name: 'acta.txt', mimeType: 'text/plain', buffer: Buffer.from('Acta de entrega.') },

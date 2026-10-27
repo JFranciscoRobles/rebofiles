@@ -19,7 +19,7 @@ test('a folder made in one window is there in the other, and its new name too', 
   await one.getByRole('button', { name: 'Upload' }).click();
   await one.getByRole('menuitem', { name: 'New folder' }).click();
   await one.getByRole('textbox', { name: 'Folder name' }).fill('Arrived live');
-  await one.getByRole('button', { name: 'Create' }).click();
+  await one.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(item(two, 'Arrived live')).toBeVisible({ timeout: 5000 });
 
   await item(one, 'Arrived live').click();

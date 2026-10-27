@@ -66,7 +66,7 @@ test('a legal hold keeps a folder from the trash until it is released', async ({
   await page.getByRole('button', { name: 'Upload' }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill(name);
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, name).click();
   await details(page).getByRole('button', { name: 'Put on hold' }).click();
   await expect(details(page).getByText('On hold', { exact: true })).toBeVisible();

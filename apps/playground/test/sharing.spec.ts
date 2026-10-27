@@ -15,7 +15,7 @@ test('Ana shares a folder with Bea as an editor, and Bea finds it and puts a fil
   await page.getByRole('button', { name: 'Upload' }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Team');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
 
   await item(page, 'Team').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
@@ -102,7 +102,7 @@ test('what is newly shared is counted beside Shared with me, until it is looked 
   await page.getByRole('button', { name: 'Upload' }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('News');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, 'News').click();
   await details(page).getByRole('button', { name: 'Share' }).click();
   const dialog = page.getByRole('dialog', { name: 'Share “News”' });

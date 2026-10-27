@@ -14,6 +14,9 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 5189;
 /** The demo, on a port of its own: `DEMO` in its tests. */
 export const DEMO = 'http://localhost:5188';
+/** The documents' demo, on a port of its own and a folder made empty each time: `DOCUMENTS` in its tests. */
+export const DOCUMENTS = 'http://localhost:5187';
+const DOCUMENTS_STORAGE = join(tmpdir(), 'rebofiles-documents-tests');
 const STORAGE = join(tmpdir(), 'rebofiles-browser-tests');
 
 export default defineConfig({
@@ -38,5 +41,12 @@ export default defineConfig({
       timeout: 60_000,
     },
     { command: 'npm run dev -w @rebofiles/demo -- --port 5188', url: DEMO, reuseExistingServer: false, timeout: 60_000 },
+    {
+      command: `rm -rf "${DOCUMENTS_STORAGE}" && npm run dev -w @rebofiles/documents`,
+      env: { PORT: '5187', REBOFILES_STORAGE: DOCUMENTS_STORAGE },
+      url: DOCUMENTS,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
   ],
 });

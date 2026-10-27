@@ -3,9 +3,9 @@
 // drive without Rebodocs does not carry its engine.
 //
 //   import { previewDocx } from '@rebofiles/drive/rebodocs';
-//   mountDrive(element, { previewDocument: previewDocx, viewDocument: viewDocx });
+//   mountDrive(element, { previewDocument: previewDocx, viewDocument: viewDocx, newDocument: newDocx });
 
-import { importDocx, outline, paragraphText } from '@rebodocs/core';
+import { createDoc, exportDocx, importDocx, outline, paragraphText } from '@rebodocs/core';
 import type { ViewerLayout } from '@rebodocs/viewer';
 import type { DocumentPreview } from './kinds';
 
@@ -21,6 +21,11 @@ export function previewDocx(bytes: Uint8Array): DocumentPreview {
   const title = titlePara >= 0 ? texts[titlePara] : '';
   const paragraphs = texts.filter((text, i) => text && i !== titlePara).slice(0, SHOWN);
   return { title, paragraphs };
+}
+
+/** An empty Word document, for the drive's "New document": `mountDrive(element, { newDocument: newDocx })`. */
+export function newDocx(): Uint8Array {
+  return exportDocx(createDoc());
 }
 
 /** What is written in a Word document, a paragraph a line: for the drive to find it by (`textDocument`). */

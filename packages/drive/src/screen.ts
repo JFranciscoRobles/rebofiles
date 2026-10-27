@@ -88,6 +88,12 @@ export interface DriveOptions {
    * drive's settings that the grid and the details show.
    */
   pictureDocument?: (bytes: Uint8Array, size: number, type: string, quality: number) => Promise<Blob>;
+  /**
+   * The bytes of an empty Word document: `newDocx` of `@rebofiles/drive/rebodocs`. Given, New has "New document" and
+   * the files a "Create document" button; the one named goes into the folder one is in, and is opened with
+   * `onOpenDocument`, or else in the viewer.
+   */
+  newDocument?: () => Uint8Array | Promise<Uint8Array>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -125,6 +131,7 @@ export interface MountedDrive {
 type Section = 'files' | 'recent' | 'shared' | 'trash';
 type Dialog =
   | { kind: 'folder'; name: string }
+  | { kind: 'document'; name: string }
   | { kind: 'rename'; entry: Entry; name: string }
   | { kind: 'move'; entries: Entry[]; at: EntryId | null }
   | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean }
@@ -781,8 +788,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const selectedWhen = new Map<number, EntryId | null>();
   // The same bytes anywhere in the drive, and else a file of the same name where it goes: asked about before it goes.
   const lookIn = lookInDrive(client);
+  /** What the page makes of a file it sends, its pictures and its text, and says it made. */
+  const madeOf = (file: File) => ({
+    images: settings?.settings.images,
+    renditions: picturesOf,
+    text: (blob: Blob, name: string) => textOf(blob, name, options.textDocument),
+    madeHere: madeHere(file),
+  });
   const uploader = createUploads(client, {
-    extra: (file) => ({ images: settings?.settings.images, renditions: picturesOf, text: (blob, name) => textOf(blob, name, options.textDocument), madeHere: madeHere(file) }),
+    extra: madeOf,
     check: (file, parent) => (options.checkUploads === false ? Promise.resolve({}) : lookIn(file, parent)),
     onChange: render,
     onDone: (entry, item) => {
@@ -989,9 +1003,23 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             pick(() => ((dialog = { kind: 'folder', name: '' }), render())),
             { role: 'menuitem', tabindex: '-1' },
           ),
+          options.newDocument && button(withIcon('doc', t('newDocument'), 18), pick(newDocument), { role: 'menuitem', tabindex: '-1' }),
         ),
     ];
   }
+
+  const newDocument = () => ((dialog = { kind: 'document', name: t('untitledDocument') }), render());
+  /** An empty Word document named `name` made in `into`, and opened: in Rebodocs when the application opens documents, else in the viewer. */
+  const makeDocument = async (name: string, into: EntryId | null) => {
+    const named = /\.docx$/i.test(name) ? name : `${name}.docx`;
+    const bytes = await options.newDocument!();
+    const file = new File([bytes as BlobPart], named, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const made = await client.upload(file, { parent: into, ...madeOf(file) });
+    selected = made.id;
+    changed();
+    if (options.onOpenDocument) options.onOpenDocument(made, await client.url(made.id, { inline: true }));
+    else view(made.id);
+  };
 
   /** An entry's name, and, of one found by what is written in it, a piece of that under it. */
   const named = (entry: Entry) => {
@@ -1767,8 +1795,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             const input = field as HTMLInputElement;
             input.focus();
             // The name without its extension, as a person most often changes only that.
-            const dot = initial.lastIndexOf('.');
-            input.setSelectionRange(0, dot > 0 ? dot : initial.length);
+            const dot = input.value.lastIndexOf('.');
+            input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
           },
         }),
         actionsRow(cancel(), h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: !name.trim() || name.trim() === initial }, action)),
@@ -2669,6 +2697,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         const into = folder;
         return nameDialog(t('newFolder'), t('folderName'), '', t('create'), dialog.name, (name) => void attempt(() => client.createFolder(name, into).then((made) => (selected = made.id))));
       }
+      case 'document': {
+        const into = folder;
+        return nameDialog(t('newDocument'), t('documentName'), '', t('create'), dialog.name, (name) => void attempt(() => makeDocument(name, into)));
+      }
       case 'rename': {
         const { entry } = dialog;
         return nameDialog(t('rename'), t('newName'), entry.name, t('save'), dialog.name, async (name) => {
@@ -2860,6 +2892,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                         ),
                       ],
                 ),
+                options.newDocument && section === 'files' && !query && button(withIcon('doc', t('createDocument')), newDocument, { class: 'rf-btn rf-create-doc', 'aria-haspopup': 'dialog' }),
                 section === 'trash' && entries.length > 0 && !query && button(t('emptyTrash'), () => ((dialog = { kind: 'empty' }), render()), { class: 'rf-btn rf-danger' }),
                 h(
                   'select',

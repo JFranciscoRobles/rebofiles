@@ -11,7 +11,7 @@ test('the activity of a file and of its folder, the newest first, as it changes'
   await page.getByRole('button', { name: 'Upload' }).click();
   await page.getByRole('menuitem', { name: 'New folder' }).click();
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Log');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, 'Log').dblclick();
   await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles([{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') }]);
   await item(page, 'notes.txt').click();

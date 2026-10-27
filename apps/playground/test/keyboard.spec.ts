@@ -25,6 +25,8 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
   await page.keyboard.press('ArrowDown');
   expect(await focused(page)).toBe('New folder');
   await page.keyboard.press('ArrowDown');
+  expect(await focused(page)).toBe('New document');
+  await page.keyboard.press('ArrowDown');
   expect(await focused(page)).toBe('Upload files');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toBeHidden();
@@ -32,7 +34,9 @@ test('makes folders from the menu, goes into one, uploads, renames, moves and tr
 
   for (const name of ['Archive', 'Projects']) {
     await page.keyboard.press('Enter');
+    // New folder, one above New document at the end.
     await page.keyboard.press('End');
+    await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Enter');
     await page.keyboard.type(name);
     await page.keyboard.press('Enter');
