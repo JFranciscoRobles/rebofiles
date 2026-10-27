@@ -35,6 +35,7 @@ export const PROPS: Prop[] = [
     group: 'Look',
     does: '`false` leaves out its bar and its sections, for your application’s own around it: it drives it with `go`, `search`, `upload`, `newFolder`, `openSettings`.',
   },
+  { name: 'root', type: 'EntryId', group: 'Look', does: 'The folder it is kept in, as the files of one record of yours: it starts there, its path starts there, nothing above it.' },
   {
     name: 'onState',
     type: '(state) => void',

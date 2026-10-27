@@ -43,3 +43,22 @@ test('without its own bar and sections, driven by the application’s and tellin
   await expect(page.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(host.locator('output')).toHaveText('1 shown');
 });
+
+test('kept in a folder: it starts there, its path starts there, and nothing above it is gone to', async ({ page }) => {
+  const asked = async (method: string, path: string, data?: unknown) => (await page.request.fetch(`/api/files${path}`, { method, headers: { 'x-user': 'rooted' }, data })).json();
+  const top = (await asked('POST', '/folders', { name: `Property ${Date.now()}`, parent: null })).entry;
+  await asked('POST', '/folders', { name: 'Deeds', parent: top.id });
+  await page.goto(`/?chrome=0&as=rooted&root=${top.id}`);
+  const host = page.getByRole('region', { name: 'The application' });
+  await expect(host.getByRole('heading', { level: 1 })).toHaveText(top.name);
+  await expect(page.getByRole('option', { name: /^Deeds/ })).toBeVisible();
+
+  // Inside it, its path starts at it: no My files above.
+  await page.getByRole('option', { name: /^Deeds/ }).dblclick();
+  const crumbs = page.locator('.rf-crumbs');
+  await expect(crumbs.getByRole('button')).toHaveText([top.name, 'Deeds']);
+  await expect(crumbs.getByRole('button', { name: 'My files' })).toHaveCount(0);
+  // Its own section of files goes back to it, not to the top of the drive.
+  await host.getByRole('button', { name: 'Files' }).click();
+  await expect(host.getByRole('heading', { level: 1 })).toHaveText(top.name);
+});

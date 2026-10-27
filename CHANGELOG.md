@@ -14,6 +14,10 @@ minor version (0.x.0) may change the API; such changes are listed under
   through a link, with the folders above it. For an audit of reading, beside
   the activity of what is changed. A smaller picture for a list is not one,
   and what one may not read is not told.
+- **Kept in a folder.** `root` of the drive: the folder it starts in and is
+  kept in, as for the files of one record of yours (a client, a property). Its
+  path starts at it, nothing above it is gone to, and My files goes back to it.
+  Changed, the drive goes to the new one.
 
 ## 0.9.0 — 2026-10-27
 

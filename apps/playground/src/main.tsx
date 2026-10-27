@@ -7,7 +7,8 @@
 // of the drive comes here as `?link=…`, and shows what it reads.
 // `?retries=0` gives up a cut upload at once, for its "Try again" to be seen.
 // `?chrome=0` is the drive without its own bar and sections, inside a bar of an
-// application's (`chrome={false}`), driven by it and telling it where it is.
+// application's (`chrome={false}`), driven by it and telling it where it is;
+// `&root=<id>` keeps it in that folder, as the files of one record.
 
 import type { FileEntry } from '@rebofiles/core';
 import { type DriveControls, type DriveState, DriveProvider, FileDrive, type Section, SharedLink, createDriveClient } from '@rebofiles/react';
@@ -66,6 +67,7 @@ function Playground() {
       {bare && <HostBar controls={controls} state={state} />}
       <FileDrive
         chrome={!bare}
+        root={params.get('root') ?? undefined}
         controls={controls}
         onState={bare ? setState : undefined}
         theme={theme}

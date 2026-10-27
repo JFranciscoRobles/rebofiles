@@ -60,6 +60,10 @@ drive.openSettings();
 In React, `<FileDrive chrome={false} controls={ref} onState={setState} />`,
 with `ref = useRef<DriveControls>(null)`.
 
+`root: folderId` keeps the drive in one folder, as the files of one record of
+yours (a client, a property): it starts there, its path starts there, and
+nothing above it is gone to.
+
 The element takes the drive's height: give it one. Everything `<FileDrive>`
 takes, `mountDrive` takes: `client`, `headers`, `texts`, `logo` (a Node),
 `defaultView`, `onOpen`, `linkAddress`, `className`, `settings: false`,

@@ -136,6 +136,11 @@ export interface DriveOptions {
    * with `go`, `search`, `upload`, `newFolder` and `openSettings`, and shows where it is from `onState`.
    */
   chrome?: boolean;
+  /**
+   * The folder the drive is kept in, as for the files of one record of the application's (a client, a property): it
+   * starts there, its path starts there, and nothing above it is gone to. Its sections are still the person's own.
+   */
+  root?: EntryId;
   /** Told where the drive is each time that changes: the section, the folder, what is searched, how many, the space. */
   onState?: (state: DriveState) => void;
   className?: string;
@@ -320,7 +325,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // What is shown, as the hooks of @rebofiles/react keep it.
   let section: Section = 'files';
-  let folder: EntryId | null = null;
+  // Kept in a folder of its own, it starts there.
+  let folder: EntryId | null = options.root ?? null;
   let from: 'files' | 'shared' = 'files';
   /** The one the keyboard is on, and whose details are shown when it is the only one picked. */
   let selected: EntryId | null = null;
@@ -894,6 +900,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   };
 
   const go = (next: Section, to: EntryId | null = null) => {
+    // The top of a drive kept in a folder is that folder.
+    if (next === 'files' && to === null && options.root) to = options.root;
     if (next === 'shared' || (next === 'files' && to === null)) from = next === 'shared' ? 'shared' : 'files';
     if (next === 'shared' && freshShared) {
       freshShared = 0;
@@ -4567,6 +4575,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const { value, loading, error } = listing(key);
     const entries = arranged(value?.entries ?? []);
     const path = value?.path ?? [];
+    /** Kept in a folder, and in it: its path starts at it. */
+    const rooted = Boolean(options.root) && section === 'files' && path.some((step) => step.id === options.root);
     shownEntries = entries;
     const pickedEntries = entries.filter((entry) => picked.has(entry.id));
     const selectedEntry = pickedEntries.length > 1 ? null : (entries.find((entry) => entry.id === selected) ?? null);
@@ -4826,14 +4836,17 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   heading
                     ? h('h2', { class: 'rf-crumb', style: 'margin: 0' }, heading)
                     : [
-                        from === 'shared'
-                          ? button(t('sharedWithMe'), () => go('shared'), { class: 'rf-crumb', key: 'from-shared' })
-                          : button(t('myFiles'), () => go('files'), { class: 'rf-crumb', key: 'from-files', ...dropTarget(null) }),
-                        path.map((step) =>
+                        // Kept in a folder, its path starts at it: nothing above it.
+                        rooted
+                          ? null
+                          : from === 'shared'
+                            ? button(t('sharedWithMe'), () => go('shared'), { class: 'rf-crumb', key: 'from-shared' })
+                            : button(t('myFiles'), () => go('files'), { class: 'rf-crumb', key: 'from-files', ...dropTarget(null) }),
+                        (rooted ? path.slice(path.findIndex((step) => step.id === options.root)) : path).map((step, i) =>
                           h(
                             'span',
                             { key: step.id, style: 'display: contents' },
-                            icon('chevron', 16),
+                            (i > 0 || !rooted) && icon('chevron', 16),
                             button(step.name, () => go('files', step.id), { class: 'rf-crumb', 'aria-current': step.id === folder ? 'page' : undefined, ...dropTarget(step.id) }),
                           ),
                         ),
@@ -5046,7 +5059,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     newFolder: () => ((dialog = { kind: 'folder', name: '' }), render()),
     openSettings: () => openSettings(),
     update(next) {
+      const moved = 'root' in next && next.root !== options.root;
       options = { ...options, ...next };
+      // Kept in another folder now: there.
+      if (moved) go('files', options.root ?? null);
       retranslate();
       render();
     },
