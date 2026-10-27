@@ -450,7 +450,7 @@ const { upload } = useActions();
 
 export const NEW_DOC = `import { newDocx } from '@rebofiles/react/rebodocs';
 
-// "Create document" over the files, and "New document" in New: an empty .docx,
+// "New document" in the Upload menu: an empty .docx,
 // named by the person, in the folder they are in, and opened with onOpenDocument.
 <FileDrive base="/api/files" newDocument={newDocx} viewDocument={viewDocx} onOpenDocument={open} />`;
 

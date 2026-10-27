@@ -41,6 +41,9 @@ export interface View {
     owned(owner: string): Promise<Scope>;
     withLink(link: string): Promise<Scope>;
     withField(name: string, value: string, limit: number): Promise<Scope>;
+    /** Of a store that answers a piece at a time and cannot find them, null: there is no looking for them. */
+    withFieldUpTo(name: string, upTo: string, limit: number): Promise<Scope | null>;
+    withReminders(limit: number): Promise<Scope | null>;
   };
 }
 
@@ -101,6 +104,8 @@ export function viewOf(store: MetadataStore): View {
         return found(entry ? [entry] : []);
       },
       withField: async (name, value, limit) => (q ? found(await q.withField(name, value, limit)) : {}),
+      withFieldUpTo: async (name, upTo, limit) => (!q ? {} : q.withFieldUpTo ? found(await q.withFieldUpTo(name, upTo, limit)) : null),
+      withReminders: async (limit) => (!q ? {} : q.withReminders ? found(await q.withReminders(limit)) : null),
     },
   };
 }

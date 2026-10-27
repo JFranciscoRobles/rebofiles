@@ -367,7 +367,7 @@ export const schema: DocPage = {
           columns={['Name', 'Value']}
           code={[0]}
           rows={[
-            ['drive', '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays }: the drive’s, as whoever may configure it saved them.'],
+            ['drive', '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays, company, requestTemplates }: the drive’s, as whoever may configure it saved them.'],
             ['person:<id>', '{ language, theme }: one person’s own, over the drive’s.'],
             ['link:<link id>', '"salt:hash": the password of a link, as scrypt makes it (32 bytes, a salt of 16), never the password.'],
             ['seen-shared:<id>', 'When the person last looked at Shared with me, as ISO 8601: what is newer is new.'],

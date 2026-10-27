@@ -8,6 +8,65 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Added
 
+- **Templates of requests.** A request kept with a name (“Supplier sign-up”)
+  and started from with a click in the dialog of a request, saved from it by
+  who may configure the drive and taken out in Settings → Appearance
+  (`requestTemplates` of the drive's settings, `readTemplates` of core;
+  `requestTemplates: false` of the screen for none).
+- **A QR code of a request**, in the page of a request made, to show a
+  phone's camera or download as a PNG (`qrMatrix`, `qrSvg`, `qrPng`, with
+  nothing to install; `qr: false` for none).
+- **Reminders.** A request sent to an email reminds it every so many days
+  (`remind`) of what is still missing, while it is open, and at once with
+  “Remind now” (`POST /entries/:id/links/:link/remind`). The server's
+  `reminders` sends them: `mailReminders({ mail: resend({ apiKey, from }),
+  url })` writes a mail in the drive's language and sends it by Resend, or by
+  a function of yours; `remindersDue` and `reminded` of core.
+- **What came, checked.** A document asked may name words one of which it
+  should say (`words`) and patterns of fields to find in it (`find`): once
+  its text is known (OCR too), a file that says none is marked “Does not
+  say …” in Received and its details, and what the patterns found is kept in
+  its fields (`checkWritten` of core; the server's `check`, yours or
+  `false`). The page of a request asks to take a photo again when it looks
+  blurry (`checkBlur: false` of `mountSharedLink` for not).
+- **What stops being good.** A document asked may ask until when it is good
+  (`expires`), kept in the field `expires` of the file; its owner is told in
+  the bell 15 days before (`expiring` of the server, with `onExpiring`;
+  `GET /expiring`), Received and the details show the days left, and “Ask
+  again” makes a request of that document alone (`expiringWithin` of core).
+
+- **Requests for files that collect documents.** A request names the
+  documents it asks for, each with a place of its own in the page of the
+  link, and may close itself once all came; it may ask the name of who
+  sends, take only some kinds (`accept`), up to a size and a number, put
+  what comes in a folder for each person, name it by a pattern, and give it
+  fields of the application (`request` of a link; `readRequest`,
+  `receivedThrough`, `updateLink` of core). What came is counted on the link
+  (`got`), shown over the folder and in the dialog of requests, which is
+  written beside a preview of what whoever sends will see, and is changed,
+  closed and opened again (`PATCH /entries/:id/links/:link`).
+- **The page of a request** in the colour of the drive, with its message,
+  each document to choose a file or take photos for (made one PDF in the
+  page, `picturesToPdf`), uploads that resume, ten minutes to take one back
+  (`DELETE /links/:token/sent/:receipt`) and a receipt to keep.
+- **Received.** What came through one's requests in a place of its own, how
+  many to look at beside it; each accepted, or turned back with a reason
+  (`PUT /entries/:id/review`, `onReview`); `onReceived` for each that comes,
+  and `GET /admin/requests` for an application to remind whom a request was
+  sent to of what is missing.
+- **The head of a folder**: its name and colour, what it holds, who it is
+  shared with, Share, Request files and its options; the menu of an entry
+  in groups, with their names and its keys (F2), and a link to view.
+- **Received, by request**: to look at, accepted and returned, a request at a
+  time with what it asked and what is missing, each file accepted or turned
+  back with its reason there and then. The requests of a folder in its
+  details, nothing picked; who sent a file in the column of its owner, and
+  “Received first” to order by.
+- **The page of a request** with the name of the organisation (`company` of
+  the drive's settings), each photo of a document seen before it goes, to
+  take out the one that came out wrong, and a file dropped on a document.
+  The documents of a request put in another order in its dialog, by their
+  handle or by Alt and the arrows.
 - **A copy of a file.** Make a copy, in its menu and its details: a file of
   its own beside it ("(2)"), its bytes copied in the storage under a key of
   its own (`copy` of a storage: S3's CopyObject, the disk, Azure block by
@@ -31,9 +90,9 @@ minor version (0.x.0) may change the API; such changes are listed under
 - **Frames of videos made by the server.** `video()` of
   `@rebofiles/server/derive`, with ffmpeg: a frame in the drive's sizes and
   its placeholder, for videos that came from no page.
-- **Create document, and a document as a PDF.** `newDocument` (`newDocx` of
-  `@rebofiles/drive/rebodocs`) gives the files a "Create document" button and
-  New a "New document": an empty .docx, named by the person, in the folder
+- **New document, and a document as a PDF.** `newDocument` (`newDocx` of
+  `@rebofiles/drive/rebodocs`) gives the Upload menu a "New document": an
+  empty .docx, named by the person, in the folder
   they are in, opened with `onOpenDocument`. The viewer of a Word document has
   "PDF" beside Print, made in the page by Rebodocs (`pdf()` of `viewDocx`).
 - **Starred.** Each person's own, from the details or the menu, marked with a
@@ -64,7 +123,7 @@ minor version (0.x.0) may change the API; such changes are listed under
   Block From URL. Tried against Azurite. A storage may say its parts need no
   ETag (`etags: false` of an upload's plan).
 - **`apps/documents`.** Word documents made, written and read in the drive,
-  all with Rebodocs: Create document, its editor with several people in one
+  all with Rebodocs: New document, its editor with several people in one
   document at once (`@rebodocs/collab`, a room for each file, a version kept
   when everybody leaves), its viewer, and PDF (`npm run documents`).
 - **The drive a piece at a time.** SQLite, Postgres and the store in memory

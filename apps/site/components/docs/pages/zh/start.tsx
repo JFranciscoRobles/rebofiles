@@ -334,11 +334,12 @@ export const demos: DocPage = {
       title: '文档',
       badge: 'npm run documents',
       color: 'orange',
-      lead: '用 Rebodocs 完整处理 Word 文档：创建文档、多人同时编辑的编辑器、查看器和 PDF。地址为 http://localhost:5184。',
+      lead: '用 Rebodocs 完整处理 Word 文档：新建文档、多人同时编辑的编辑器、查看器和 PDF。地址为 http://localhost:5184。',
       body: (
         <P>
-          以 <C>?as=ana</C> 打开一个文档，共享给 bea 后再以 <C>?as=bea</C> 打开：双方都能看到对方的光标和输入的内容，两人都离开后会保存一个版本。房间的实现在 <C>apps/documents</C> 的{' '}
-          <C>server/collab.ts</C> 中。
+          以 <C>?as=ana</C> 打开一个文档，共享给 bea 后再以 <C>?as=bea</C>{' '}
+          打开：双方都能看到对方的光标和输入的内容，两人都离开后会保存一个版本。此外，网盘的其他功能也都已开启：历史中的比较、副本、文件收集（
+          <C>?link=</C>）、服务器为每个文件生成的内容（用 ffmpeg 处理视频、OCR），以及演示在 <C>/api/hooks</C> 接收的 webhook。房间的实现在 <C>apps/documents</C> 的 <C>server/collab.ts</C> 中。
         </P>
       ),
     },

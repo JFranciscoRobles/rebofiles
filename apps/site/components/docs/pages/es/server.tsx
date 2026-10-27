@@ -5,7 +5,7 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REMINDERS_CODE, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
 import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ES } from '../team';
 
@@ -436,15 +436,38 @@ export const sharing: DocPage = {
       title: 'Solicitudes de archivos',
       badge: 'Subidas',
       color: 'green',
-      lead: 'Un enlace de una carpeta puede recibir archivos: “Ver y añadir archivos”, o “Solo enviar archivos”, una solicitud que no muestra nada de lo que hay. Quien lo abre sin sesión dice quién es, si quiere, y envía.',
+      lead: 'Solicitar archivos, en el menú de una carpeta (y junto a su nombre al estar en ella): un enlace que recibe archivos, “Solo enviar archivos”, sin mostrar nada de lo que hay, o “Ver y añadir archivos”. Hecho, se copia, para abrirlo o enviarlo; quien lo abre sin sesión dice quién es, si quiere, y envía.',
       body: (
         <>
           <Code code={REQUEST_CODE} />
           <List
             items={[
-              'Lo que llega es del dueño de la carpeta, cuenta en su espacio y dice quién lo envió (un campo “from”). Al dueño se le avisa en la campana.',
-              'Sube como cualquier archivo, por partes directo al almacenamiento y revisado como cualquiera; el enlace no puede hacer nada más.',
-              'Su vencimiento, su contraseña y sus usos valen como en cualquier enlace.',
+              'Quien envía ve cada documento pedido en su propio lugar, con “Elegir archivo” y “Tomar foto”: las fotos de un documento van como un solo PDF. Puede deshacer lo que envió durante diez minutos, y se lleva un comprobante.',
+              'Lo que llega es del dueño de la carpeta, cuenta en su espacio y dice quién lo envió y qué documento es. Al dueño se le avisa en la campana, lo encuentra todo en Recibidos, y lo acepta o lo devuelve con un motivo.',
+              'La carpeta muestra sus solicitudes abiertas sobre sus archivos: qué llegó de cada una, qué falta, hasta cuándo.',
+              'Sube como cualquier archivo, por partes directo al almacenamiento, retomado tras un corte y revisado como cualquiera; el enlace no puede hacer nada más. Su vencimiento y su contraseña valen como en cualquier enlace.',
+              'La página del enlace lleva el nombre de tu empresa (Ajustes → company) y el color de marca del drive, para que quien envía sepa a quién.',
+            ]}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'reminders-and-checks',
+      title: 'Plantillas, recordatorios, revisión y vencimientos',
+      badge: 'Solicitudes',
+      color: 'green',
+      lead: 'Lo que hace una solicitud además de recibir archivos. Cada cosa está activa salvo que el drive o el servidor digan false, y los recordatorios solo con una forma de enviarlos.',
+      body: (
+        <>
+          <Code code={REMINDERS_CODE} />
+          <List
+            items={[
+              'Plantillas: “Empezar de una plantilla” arriba del diálogo de una solicitud, y “Guardar como plantilla” para quien puede configurar el drive (lo que pide y cómo, no a quién). Ajustes → Apariencia las lista, para quitar una. requestTemplates: false de la pantalla para ninguna.',
+              'Un código QR de la dirección, en la página de una solicitud hecha, para mostrarlo a un teléfono o descargarlo como PNG; qr: false para ninguno.',
+              'Recordatorios: a quien se le envió la solicitud, cada 2, 3 o 7 días mientras falte algo y esté abierta, y al momento con “Recordar ahora”. Sin los reminders del servidor, el diálogo no los ofrece.',
+              'Revisión: las palabras que debe decir un documento y los campos que buscar en él, contra lo escrito en lo que llegó (su texto, o el OCR de una imagen). Lo que no dice ninguna se marca “No dice …” en Recibidos; una foto borrosa se pide otra vez antes de enviarse (checkBlur: false de la página del enlace para no).',
+              'Vencimientos: un documento puede pedir hasta cuándo vale. A su dueño se le avisa en la campana quince días antes; Recibidos y los detalles muestran los días que quedan, y “Pedir de nuevo” hace una solicitud de ese solo documento.',
             ]}
           />
         </>

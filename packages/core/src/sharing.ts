@@ -3,6 +3,7 @@
 // folder owns what is in it as far as access goes, whoever put it there.
 // Links read an entry without signing in, until they expire or are removed.
 
+import type { FileRequest } from './requests';
 import { DriveError } from './errors';
 import type { Context, Drive, Entry, EntryId, Link, Role, Share } from './model';
 import { getEntry, isTrashed } from './tree';
@@ -128,7 +129,12 @@ export function sharedSince(drive: Drive, who: Who, since: string | undefined): 
 }
 
 /** A link to read an entry, and what is inside it, until `expires`. */
-export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string; locked?: boolean; uses?: number; uploads?: 'also' | 'only' }, context: Context): Drive {
+export function addLink(
+  drive: Drive,
+  id: EntryId,
+  link: { id: string; expires: string; locked?: boolean; uses?: number; uploads?: 'also' | 'only'; request?: FileRequest; viewOnly?: boolean; watermark?: boolean },
+  context: Context,
+): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
   if (!(link.expires > context.at)) throw new DriveError('invalid-share', 'A link has to expire after it is made');
@@ -136,6 +142,7 @@ export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: 
   if (link.uses !== undefined && !(Number.isInteger(link.uses) && link.uses >= 1)) throw new DriveError('invalid-share', 'A link is used once or more');
   if (link.uploads !== undefined && (!['also', 'only'].includes(link.uploads) || entry.kind !== 'folder'))
     throw new DriveError('invalid-share', 'Files are put through a link of a folder, also or only');
+  if ((link.viewOnly || link.watermark) && link.uploads === 'only') throw new DriveError('invalid-share', 'A request for files shows nothing to be seen');
   const made: Link = {
     id: link.id,
     role: 'viewer',
@@ -145,8 +152,27 @@ export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: 
     ...(link.locked ? { locked: true } : {}),
     ...(link.uses ? { uses: link.uses } : {}),
     ...(link.uploads ? { uploads: link.uploads } : {}),
+    ...(link.uploads && link.request && Object.keys(link.request).length ? { request: link.request } : {}),
+    ...(link.viewOnly ? { viewOnly: true } : {}),
+    ...(link.watermark ? { watermark: true } : {}),
   };
   return put(drive, { ...entry, links: [...(entry.links ?? []), made] });
+}
+
+/** How many of who opened a link are kept on it, the last. */
+export const LINK_VIEWS = 50;
+
+/** A link opened by someone, as they said they are called: kept, the last 50; the same name within the hour once. */
+export function viewedLink(drive: Drive, linkId: string, name: string, at: string): Drive {
+  for (const entry of drive.entries.values()) {
+    const link = entry.links?.find((l) => l.id === linkId);
+    if (!link) continue;
+    const last = link.views?.[link.views.length - 1];
+    if (last && last.name === name && Date.parse(at) - Date.parse(last.at) < 3_600_000) return drive;
+    const next: Link = { ...link, views: [...(link.views ?? []), { name, at }].slice(-LINK_VIEWS) };
+    return put(drive, { ...entry, links: entry.links!.map((l) => (l.id === linkId ? next : l)) });
+  }
+  return drive;
 }
 
 export function removeLink(drive: Drive, id: EntryId, linkId: string): Drive {
@@ -164,7 +190,7 @@ export const LINK_GRACE = 15 * 60_000;
 export function linked(drive: Drive, linkId: string, now: string): Entry | null {
   for (const entry of drive.entries.values()) {
     const link = entry.links?.find((l) => l.id === linkId);
-    if (link) return link.expires > now && !linkSpent(link, now) && !isTrashed(drive, entry.id) ? entry : null;
+    if (link) return link.expires > now && !link.closed && !linkSpent(link, now) && !isTrashed(drive, entry.id) ? entry : null;
   }
   return null;
 }

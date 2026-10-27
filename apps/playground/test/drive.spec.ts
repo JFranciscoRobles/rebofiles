@@ -21,7 +21,7 @@ test('makes a folder and uploads into it, a large file in parts among them', asy
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Clients');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await item(page, 'Clients').dblclick();
-  await expect(page.getByRole('button', { name: 'Clients' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Clients', exact: true })).toHaveAttribute('aria-current', 'page');
 
   await upload(page, [
     { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Call Acme on Monday.') },

@@ -81,6 +81,7 @@ describe('the drive held in memory', () => {
     const ana = client(handler(store));
     await ana.ask('GET', '/api/files/entries');
     await ana.ask('GET', '/api/files/entries');
-    expect(seen.loads).toBe(2);
+    // And once by the sweep of the first, which looks for what stops being good soon.
+    expect(seen.loads).toBe(3);
   });
 });

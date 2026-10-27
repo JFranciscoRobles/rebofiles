@@ -37,3 +37,5 @@ export { type Picked, readDropped, readChosen } from './folders';
 export { type ZipProgress, type ZipDownload, type ZipDownloadOptions, downloadZip } from './download';
 export { type DriveOptions, type MountedDrive, mountDrive } from './screen';
 export { type SharedLinkOptions, mountSharedLink } from './link';
+export { picturesToPdf } from './pdf';
+export { qrMatrix, qrSvg, qrPng } from './qr';

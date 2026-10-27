@@ -369,11 +369,12 @@ export const demos: DocPage = {
       title: 'Documents',
       badge: 'npm run documents',
       color: 'orange',
-      lead: 'Word documents from start to end, all with Rebodocs: Create document, its editor with several people in one document at once, its viewer, and PDF. At http://localhost:5184.',
+      lead: 'Word documents from start to end, all with Rebodocs: New document, its editor with several people in one document at once, its viewer, and PDF. At http://localhost:5184.',
       body: (
         <P>
-          Open a document as <C>?as=ana</C> and, shared with her, as <C>?as=bea</C>: each sees the other’s caret and what they write, and a version is kept when both have left. In{' '}
-          <C>apps/documents</C>, the rooms over the drive are <C>server/collab.ts</C>.
+          Open a document as <C>?as=ana</C> and, shared with her, as <C>?as=bea</C>: each sees the other’s caret and what they write, and a version is kept when both have left. Besides, everything
+          else of the drive is on: Compare in the history, copies, requests for files (<C>?link=</C>), what the server makes of each file (video with ffmpeg, OCR), and a webhook the demo takes at{' '}
+          <C>/api/hooks</C>. In <C>apps/documents</C>, the rooms over the drive are <C>server/collab.ts</C>.
         </P>
       ),
     },

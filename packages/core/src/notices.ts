@@ -7,7 +7,7 @@ import type { EntryId, Role } from './model';
 export interface Notice {
   id: string;
   /** Shared with them (or a group they are in), named with @ in a comment, or a file put in a folder of theirs through a link. */
-  kind: 'shared' | 'mentioned' | 'received';
+  kind: 'shared' | 'mentioned' | 'received' | 'expiring';
   entry: EntryId;
   /** What the entry was called then. */
   name: string;
@@ -17,6 +17,8 @@ export interface Notice {
   role?: Role;
   /** Of a comment: its beginning. */
   text?: string;
+  /** Of a file that stops being good: the day it does. */
+  expires?: string;
 }
 
 /** How many are kept for each, the newest; the older go. */

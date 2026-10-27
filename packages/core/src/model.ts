@@ -1,3 +1,4 @@
+import type { FileRequest, Received } from './requests';
 // What a drive is: entries, each a folder or a file, each in a folder or at
 // the top. A `Drive` is an immutable value: every operation returns a new one
 // and keeps the entries it did not change, so telling what changed is a
@@ -80,7 +81,26 @@ export interface Link {
    * what is there (`'only'`, a request for files). Only to read unless said.
    */
   uploads?: 'also' | 'only';
+  /** Of a link that takes files: what it asks of whoever sends them, and what is done with what comes. */
+  request?: FileRequest;
+  /** What came through it. */
+  got?: Received;
+  /** ISO 8601: when it was closed, by its owner or by having all it asked for. It works no more. */
+  closed?: string;
+  /** ISO 8601: when whoever it was sent to was last reminded of what is missing. */
+  reminded?: string;
+  /** Only to be seen in its page: nothing of it downloaded through it, one file or an archive. */
+  viewOnly?: boolean;
+  /** Who opens it says their name first, shown over what they see, with the day; and kept in `views`. */
+  watermark?: boolean;
+  /** Who opened it, as they said they are called, and when: the last 50. */
+  views?: readonly LinkView[];
   by: string;
+  at: string;
+}
+
+export interface LinkView {
+  name: string;
   at: string;
 }
 

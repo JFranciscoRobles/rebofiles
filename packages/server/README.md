@@ -153,6 +153,28 @@ pdf.js, the text of Word documents, Excel workbooks and text files. `ocr()`
 reads pictures and scanned PDFs with Tesseract, given to `deriveAll(…)`. Each
 library is optional, imported when first needed.
 
+## Requests that collect documents
+
+A link of a folder with `uploads` and a `request`: the documents it asks
+for, its message, whether it asks the name of who sends, what kinds and
+how large, a folder for each person, a pattern of names, fields; what came
+counted on it (`got`), closed when all came if it says so. `onReceived`,
+`PUT /entries/:id/review` and `onReview`, `GET /received`, `GET /requests`
+and `GET /admin/requests` for reminders.
+
+## Reminders, checks, what stops being good
+
+`reminders: mailReminders({ mail: resend({ apiKey, from }), url: (token) =>
+…/?link=${token} })` reminds whom a request was sent to every `remind` days
+of what is missing, and at once from `POST /entries/:id/links/:link/remind`;
+`mail` may be any function of `{ to, subject, text, html }`, SMTP or another
+service. What is written in a file that came is checked against the
+`words` and `find` of its document (`check`, the core's `checkWritten`
+unless yours, or `false`). `expiring: { days: 15, onExpiring }` tells the
+owner of a file whose field `expires` comes near; `GET /expiring?days=`
+lists them. Both are looked at with the sweep, every ten minutes as
+requests come.
+
 ## Copies, requests for files, shares for a while, webhooks
 
 `POST /entries/:id/copy` copies a file's bytes in the storage; a link of a

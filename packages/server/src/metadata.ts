@@ -35,6 +35,10 @@ export interface ScopedQueries {
   withLink(link: string): Promise<Entry | undefined>;
   /** What has the field `name` set to `value` (`fields` of an entry), at most `limit`. */
   withField(name: string, value: string, limit: number): Promise<Entry[]>;
+  /** What has the field `name` set to a text no later than `upTo` (dates as YYYY-MM-DD), at most `limit`: what stops being good. */
+  withFieldUpTo?(name: string, upTo: string, limit: number): Promise<Entry[]>;
+  /** What has a link whose request for files reminds whom it was sent to, at most `limit`. */
+  withReminders?(limit: number): Promise<Entry[]>;
 }
 
 export interface MetadataStore {
@@ -184,6 +188,16 @@ export function scopedOver(current: () => Drive): ScopedQueries {
     async withField(name, value, limit) {
       return all()
         .filter((entry) => entry.fields?.[name] === value)
+        .slice(0, limit);
+    },
+    async withFieldUpTo(name, upTo, limit) {
+      return all()
+        .filter((entry) => !!entry.fields?.[name] && entry.fields[name] <= upTo)
+        .slice(0, limit);
+    },
+    async withReminders(limit) {
+      return all()
+        .filter((entry) => entry.links?.some((link) => link.request?.remind))
         .slice(0, limit);
     },
   };
@@ -339,6 +353,10 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const ownedBy = db.prepare('SELECT entry FROM rebofiles_entries WHERE owner = ?');
   const linkedBy = db.prepare('SELECT entry FROM rebofiles_entries WHERE id = (SELECT entry FROM rebofiles_links WHERE link = ?)');
   const fielded = db.prepare('SELECT entry FROM rebofiles_entries WHERE json_extract(entry, ?) = ? LIMIT ?');
+  const fieldedUpTo = db.prepare("SELECT entry FROM rebofiles_entries WHERE json_extract(entry, ?) > '' AND json_extract(entry, ?) <= ? LIMIT ?");
+  const reminding = db.prepare(
+    "SELECT entry FROM rebofiles_entries WHERE id IN (SELECT entry FROM rebofiles_links) AND EXISTS (SELECT 1 FROM json_each(entry, '$.links') WHERE json_extract(value, '$.request.remind') IS NOT NULL) LIMIT ?",
+  );
   const scoped: ScopedQueries = {
     entries: async (ids) => rows(byIds.all(JSON.stringify(ids))),
     ancestors: async (ids) => rows(above.all(JSON.stringify(ids))),
@@ -361,6 +379,8 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
     withLink: async (link) => rows(linkedBy.all(link))[0],
     // A name is of letters, digits and `_ . -` (core's FIELD_NAME), so quoted it is a path of JSON as it is.
     withField: async (name, value, limit) => rows(fielded.all(`$.fields."${name}"`, value, limit)),
+    withFieldUpTo: async (name, upTo, limit) => rows(fieldedUpTo.all(`$.fields."${name}"`, `$.fields."${name}"`, upTo, limit)),
+    withReminders: async (limit) => rows(reminding.all(limit)),
   };
   db.exec('CREATE TABLE IF NOT EXISTS rebofiles_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
   // One row, one number, one more at every save: what says whether the drive in memory is the one in the file.
@@ -645,6 +665,8 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     owned: (owner) => ask(`SELECT entry FROM ${table} WHERE owner = $1`, [owner]),
     withLink: async (link) => (await ask(`SELECT entry FROM ${table} WHERE id = (SELECT entry FROM ${table}_links WHERE link = $1)`, [link]))[0],
     withField: (name, value, limit) => ask(`SELECT entry FROM ${table} WHERE entry->'fields'->>$1 = $2 LIMIT $3`, [name, value, limit]),
+    withFieldUpTo: (name, upTo, limit) => ask(`SELECT entry FROM ${table} WHERE entry->'fields'->>$1 > '' AND entry->'fields'->>$1 <= $2 LIMIT $3`, [name, upTo, limit]),
+    withReminders: (limit) => ask(`SELECT entry FROM ${table} WHERE jsonb_path_exists(entry, '$.links[*].request.remind') LIMIT $1`, [limit]),
   };
   return {
     async load() {

@@ -336,11 +336,12 @@ export const demos: DocPage = {
       title: 'Documentos',
       badge: 'npm run documents',
       color: 'orange',
-      lead: 'Documentos de Word de principio a fin, todo con Rebodocs: Crear documento, su editor con varias personas en un documento a la vez, su visor y PDF. En http://localhost:5184.',
+      lead: 'Documentos de Word de principio a fin, todo con Rebodocs: Documento nuevo, su editor con varias personas en un documento a la vez, su visor y PDF. En http://localhost:5184.',
       body: (
         <P>
-          Abre un documento como <C>?as=ana</C> y, compartido con ella, como <C>?as=bea</C>: cada una ve el cursor de la otra y lo que escribe, y se guarda una versión cuando las dos se van. En{' '}
-          <C>apps/documents</C>, las salas sobre el drive son <C>server/collab.ts</C>.
+          Abre un documento como <C>?as=ana</C> y, compartido con ella, como <C>?as=bea</C>: cada una ve el cursor de la otra y lo que escribe, y se guarda una versión cuando las dos se van. Además
+          está todo lo demás del drive: Comparar en el historial, copias, solicitudes de archivos (<C>?link=</C>), lo que el servidor hace de cada archivo (video con ffmpeg, OCR) y un webhook que la
+          demo recibe en <C>/api/hooks</C>. En <C>apps/documents</C>, las salas sobre el drive son <C>server/collab.ts</C>.
         </P>
       ),
     },

@@ -25,6 +25,7 @@ const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = {
   Keeping: 'Conservar',
   Told: 'Avisos',
   'Looking after': 'Administrar',
+  Requests: 'Solicitudes',
 };
 const ROUTE_WORDS: [string, string, string, string] = ['Rutas', 'Rutas de un enlace', 'Ruta', 'Qué hace'];
 const IN_ENGLISH = <Callout title="En inglés:">lo medido y la hoja de ruta se escriben una vez, en inglés, como en ROADMAP.md.</Callout>;

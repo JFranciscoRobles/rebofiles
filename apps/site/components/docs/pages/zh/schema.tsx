@@ -130,7 +130,7 @@ export const schema: DocPage = {
           columns={['名称', '值']}
           code={[0]}
           rows={[
-            ['drive', '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays }：网盘的设置，由有权配置的人保存。'],
+            ['drive', '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays, company, requestTemplates }：网盘的设置，由有权配置的人保存。'],
             ['person:<id>', '{ language, theme }：某个人自己的设置，优先于网盘设置。'],
             ['link:<link id>', '"salt:hash"：经 scrypt 处理的链接密码（32 字节，16 字节盐值），绝不保存密码原文。'],
             ['seen-shared:<id>', '此人上次查看“与我共享”的时间（ISO 8601）：比它新的就是新内容。'],

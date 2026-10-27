@@ -44,7 +44,7 @@ describe('files put through a link', () => {
     expect(sent).toMatchObject({ name: 'papers.txt', parent: box.id, owner: 'ana', fields: { from: 'Carla Ruiz' } });
     // A link that lets them in besides lists them.
     expect((await guest(token).list()).entries.map((entry) => entry.name)).toEqual(['papers.txt']);
-    expect((await guest(token).list()).link).toEqual({ uploads: 'also' });
+    expect((await guest(token).list()).link).toMatchObject({ uploads: 'also', owner: 'ana' });
     const { notifications } = await ana.notifications();
     expect(notifications[0]).toMatchObject({ kind: 'received', name: 'papers.txt', by: 'Carla Ruiz', entry: sent.id });
     expect((await ana.usage()).used).toBe(9);
@@ -58,7 +58,7 @@ describe('files put through a link', () => {
     await guest(token).upload(new File(['hello'], 'theirs.txt'));
     const listed = await guest(token).list();
     expect(listed.entries).toEqual([]);
-    expect(listed.link).toEqual({ uploads: 'only' });
+    expect(listed.link).toMatchObject({ uploads: 'only' });
     const mine = (await ana.list(box.id)).entries.find((entry) => entry.name === 'mine.txt')!;
     await expect(guest(token).url(mine.id)).rejects.toMatchObject({ status: 403 });
     await expect(guest(token).pack()).rejects.toMatchObject({ status: 403 });

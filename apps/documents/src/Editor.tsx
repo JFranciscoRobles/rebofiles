@@ -1,5 +1,5 @@
 // A document of the drive open in Rebodocs, over the drive: one just made by
-// "Create document" or one opened from the viewer. It is a room of the
+// Upload → New document, or one opened from the viewer. It is a room of the
 // collaboration server, so whoever else opens it writes in it at once, each
 // with a caret of their own; who may only read it watches. ⌘S keeps it as a
 // new version, as everybody leaving does. "PDF" downloads it as one.

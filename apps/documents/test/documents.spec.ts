@@ -1,16 +1,21 @@
 // The documents' demo as a person goes through it: a document made with
-// "Create document", written in Rebodocs' editor and saved, then read in the
+// Upload → New document, written in Rebodocs' editor and saved, then read in the
 // viewer and opened again to write; New → New document; two people writing in
 // one document at once; and a document downloaded as a PDF.
 
 import { type Browser, type Page, expect, test } from '@playwright/test';
 import { DOCUMENTS } from '../../../playwright.config';
 
+/** An empty Word document, from New document of the Upload menu. */
+const newDocument = async (page: Page) => {
+  await page.getByRole('button', { name: 'Upload' }).click();
+  await page.getByRole('menuitem', { name: 'New document' }).click();
+};
 const item = (page: Page, name: string) => page.getByRole('option', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`) });
 
 test('a document made, written in the editor, saved, read in the viewer and opened again', async ({ page }) => {
   await page.goto(`${DOCUMENTS}/?as=writer`);
-  await page.getByRole('button', { name: 'Create document' }).click();
+  await newDocument(page);
   const naming = page.getByRole('dialog', { name: 'New document' });
   await expect(naming.getByRole('textbox')).toHaveValue('Untitled document');
   await naming.getByRole('textbox').fill('Contract');
@@ -50,7 +55,7 @@ test('New has New document, in Spanish too', async ({ page }) => {
 /** A document `owner` makes from the API, shared with `editor` as an editor: its id. */
 async function sharedDocument(page: Page, owner: string, editor: string, name: string) {
   await page.goto(`${DOCUMENTS}/?as=${owner}`);
-  await page.getByRole('button', { name: 'Create document' }).click();
+  await newDocument(page);
   await page.getByRole('dialog', { name: 'New document' }).getByRole('textbox').fill(name);
   await page.getByRole('dialog', { name: 'New document' }).getByRole('button', { name: 'Create', exact: true }).click();
   await expect(
@@ -99,7 +104,7 @@ test('two people write in one document at once, each seeing what the other write
 
 test('a document downloaded as a PDF, from the editor and from the viewer', async ({ page }) => {
   await page.goto(`${DOCUMENTS}/?as=printer`);
-  await page.getByRole('button', { name: 'Create document' }).click();
+  await newDocument(page);
   await page.getByRole('dialog', { name: 'New document' }).getByRole('textbox').fill('Invoice');
   await page.getByRole('dialog', { name: 'New document' }).getByRole('button', { name: 'Create', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Invoice.docx' });
@@ -126,7 +131,7 @@ test('a document downloaded as a PDF, from the editor and from the viewer', asyn
 
 test('two versions of a document compared, from its history, what changed between them shown', async ({ page }) => {
   await page.goto(`${DOCUMENTS}/?as=compare`);
-  await page.getByRole('button', { name: 'Create document' }).click();
+  await newDocument(page);
   await page.getByRole('dialog', { name: 'New document' }).getByRole('textbox').fill('Terms');
   await page.getByRole('dialog', { name: 'New document' }).getByRole('button', { name: 'Create', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Terms.docx' });
@@ -150,4 +155,31 @@ test('two versions of a document compared, from its history, what changed betwee
   await expect(viewer.locator('.dx-page').first()).toContainText('Late payment adds a fee.');
   await page.keyboard.press('Escape');
   await expect(viewer).toHaveCount(0);
+});
+
+test('a request for files opened here, a file sent through it; and each change told to the webhook, checked', async ({ page, browser }) => {
+  const as = { headers: { 'x-user': 'hooks' } };
+  const folder = (await (await page.request.post(`${DOCUMENTS}/api/files/folders`, { ...as, data: { name: 'Signed contracts', parent: null } })).json()).entry;
+  const { token } = await (await page.request.post(`${DOCUMENTS}/api/files/entries/${folder.id}/links`, { ...as, data: { days: 7, uploads: 'only' } })).json();
+
+  const guest = await (await browser.newContext()).newPage();
+  await guest.goto(`${DOCUMENTS}/?link=${encodeURIComponent(token)}`);
+  await expect(guest.getByRole('heading', { name: 'hooks asks you for files' })).toBeVisible();
+  await guest.getByRole('textbox', { name: /Your name/ }).fill('Northwind');
+  await guest.locator('.rf-send-file').setInputFiles([{ name: 'signed.txt', mimeType: 'text/plain', buffer: Buffer.from('signed by both') }]);
+  await expect(guest.getByText('Sent', { exact: true })).toBeVisible();
+  await guest.context().close();
+
+  await page.goto(`${DOCUMENTS}/?as=hooks&view=list`);
+  await item(page, 'Signed contracts').dblclick();
+  await expect(item(page, 'signed.txt')).toBeVisible();
+  // The demo is the service its webhook tells: each delivery checked by its signature, and kept.
+  await expect
+    .poll(async () => ((await (await page.request.get(`${DOCUMENTS}/api/hooks`)).json()).told as { action: string; entry: { name: string } | null }[]).map((one) => `${one.action} ${one.entry?.name}`))
+    .toEqual(expect.arrayContaining(['created Signed contracts', 'linked Signed contracts', 'uploaded signed.txt']));
+  const forged = await page.request.post(`${DOCUMENTS}/api/hooks`, {
+    data: { action: 'deleted' },
+    headers: { 'x-rebofiles-timestamp': String(Math.floor(Date.now() / 1000)), 'x-rebofiles-signature': 'sha256=00' },
+  });
+  expect(forged.status()).toBe(401);
 });

@@ -31,7 +31,7 @@ const drive = mountDrive(document.getElementById('files')!, {
   thumbDocument: thumbDocx, // the grid: its first page, until a picture of it is made
   pictureDocument: pictureOfDocx, // that picture, made at upload
   textDocument: textOfDocx, // what is written in it, to find it by
-  newDocument: newDocx, // "Create document": an empty one, named, then opened
+  newDocument: newDocx, // Upload → New document: an empty one, named, then opened
   compareDocument: compareDocx, // "Compare" in the history: what changed, over its pages
   onOpenDocument: (file, url) => openInRebodocs(file, url),
   fields: 'edit', // your application's fields of an entry, changed in its details
@@ -65,7 +65,16 @@ way instead.
 
 Make a copy is in the menu of a file; the dialog of sharing shares for a
 while, and makes links of a folder that take files, or only take them (a
-request for files, whose page `mountSharedLink` sends them from).
+request for files, whose page `mountSharedLink` sends them from). A request
+names the documents it asks for, one by one, and a person sends each in its
+place, from a phone too: its photos made one PDF. What arrives waits in
+Received, by request and by person, to be accepted or returned with a reason;
+the page of the link says which came back and why, under the name of your
+company (Settings → `company`) and in its colour. A request starts from a
+template (`requestTemplates`), has a QR code to show a phone (`qr`),
+reminds whom it was sent to (with the server's `reminders`), asks until when
+a document is good, and marks what does not say the words its document
+should; a photo that looks blurry is asked again (`checkBlur`).
 
 Starred holds what each person stars, the bell over the drive what was shared
 with them and the comments that name them, and Settings → People, for who may
@@ -137,12 +146,12 @@ drive's. `settings: false` leaves all of it out.
 
 | Area | What it is |
 | --- | --- |
-| **The screen** | `mountDrive`, `mountSharedLink`: the search by name and by what is written, My files, Shared with me with what is new, Recent and the Trash, the list and the grid, details, activity, previews, the viewer and versions, sharing and links (with a password, or for one download), uploads by button, by dropping or of a folder, moving by dragging or from a dialog, the settings. |
+| **The screen** | `mountDrive`, `mountSharedLink`: the search by name and by what is written, My files, Shared with me with what is new, Recent, Starred, Received and the Trash, the list and the grid, details, activity, previews, the viewer and versions, sharing and links (with a password, or for one download), uploads by button, by dropping or of a folder, moving by dragging or from a dialog, the settings. |
 | **The client** | `createDriveClient`, one function per route of @rebofiles/server, uploads in parts that resume; `createLinkClient` for a link, with its password; `createMemoryClient`, the drive kept in the page, for demos and tests. |
 | **Uploads** | `createUploads`, `lookInDrive`, `formatDuration`; `readDropped`, `readChosen` for folders; `hashOf`, `textOf`, `renditionsOf`, `placeholderOf`. |
 | **Archives** | `downloadZip`, `writeZip`, `blobSink`, `streamSink`. |
 | **Words** | `TEXTS` in English and Spanish, `translator`, `formatSize`, `formatDate`. |
-| **Files** | `kindOf`, `badgeOf`; of `./rebodocs`, `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`. |
+| **Files** | `kindOf`, `badgeOf`, `picturesToPdf`, `qrMatrix`, `qrSvg`, `qrPng`; of `./rebodocs`, `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`, `newDocx`, `compareDocx`. |
 | **The look** | `CSS`, scoped to `.rf-drive`, its colours, radii and fonts as custom properties, light and dark. |
 
 The screen renders itself again after each change, and changes only what

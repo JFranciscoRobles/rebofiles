@@ -134,7 +134,10 @@ export const schema: DocPage = {
           columns={['Nombre', 'Valor']}
           code={[0]}
           rows={[
-            ['drive', '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays }: los del drive, tal como los guardó quien puede configurarlo.'],
+            [
+              'drive',
+              '{ language, theme, brand, images: { enabled, sizes, format, quality }, quota, trashDays, company, requestTemplates }: los del drive, tal como los guardó quien puede configurarlo.',
+            ],
             ['person:<id>', '{ language, theme }: los propios de una persona, por encima de los del drive.'],
             ['link:<link id>', '"salt:hash": la contraseña de un enlace, tal como la hace scrypt (32 bytes, una sal de 16), nunca la contraseña.'],
             ['seen-shared:<id>', 'Cuándo miró la persona Compartido conmigo por última vez, en ISO 8601: lo más reciente es nuevo.'],

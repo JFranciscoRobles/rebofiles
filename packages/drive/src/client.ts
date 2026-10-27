@@ -6,7 +6,7 @@
 // file uploaded again goes on from where it was.
 
 import { partsOf } from '@rebofiles/core';
-import type { Activity, Comment, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Notice, Packed, PersonalSettings, Role } from '@rebofiles/core';
+import type { Activity, Comment, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FileRequest, FolderEntry, ImageSettings, Link, Notice, Packed, PersonalSettings, Role } from '@rebofiles/core';
 import { type MadeRendition, placeholderOf, renditionsOf } from './images';
 
 export interface ClientOptions {
@@ -105,6 +105,8 @@ export interface UploadOptions {
    * (`derive`), and only that: what an assistant or a sync sends, it makes all of.
    */
   madeHere?: ('pictures' | 'text')[];
+  /** Of a file sent through a link: told what takes it back, a few minutes (`LinkClient.takeBack`). */
+  onReceipt?: (receipt: string) => void;
   /** What is written in it, read in the page (`textOf`), sent after it to find it by; undefined for a file with none. */
   text?: (file: Blob, name: string) => Promise<string | undefined>;
 }
@@ -173,6 +175,8 @@ export interface SettingsAnswer {
   saved: boolean;
   /** Who is asking, as the server identified them: whose comments are their own. */
   you?: string;
+  /** What the server does besides: remind whom a request was sent to, tell what stops being good. */
+  can?: { remind?: boolean; expiring?: boolean };
 }
 
 interface Part {
@@ -408,9 +412,37 @@ export function createDriveClient(options: ClientOptions) {
     unshare: (id: EntryId, user: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/shares/${encodeURIComponent(user)}`),
     /** A link to read it without signing in, for `days`; the token is what goes in its address. */
     /** A link for `days`, opened only with `password` when one is given, and good for one download when `once`. */
-    /** A link to read it; of a folder, with `uploads`, one that lets files in too (`'also'`) or only (`'only'`, a request for files). */
-    createLink: (id: EntryId, days?: number, how: { password?: string; once?: boolean; uploads?: 'also' | 'only' } = {}) =>
-      ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days, password: how.password, once: how.once, ...(how.uploads ? { uploads: how.uploads } : {}) }),
+    /**
+     * A link to read it; of a folder, with `uploads`, one that lets files in too (`'also'`) or only (`'only'`, a request
+     * for files), and `request`: what it asks of whoever sends them, and what is done with what comes. `viewOnly`: only
+     * to be seen, nothing saved through it; `watermark`: who sees it says their name first, shown over it and kept.
+     */
+    createLink: (id: EntryId, days?: number, how: { password?: string; once?: boolean; uploads?: 'also' | 'only'; request?: FileRequest; viewOnly?: boolean; watermark?: boolean } = {}) =>
+      ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, {
+        days,
+        password: how.password,
+        once: how.once,
+        ...(how.uploads ? { uploads: how.uploads } : {}),
+        ...(how.request ? { request: how.request } : {}),
+        ...(how.viewOnly ? { viewOnly: true } : {}),
+        ...(how.watermark ? { watermark: true } : {}),
+      }),
+    /** A link changed: for `days` from now, what it takes, what it asks; closed, or opened again. */
+    updateLink: (id: EntryId, link: string, change: { days?: number; uploads?: 'also' | 'only'; request?: FileRequest; closed?: boolean }) =>
+      one('PATCH', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`, change),
+    /** A file that came through a request accepted, or turned back with a reason; looked at no more with null. */
+    review: (id: EntryId, status: 'accepted' | 'rejected' | null, reason?: string) => one('PUT', `/entries/${encodeURIComponent(id)}/review`, { status, reason }),
+    /** What came through one's requests for files, the newest first. */
+    received: async () => (await ask<{ entries: Entry[] }>('GET', '/received')).entries,
+    /** For who may configure the drive: every request for files open, whom it was sent to and what is still missing, to remind them. */
+    adminRequests: async () =>
+      (await ask<{ requests: { folder: { id: EntryId; name: string; owner: string }; link: Link; token: string; missing: { id: string; label: string }[] }[] }>('GET', '/admin/requests')).requests,
+    /** Whoever a request was sent to reminded now of what is missing, as the server's `reminders` send it. */
+    remind: (id: EntryId, link: string) => one('POST', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}/remind`),
+    /** Files one may read that stop being good within `days` days (as their field `expires` says), or did; the soonest first. */
+    expiring: async (days?: number) => (await ask<{ files: { entry: Entry; expires: string; days: number }[] }>('GET', `/expiring${q({ days: days === undefined ? undefined : String(days) })}`)).files,
+    /** One's requests for files: each folder, its link and its token, and what came. */
+    requests: async () => (await ask<{ requests: { folder: { id: EntryId; name: string }; link: Link; token: string }[] }>('GET', '/requests')).requests,
     /** The token of a link made before: the same every time. */
     linkToken: async (id: EntryId, link: string) => (await ask<{ token: string }>('GET', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`)).token,
     removeLink: (id: EntryId, link: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`),
@@ -527,7 +559,9 @@ export function createDriveClient(options: ClientOptions) {
         report();
         waiting = again.parts;
       }
-      let entry = (await ask<{ entry: FileEntry }>('POST', '/uploads/finish', { token, parts: [...finished].map(([number, etag]) => ({ number, etag })) }, signal)).entry;
+      const done = await ask<{ entry: FileEntry; receipt?: string }>('POST', '/uploads/finish', { token, parts: [...finished].map(([number, etag]) => ({ number, etag })) }, signal);
+      let entry = done.entry;
+      if (done.receipt) options.onReceipt?.(done.receipt);
       memory.delete(key);
       // The smaller pictures after: the file is up whether or not they are, and is shown by the original until they are.
       if (options.images && !options.rendition) {
@@ -566,38 +600,106 @@ export interface LinkListing {
   /** From the root down to the folder. */
   path: Entry[];
   entries: Entry[];
-  /** What the link lets in besides: files too, or only files (and then nothing of what is there is listed). */
-  link?: { uploads: 'also' | 'only' | null };
+  /** What the link lets in besides: files too, or only files (and then nothing of what is there is listed); of a request, what it asks. */
+  link?: {
+    uploads: 'also' | 'only' | null;
+    /** Only to be seen: nothing of it saved through it. */
+    viewOnly?: boolean;
+    /** Who sees it says their name first (`viewer`), shown over what they see. */
+    watermark?: boolean;
+    owner?: string;
+    expires?: string;
+    brand?: string | null;
+    company?: string | null;
+    request?: {
+      title?: string;
+      message?: string;
+      askName?: boolean;
+      accept?: string[];
+      maxSize?: number;
+      maxFiles?: number;
+      left?: number;
+      items?: { id: string; label: string; received: number; expires?: boolean }[];
+      /** What is asked to be written, sent with each file (`answers`). */
+      questions?: { id: string; label: string; required?: boolean }[];
+    };
+  };
 }
 
 /** What a link reads, for someone not signed in: its folders and an address to read each file from. */
-export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch; password?: () => string | undefined; from?: () => string | undefined }) {
+export function createLinkClient(options: {
+  base: string;
+  token: string;
+  fetch?: typeof fetch;
+  password?: () => string | undefined;
+  from?: () => string | undefined;
+  /** Who sees what a link with `watermark` shares, as they said: sent with every request. */
+  viewer?: () => string | undefined;
+  /** What was written to the questions of its request, by the id of each: sent with each file. */
+  answers?: () => Record<string, string> | undefined;
+  /** Where an upload halfway is remembered, to go on after a cut: the page's localStorage unless said; null for nowhere. */
+  remember?: UploadMemory | null;
+}) {
   const base = `${options.base.replace(/\/$/, '')}/links/${encodeURIComponent(options.token)}`;
   const send = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
-  const ask = async <T>(path: string): Promise<T> => {
-    // A link's password goes with every request, in a header, as the server asks for it at every one.
+  // A link's password goes with every request, in a header, as the server asks for it at every one; and who sees it.
+  const told = () => {
     const password = options.password?.();
-    const answer = await send(base + path, password ? { headers: { 'x-link-password': password } } : undefined);
+    const viewer = options.viewer?.();
+    return { ...(password ? { 'x-link-password': password } : {}), ...(viewer ? { 'x-link-viewer': encodeURIComponent(viewer) } : {}) };
+  };
+  const ask = async <T>(path: string): Promise<T> => {
+    const answer = await send(base + path, { headers: told() });
     const said = (await answer.json().catch(() => ({}))) as { error?: string; message?: string };
     if (!answer.ok) throw new RequestError(answer.status, said.error ?? 'server', said.message ?? `The server answered ${answer.status}.`);
     return said as T;
   };
   const absolute = (url: string) => (/^https?:/.test(url) ? url : new URL(url, /^https?:/.test(base) ? base : typeof location === 'undefined' ? 'http://localhost' : location.href).toString());
-  // Files put through the link go up as any do, in parts straight to the storage, at the link's own routes.
-  const sender = createDriveClient({
-    base,
-    fetch: options.fetch,
-    remember: null,
-    headers: () => {
-      const password = options.password?.();
-      const from = options.from?.();
-      return { ...(password ? { 'x-link-password': password } : {}), ...(from ? { 'x-link-name': from } : {}) };
-    },
-  });
+  // Files put through the link go up as any do, in parts straight to the storage, at the link's own routes, and an
+  // upload cut goes on where it was; each says who sends it and the document of the request it is.
+  const senderFor = (item?: string, expires?: string) =>
+    createDriveClient({
+      base,
+      fetch: options.fetch,
+      remember: options.remember,
+      headers: () => {
+        const from = options.from?.();
+        const answers = options.answers?.();
+        return {
+          ...told(),
+          ...(from ? { 'x-link-name': encodeURIComponent(from) } : {}),
+          ...(answers && Object.keys(answers).length ? { 'x-link-answers': encodeURIComponent(JSON.stringify(answers)) } : {}),
+          ...(item ? { 'x-link-item': item } : {}),
+          ...(expires ? { 'x-link-expires': expires } : {}),
+        };
+      },
+    });
   return {
-    /** A file put in the folder of a link that lets files in, or in a folder inside it: the owner's, told of it. */
-    upload: (file: Blob & { name?: string }, how: { folder?: EntryId; onProgress?: UploadOptions['onProgress']; signal?: AbortSignal } = {}) =>
-      sender.upload(file, { parent: how.folder, onProgress: how.onProgress, signal: how.signal }),
+    /**
+     * A file put in the folder of a link that lets files in, or in a folder inside it, for a document its request asks for
+     * (`item`), and until when it is good (`expires`, YYYY-MM-DD) of one that asks it: the owner's, told of it.
+     * `onReceipt` is given what takes it back, a few minutes.
+     */
+    upload: async (
+      file: Blob & { name?: string },
+      how: { folder?: EntryId; item?: string; expires?: string; onProgress?: UploadOptions['onProgress']; onReceipt?: (receipt: string) => void; signal?: AbortSignal } = {},
+    ) =>
+      // Its SHA-256 said, for its owner to be told of one they have already.
+      senderFor(how.item, how.expires).upload(file, {
+        parent: how.folder,
+        onProgress: how.onProgress,
+        onReceipt: how.onReceipt,
+        signal: how.signal,
+        sha256: await hashOf(file).catch(() => undefined),
+      }),
+    /** A file just sent taken back, by the receipt its upload gave. */
+    takeBack: async (receipt: string) => {
+      const answer = await send(`${base}/sent/${encodeURIComponent(receipt)}`, { method: 'DELETE', headers: told() });
+      if (!answer.ok) {
+        const said = (await answer.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new RequestError(answer.status, said.error ?? 'server', said.message ?? `The server answered ${answer.status}.`);
+      }
+    },
     list: (folder?: EntryId) => ask<LinkListing>(folder ? `?folder=${encodeURIComponent(folder)}` : ''),
     url: async (id: EntryId, how: { inline?: boolean } = {}) => absolute((await ask<{ url: string }>(`/download?id=${encodeURIComponent(id)}${how.inline ? '&inline=1' : ''}`)).url),
     /** What an archive of these holds, or of all the link reads. */

@@ -1,13 +1,16 @@
 // Word documents from start to end in the drive, all of them Rebodocs':
-// "Create document" (and New → New document) makes an empty one in the folder
+// Upload → New document makes an empty one in the folder
 // one is in and opens it in Rebodocs' editor, where whoever else opens it
 // writes with them at once; each save is a new version, as everybody leaving
 // is, and "PDF" downloads it as one. A double click shows a document in its pages, in the viewer, read only, with "Open in
 // Rebodocs" to write in it again; the grid shows each one's first page.
-// `?lang=es` (or `zh`) shows it in Spanish, `?as=bea` as Bea sees it.
+// "Compare" in a document's history shows what changed from a version.
+// `?lang=es` (or `zh`) shows it in Spanish, `?as=bea` as Bea sees it. A link
+// of the drive comes here as `?link=…`: what it reads, or, of a request for
+// files, where to send them.
 
 import type { FileEntry } from '@rebofiles/core';
-import { DriveProvider, FileDrive } from '@rebofiles/react';
+import { DriveProvider, FileDrive, SharedLink } from '@rebofiles/react';
 import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode, Suspense, lazy, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -18,6 +21,7 @@ const Editor = lazy(() => import('./Editor'));
 const params = new URLSearchParams(location.search);
 const language = (['en', 'es', 'zh'] as const).find((one) => one === params.get('lang'));
 const as = params.get('as');
+const link = params.get('link');
 const headers = (): Record<string, string> => (as ? { 'x-user': as } : {});
 
 function Documents() {
@@ -46,8 +50,4 @@ function Documents() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Documents />
-  </StrictMode>,
-);
+createRoot(document.getElementById('root')!).render(<StrictMode>{link ? <SharedLink base="/api/files" token={link} language={language} /> : <Documents />}</StrictMode>);

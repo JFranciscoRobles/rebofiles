@@ -44,7 +44,7 @@
 //   POST   /shared/seen                   they looked: none is new any more
 //   POST   /entries/:id/shares            { with, role, days }: shared, or given another role; for that many days, for good with null, as before unless said
 //   DELETE /entries/:id/shares/:with      no longer shared with them
-//   POST   /entries/:id/links             { days, password, once }: a link to read it without signing in, and its address
+//   POST   /entries/:id/links             { days, password, once, viewOnly, watermark }: a link to read it without signing in, and its address
 //   GET    /entries/:id/links/:link       the address of a link again
 //   DELETE /entries/:id/links/:link       taken back
 //   GET    /entries/:id/comments          what is said of it, each thread with its replies under it
@@ -62,12 +62,25 @@
 //
 // Every one asks `identify` who is asking and `authorize` whether they may,
 // but for what a link reads, which asks neither: the link is the permission.
+// A link with `watermark` asks with each the name of who sees it (X-Link-Viewer);
+// one `viewOnly` shows what it shares, inline, and gives nothing to save.
 //
 //   GET    /links/:token?folder=…         what the link reads, or a folder inside it
 //   GET    /links/:token/download?id=…&inline=1
 //   GET    /links/:token/zip?ids=…        what an archive of some of it (all, unless said) holds
 //   GET    /links/:token/urls?ids=…       the addresses of some of its files
-//   POST   /links/:token/uploads          { name, folder, type, size }, and /finish, /abort: a file put in it, of a link that lets files in ({ uploads })
+//   POST   /links/:token/uploads          { name, folder, type, size }, and /finish, /resume, /abort: a file put in it, of a link that lets files in ({ uploads });
+//                                         X-Link-Name says who sends, X-Link-Item which document asked for it is,
+//                                         X-Link-Expires until when it is good (YYYY-MM-DD), of a document that asks it
+//                                         and X-Link-Answers what they wrote to its questions ({ id: text }, as JSON, encoded)
+//   DELETE /links/:token/sent/:receipt     a file just sent through it taken back, for ten minutes, by the receipt its upload gave
+//   PATCH  /entries/:id/links/:link        { days, uploads, request, closed }: a link changed, closed or opened again
+//   PUT    /entries/:id/review             { status: 'accepted' | 'rejected' | null, reason }: a file that came through a request, looked at
+//   GET    /received                      what came through the requests for files of the one asking, the newest first
+//   GET    /requests                      the requests for files of the one asking: each folder, its link, its token, what came
+//   GET    /admin/requests                for who may 'configure': every request for files, with whom it was sent to and what is missing
+//   POST   /entries/:id/links/:link/remind  whoever a request was sent to reminded now of what is missing (with `reminders`)
+//   GET    /expiring?days=                files one may read whose field `expires` says they stop being good within so many days
 
 import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -88,6 +101,7 @@ import * as core from '@rebofiles/core';
 import type { Action, Context, Drive, Entry, EntryId, Role } from '@rebofiles/core';
 import type { Inspect, UploadAsked } from './inspect';
 import type { Derive, MadeHere } from './made';
+import type { Reminder } from './mail';
 import { DEFAULT_LIMITS, type Limit, type Limiter, type Limits, type Logger, type RequestDone, consoleLogger, memoryLimiter } from './observe';
 import { type KeptText, type MetadataStore, activityIn } from './metadata';
 import { type Scope, viewOf } from './view';
@@ -168,6 +182,35 @@ export interface DriveServerOptions {
   /** Each comment made, with whom it names with an @ (`@bea`): to tell them, as your application does. Its failure is logged. */
   onComment?: (event: { comment: core.Comment; entry: Entry; mentions: string[]; by: User }) => void | Promise<void>;
   /**
+   * Each file that came through a request for files: who sent it, the document asked for it is, the request (its
+   * `email` among it, for a receipt) and what came through it so far. Its failure is logged.
+   */
+  onReceived?: (event: { entry: core.FileEntry; from?: string; item?: string; request?: core.FileRequest; got?: core.Received }) => void | Promise<void>;
+  /** A file that came through a request, accepted or turned back with a reason: to tell who sent it. Its failure is logged. */
+  onReview?: (event: { entry: Entry; status: 'accepted' | 'rejected' | null; reason?: string; from?: string; by: User }) => void | Promise<void>;
+  /**
+   * Whoever a request for files was sent to (its `email`) reminded of what is missing, every `remind` days the request
+   * says, while it is open; and at once from the drive. `mailReminders({ mail: resend(…), url })` of this package sends
+   * a mail of it; yours may do anything. Without it, nobody is reminded and the drive offers it to nobody.
+   */
+  reminders?: { send: (reminder: Reminder) => void | Promise<void> };
+  /**
+   * What is written in a file that came through a request, once it is known, against the document it was asked as:
+   * the words it should say and the fields its patterns find (`checkWritten` of the core, the default). Yours may
+   * return the same of it (`{ missing, fields }`), as a service that reads documents would. `false` for none.
+   */
+  check?: false | ((event: { entry: core.FileEntry; item: core.RequestItem; text: string }) => ReturnType<typeof core.checkWritten> | Promise<ReturnType<typeof core.checkWritten>>);
+  /**
+   * The files whose field `field` (`expires`, as a request asks it) says they stop being good, told to their owner in
+   * the drive `days` before (15), and to `onExpiring`. `false` for none.
+   */
+  expiring?: false | { field?: string; days?: number; onExpiring?: (event: { entry: Entry; expires: string; days: number }) => void | Promise<void> };
+  /**
+   * A file that came through a request with the same bytes as one its owner has already, marked with the field `same`
+   * (the id of that one), to be told in what came: by the SHA-256 the page of the link says. `false` for none.
+   */
+  duplicates?: false;
+  /**
    * What the server makes of a file once it is kept, a moment after, for what the page did not make itself: its
    * smaller pictures, its placeholder, what is written in it. `deriveAll()` of `@rebofiles/server/derive` makes them of
    * pictures, PDFs, Word documents and text, with sharp and pdf.js. Needs a storage that can read and write.
@@ -206,6 +249,15 @@ interface LinkToken {
   link: string;
 }
 
+/** What lets whoever sent a file through a link take it back, a while. */
+interface ReceiptToken {
+  purpose: 'receipt';
+  file: EntryId;
+  link?: string;
+}
+/** How long a file just sent through a link may be taken back by who sent it, in seconds. */
+const RECEIPT_LIFE = 10 * 60;
+
 /** The most days a link may last. */
 const LINK_DAYS = 90;
 
@@ -233,6 +285,13 @@ interface Pending {
   /** Of a file put through a link: whose it is, the owner of the folder, and what whoever sent it said they are called. */
   owner?: string;
   from?: string;
+  /** The link it came through, and the document of its request it is. */
+  link?: string;
+  item?: { id: string; label: string };
+  /** Until when it is good, as its sender said, of a document that asks it: YYYY-MM-DD. */
+  expires?: string;
+  /** What its sender wrote to the questions of the request, by the field each is kept as. */
+  answers?: Record<string, string>;
 }
 
 /** Where to read a file from, and until when. */
@@ -280,6 +339,19 @@ const COPY_THROUGH = 100 * 1024 * 1024;
 /** How many entries a person may star; the oldest go past it. */
 const MAX_STARRED = 1000;
 /** A person's starred entries, as kept. */
+/** An entry as whoever holds a link sees it: not with whom it is shared, its links, nor the fields of the application's. */
+const bare = (entry: Entry): Entry => {
+  const { shares: _, links: __, fields: ___, hold: ____, ...rest } = entry;
+  return rest as Entry;
+};
+/** A header sent encoded, so what is in it may be in any language: as it was, trimmed; as it came, if it was not. */
+const decoded = (said: string) => {
+  try {
+    return decodeURIComponent(said).trim();
+  } catch {
+    return said.trim();
+  }
+};
 const starredOf = (kept: unknown): EntryId[] => (Array.isArray(kept) ? kept.filter((one): one is EntryId => typeof one === 'string') : []);
 
 /** A request's route as the list at the top says it, its ids as their names: `PATCH /entries/:id`. */
@@ -337,8 +409,31 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
   };
   // The text of each file, to find it by: kept by the store when it can, else for as long as the process lasts.
   const ownTexts = new Map<EntryId, KeptText>();
-  const keepText = (id: EntryId, version: string, text: string) =>
-    options.metadata.keepText ? options.metadata.keepText(id, version, text) : (ownTexts.set(id, { id, version, text }), Promise.resolve());
+  const keepText = async (id: EntryId, version: string, text: string) => {
+    await (options.metadata.keepText ? options.metadata.keepText(id, version, text) : (ownTexts.set(id, { id, version, text }), Promise.resolve()));
+    await checked(id, text).catch((error) => log.error('What is written in a file that came could not be checked:', error));
+  };
+  /**
+   * A file that came through a request, its text known: whether it says what the document asked should, and the
+   * fields found in it, kept on it for whoever looks at it (`check`: the words it does not say).
+   */
+  const checked = async (id: EntryId, text: string) => {
+    if (options.check === false) return;
+    const scope = await load({ ids: [id] });
+    const file = scope.entries.get(id);
+    if (file?.kind !== 'file' || file.fields?.via !== 'request' || !file.fields.request || !file.fields.item) return;
+    const drive = await load(await find.withLink(file.fields.request));
+    const item = core.linkOf(drive, file.fields.request)?.request?.items?.find((one) => one.label === file.fields!.item);
+    if (!item) return;
+    const said = options.check ? await options.check({ entry: file, item, text }) : core.checkWritten(item, text);
+    if (!said) return;
+    const fields = Object.fromEntries(Object.entries(said.fields ?? {}).filter(([name]) => !file.fields?.[name]));
+    await change(
+      async (drive) => ({ drive: core.setFields(drive, id, { ...fields, check: said.missing?.length ? said.missing.join(' | ') : null }, { by: 'drive', at: now() }), answer: null }),
+      'drive',
+      { ids: [id] },
+    );
+  };
   const findText = (query: string, limit: number) => (options.metadata.findText ? options.metadata.findText(query, limit) : Promise.resolve([...ownTexts.values()]));
   const activity = (id: EntryId, limit: number) => (options.metadata.activity ? options.metadata.activity(id, limit) : Promise.resolve(activityIn(ownActivity, id, limit)));
 
@@ -539,7 +634,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
    * Who puts files through a link: a user made for the request, who may make a file in the link's folder and under it,
    * and nothing else; and the folder, whose owner the files are, and what they said they are called.
    */
-  const throughLinks = new WeakMap<User, { root: Entry; owner: string; link: core.Link; from?: string }>();
+  const throughLinks = new WeakMap<User, { root: Entry; owner: string; link: core.Link; from?: string; item?: string; expires?: string; answers?: Record<string, unknown> }>();
   const linkUsers = new WeakMap<Request, User>();
   const may = (user: User, action: Action, entry: Entry | null, drive: Drive): boolean | Promise<boolean> => {
     const via = throughLinks.get(user);
@@ -679,10 +774,13 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
   // The trash emptying itself, as the settings say: looked at now and then, as requests come, not on a timer of its own.
   let sweptAt = 0;
   const sweep = async () => {
-    if (Date.now() - sweptAt < SWEEP_EVERY) return;
-    sweptAt = Date.now();
+    // By the drive's clock, so a test's moves it on too.
+    const at = Date.parse(now());
+    if (at - sweptAt < SWEEP_EVERY) return;
+    sweptAt = at;
     // Uploads left halfway, past the life of their tokens, so none can be finished any more: their parts taken away.
     void options.storage.sweepUploads?.(new Date(Date.parse(now()) - (UPLOAD_LIFE + 3600) * 1000)).catch((error) => log.error('Uploads left halfway could not be swept:', error));
+    void lookAhead().catch((error) => log.error('Reminders and what stops being good could not be looked at:', error));
     const days = (await driveSettings()).trashDays;
     if (!days) return;
     const before = new Date(Date.parse(now()) - days * 86_400_000).toISOString();
@@ -696,6 +794,53 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
     );
     await forgetComments(keys.removed);
     if (keys.keys.length) await options.storage.remove(keys.keys);
+  };
+
+  /** Whoever a request was sent to reminded of what is missing, now: sent, then kept as reminded. */
+  const remind = async (entry: Entry, link: core.Link) => {
+    const settings = await driveSettings();
+    await options.reminders!.send({
+      email: link.request!.email!,
+      folder: { id: entry.id, name: entry.name, owner: entry.owner },
+      link,
+      request: link.request!,
+      missing: core.missingOf(link),
+      token: linkToken(link),
+      company: settings.company ?? null,
+      language: settings.language,
+    });
+    return change(
+      async (drive) => {
+        const next = core.reminded(drive, entry.id, link.id, now());
+        return { drive: next, answer: { entry: core.getEntry(next, entry.id) } };
+      },
+      'drive',
+      { ids: [entry.id] },
+    );
+  };
+  const expiringField = () => (options.expiring === false ? null : (options.expiring?.field ?? 'expires'));
+  /**
+   * Now and then, with the sweep: the requests due a reminder reminded, and the owners of files that stop being good
+   * soon told, once for each day a file says. Of the whole drive, as there is no index of either.
+   */
+  const lookAhead = async () => {
+    const field = expiringField();
+    const at = now();
+    const live = (drive: Drive) => [...drive.entries.values()].filter((entry) => !core.isTrashed(drive, entry.id));
+    const reminding = options.reminders ? await find.withReminders(1000) : null;
+    if (reminding)
+      for (const { entry, link } of core.remindersDue(live(await load(reminding)), at))
+        await remind(entry, link).catch((error) => log.error(`The reminder of a request of “${entry.name}” could not be sent:`, error));
+    if (!field || options.expiring === false) return;
+    const days = options.expiring?.days ?? 15;
+    const soon = await find.withFieldUpTo(field, new Date(Date.parse(at) + days * 86_400_000).toISOString().slice(0, 10), 1000);
+    if (!soon) return;
+    for (const { entry, expires, days: left } of core.expiringWithin(live(await load(soon)), field, at, days)) {
+      const told = core.noticesOf(await getSetting(`inbox:${entry.owner}`)).some((notice) => notice.kind === 'expiring' && notice.entry === entry.id && notice.expires === expires);
+      if (told) continue;
+      await notify(entry.owner, { kind: 'expiring', entry: entry.id, name: entry.name, by: 'drive', expires });
+      if (options.expiring?.onExpiring) void Promise.resolve(options.expiring.onExpiring({ entry, expires, days: left })).catch((error) => log.error('onExpiring failed:', error));
+    }
   };
 
   /** The rule of keeping, as the settings say it now: no entry deleted for good before so many days since it was made. */
@@ -754,7 +899,8 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
       };
       const route = routeOf(request.method, path);
       // Through a link that lets files in: a file put in its folder, and nothing else.
-      if (via && !['POST /uploads', 'POST /uploads/finish', 'POST /uploads/abort'].includes(route)) throw new Refused(403, 'forbidden', 'A link puts files in, and does nothing else.');
+      if (via && !['POST /uploads', 'POST /uploads/finish', 'POST /uploads/resume', 'POST /uploads/abort'].includes(route))
+        throw new Refused(403, 'forbidden', 'A link puts files in, and does nothing else.');
       const id = decodeURIComponent(/^\/entries\/([^/]+)/.exec(path)?.[1] ?? '');
       const versionId = decodeURIComponent(/\/versions\/([^/]+)/.exec(path)?.[1] ?? '');
       const shareWith = decodeURIComponent(/\/shares\/([^/]+)/.exec(path)?.[1] ?? '');
@@ -932,6 +1078,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             canConfigure: await may(user, 'configure', null, drive),
             saved: kept !== undefined || options.settings !== undefined,
             you: user.id,
+            can: { remind: !!options.reminders, expiring: options.expiring !== false },
           });
         }
 
@@ -1018,13 +1165,43 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             const parent = via && !asked.parent ? via.root : folderOf(drive, asked.parent);
             await allow(user, 'upload', parent, drive);
             if (parent && core.isTrashed(drive, parent.id)) throw new Refused(409, 'in-trash', 'That folder is in the trash.');
+            // What a request asks of what is sent through it, said before anything goes.
+            let item: core.RequestItem | undefined;
+            let answers: Record<string, string> | undefined;
+            if (via) {
+              const request = via.link.request;
+              if (request?.askName && !via.from) throw new Refused(400, 'name-needed', 'Say who you are first.');
+              if (!core.accepts(request, name, type)) throw new Refused(415, 'not-accepted', `This request takes ${request!.accept!.join(', ')}.`);
+              if (request?.maxSize !== undefined && size > request.maxSize) throw new Refused(413, 'too-large', `Files up to ${bytes(request.maxSize)} here.`);
+              if (request?.maxFiles !== undefined && (via.link.got?.files ?? 0) >= request.maxFiles) throw new Refused(409, 'request-full', 'This request has all the files it takes.');
+              if (via.item) {
+                item = request?.items?.find((one) => one.id === via.item);
+                if (!item) throw new Refused(400, 'no-item', 'This request does not ask for that document.');
+              }
+              if (via.expires && (!item?.expires || !/^\d{4}-\d{2}-\d{2}$/.test(via.expires) || !core.isDate(via.expires)))
+                throw new Refused(400, 'bad-expires', 'Say until when it is good as a date, of a document that asks it.');
+              try {
+                answers = core.answersTo(request, via.answers ?? {});
+              } catch (error) {
+                throw new Refused(400, 'answers-missing', (error as Error).message);
+              }
+            }
             pending = {
               versionId,
               size,
               type,
               user: user.id,
               file: { id: newId(), name, parent: parent?.id ?? null },
-              ...(via ? { owner: via.owner, ...(via.from ? { from: via.from } : {}) } : {}),
+              ...(via
+                ? {
+                    owner: via.owner,
+                    link: via.link.id,
+                    ...(via.from ? { from: via.from } : {}),
+                    ...(item ? { item: { id: item.id, label: item.label } } : {}),
+                    ...(via.expires ? { expires: via.expires } : {}),
+                    ...(answers && Object.keys(answers).length ? { answers } : {}),
+                  }
+                : {}),
             };
           }
           if (options.beforeUpload) {
@@ -1101,6 +1278,15 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           }
           if (options.inspect) await inspected(pending, user);
           const version = { id: pending.versionId, key: pending.key, size: pending.size, ...(pending.sha256 ? { sha256: pending.sha256 } : {}), ...(pending.parts ? { parts: pending.parts } : {}) };
+          // Of what came through a request, a file its owner has already, of the same bytes: the first of them they may read.
+          const same =
+            pending.link && pending.owner && pending.sha256 && options.duplicates !== false
+              ? await (async () => {
+                  const drive = await load(await find.withHashes([pending.sha256!]));
+                  const files = (core.filesByHash(drive, [pending.sha256!]).get(pending.sha256!) ?? []).filter((file) => !core.isTrashed(drive, file.id));
+                  return (await readable({ id: pending.owner! }, files, drive))[0]?.id;
+                })().catch((error) => (log.warn('The same bytes could not be looked for:', error), undefined))
+              : undefined;
           const kept = await change(
             async (drive) => {
               if (pending.rendition) {
@@ -1115,11 +1301,48 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
                 const next = core.addVersion(drive, pending.of, version, context());
                 return { drive: next, answer: { entry: core.getEntry(next, pending.of) } };
               }
-              const file = pending.file!;
+              const file = { ...pending.file! };
               await allow(user, 'upload', folderOf(drive, file.parent), drive);
-              let next = core.addFile(drive, { ...file, type: pending.type, version, ...(pending.owner ? { owner: pending.owner } : {}) }, context());
-              // Who sent it through a link, as they said.
-              if (pending.from) next = core.setFields(next, file.id, { from: pending.from }, context());
+              let next = drive;
+              const link = pending.link ? core.linkOf(drive, pending.link) : undefined;
+              const request = link?.request;
+              if (link) {
+                if (request?.maxFiles !== undefined && (link.got?.files ?? 0) >= request.maxFiles) throw new Refused(409, 'request-full', 'This request has all the files it takes.');
+                // A folder of their own for each who sends, inside the link's, made with the first they send.
+                if (request?.perSender && pending.from) {
+                  const name = pending.from.replace(/[\\/:*?"<>|]/g, '-').slice(0, 100);
+                  const theirs = core.children(drive, file.parent).find((entry) => entry.kind === 'folder' && core.sameName(entry.name, name));
+                  if (theirs) file.parent = theirs.id;
+                  else {
+                    const made = newId();
+                    next = core.createFolder(next, { id: made, name, parent: file.parent, owner: pending.owner }, context());
+                    file.parent = made;
+                  }
+                  // What they wrote, on their folder too: theirs, the last said.
+                  if (pending.answers) next = core.setFields(next, file.parent, pending.answers, context());
+                }
+                file.name = core.renamed(request, { name: file.name, item: pending.item?.label, from: pending.from, at: now() });
+              }
+              next = core.addFile(next, { ...file, type: pending.type, version, ...(pending.owner ? { owner: pending.owner } : {}) }, context());
+              // Who sent it through a link, as they said; what it is of the request; the application's fields of it.
+              if (link) {
+                next = core.setFields(
+                  next,
+                  file.id,
+                  {
+                    ...pending.answers,
+                    ...request?.fields,
+                    via: 'request',
+                    request: link.id,
+                    ...(pending.from ? { from: pending.from } : {}),
+                    ...(pending.item ? { item: pending.item.label } : {}),
+                    ...(pending.expires ? { expires: pending.expires } : {}),
+                    ...(same ? { same } : {}),
+                  },
+                  context(),
+                );
+                next = core.receivedThrough(next, link.id, { at: now(), item: pending.item?.id, from: pending.from });
+              }
               return { drive: next, answer: { entry: core.getEntry(next, file.id) } };
             },
             user.id,
@@ -1127,8 +1350,20 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           );
           // What the page does not make of it, made after the answer: its pictures, what is written in it.
           if (!pending.rendition) toDerive(kept.entry.id, pending.versionId, pending.madeHere ?? []);
-          // The owner told of a file that came through a link of theirs.
-          if (pending.owner && pending.file) await notify(pending.owner, { kind: 'received', entry: kept.entry.id, name: kept.entry.name, by: pending.from ?? user.id });
+          // The owner told of a file that came through a link of theirs; whoever sent it given what takes it back a while.
+          if (pending.owner && pending.file) {
+            await notify(pending.owner, { kind: 'received', entry: kept.entry.id, name: kept.entry.name, by: pending.from ?? user.id });
+            if (options.onReceived)
+              void Promise.resolve()
+                .then(async () => {
+                  const drive = await load({ ids: [kept.entry.id] });
+                  const link = pending.link ? core.linkOf(drive, pending.link) : undefined;
+                  return options.onReceived!({ entry: kept.entry as core.FileEntry, from: pending.from, item: pending.item?.label, request: link?.request, got: link?.got });
+                })
+                .catch((error) => log.error('onReceived failed:', error));
+            const receipt = sealToken(options.secret, { purpose: 'receipt', file: kept.entry.id, link: pending.link } satisfies ReceiptToken, RECEIPT_LIFE);
+            return Response.json({ ...kept, receipt });
+          }
           return Response.json(kept);
         }
 
@@ -1391,8 +1626,9 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           );
 
         case 'POST /entries/:id/links': {
-          const asked = await body<{ days?: number; password?: string; once?: boolean; uploads?: 'also' | 'only' }>();
+          const asked = await body<{ days?: number; password?: string; once?: boolean; uploads?: 'also' | 'only'; request?: unknown; viewOnly?: boolean; watermark?: boolean }>();
           const days = asked.days === undefined ? 7 : Number(asked.days);
+          const request = asked.uploads && asked.request !== undefined ? core.readRequest(asked.request) : undefined;
           if (!(days > 0 && days <= LINK_DAYS)) throw new Refused(400, 'bad-days', `A link lasts from a day to ${LINK_DAYS} days.`);
           const password = typeof asked.password === 'string' && asked.password ? asked.password : undefined;
           if (password && password.length < 4) throw new Refused(400, 'bad-password', 'A password of four characters or more.');
@@ -1402,6 +1638,9 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             locked: !!password,
             uses: asked.once ? 1 : undefined,
             ...(asked.uploads ? { uploads: asked.uploads } : {}),
+            ...(request ? { request } : {}),
+            ...(asked.viewOnly === true ? { viewOnly: true } : {}),
+            ...(asked.watermark === true ? { watermark: true } : {}),
           };
           // Kept before the link is there, so it is never there without it.
           if (password) await setSetting(`link:${made.id}`, await sealPassword(password));
@@ -1416,6 +1655,118 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
               { ids: [id] },
             ),
           );
+        }
+        case 'PATCH /entries/:id/links/:link': {
+          const asked = await body<{ days?: number; uploads?: 'also' | 'only'; request?: unknown; closed?: boolean }>();
+          const days = asked.days === undefined ? undefined : Number(asked.days);
+          if (days !== undefined && !(days > 0 && days <= LINK_DAYS)) throw new Refused(400, 'bad-days', `A link lasts from a day to ${LINK_DAYS} days.`);
+          return Response.json(
+            await change(
+              async (drive) => {
+                await allow(user, 'share', core.getEntry(drive, id), drive);
+                const at = now();
+                const next = core.updateLink(
+                  drive,
+                  id,
+                  linkId,
+                  {
+                    ...(days ? { expires: new Date(Date.parse(at) + days * 86_400_000).toISOString() } : {}),
+                    ...(asked.uploads ? { uploads: asked.uploads } : {}),
+                    ...(asked.request !== undefined ? { request: core.readRequest(asked.request) } : {}),
+                    ...(asked.closed === true ? { closed: at } : asked.closed === false ? { closed: null } : {}),
+                  },
+                  at,
+                );
+                return { drive: next, answer: { entry: core.getEntry(next, id) } };
+              },
+              user.id,
+              { ids: [id] },
+            ),
+          );
+        }
+        case 'PUT /entries/:id/review': {
+          const asked = await body<{ status?: 'accepted' | 'rejected' | null; reason?: string }>();
+          const status = asked.status === 'accepted' || asked.status === 'rejected' ? asked.status : null;
+          const reason = status === 'rejected' && typeof asked.reason === 'string' ? asked.reason.trim().slice(0, 500) : '';
+          const kept = await change(
+            async (drive) => {
+              await allow(user, 'rename', core.getEntry(drive, id), drive);
+              const next = core.setFields(drive, id, { review: status, reviewReason: reason || null }, context());
+              return { drive: next, answer: { entry: core.getEntry(next, id) } };
+            },
+            user.id,
+            { ids: [id] },
+          );
+          if (options.onReview)
+            void Promise.resolve(options.onReview({ entry: kept.entry, status, ...(reason ? { reason } : {}), from: kept.entry.fields?.from, by: user })).catch((error) =>
+              log.error('onReview failed:', error),
+            );
+          return Response.json(kept);
+        }
+        case 'GET /received': {
+          // What came through requests for files, of what the one asking may read, the newest first.
+          const drive = await load(await find.withField('via', 'request', 2000));
+          const entries = [...drive.entries.values()]
+            .filter((entry) => entry.fields?.via === 'request' && !core.isTrashed(drive, entry.id))
+            .sort((a, b) => (a.created < b.created ? 1 : a.created > b.created ? -1 : 0))
+            .slice(0, 500);
+          return Response.json({ entries: await readable(user, entries, drive) });
+        }
+        case 'GET /requests': {
+          // One's own requests for files: the folders one owns whose links take files.
+          const drive = await load(await find.owned(user.id));
+          const requests = [...drive.entries.values()]
+            .filter((entry) => entry.owner === user.id && !core.isTrashed(drive, entry.id))
+            .flatMap((entry) => (entry.links ?? []).filter((link) => link.uploads).map((link) => ({ folder: { id: entry.id, name: entry.name }, link, token: linkToken(link) })))
+            .sort((a, b) => (a.link.at < b.link.at ? 1 : -1));
+          return Response.json({ requests });
+        }
+        case 'GET /admin/requests': {
+          await allow(user, 'configure', null, await load({}));
+          // Every request for files, for the application to remind whom each was sent to of what is missing before it ends.
+          const drive = await options.metadata.load();
+          const at = now();
+          const requests = [...drive.entries.values()].flatMap((entry) =>
+            (entry.links ?? [])
+              .filter((link) => link.uploads && link.request && !link.closed && link.expires > at && !core.isTrashed(drive, entry.id))
+              .map((link) => ({ folder: { id: entry.id, name: entry.name, owner: entry.owner }, link, token: linkToken(link), missing: core.missingOf(link) })),
+          );
+          return Response.json({ requests });
+        }
+        case 'POST /entries/:id/links/:link/remind': {
+          if (!options.reminders) throw new Refused(409, 'no-reminders', 'This drive sends no reminders.');
+          const drive = await load({ ids: [id] });
+          const entry = core.getEntry(drive, id);
+          await allow(user, 'share', entry, drive);
+          const link = entry.links?.find((l) => l.id === linkId);
+          if (!link) throw new Refused(404, 'no-link', 'There is no such link.');
+          if (!link.request?.email) throw new Refused(409, 'no-email', 'This request was sent to no email.');
+          if (link.closed || !(link.expires > now())) throw new Refused(409, 'closed', 'This request is closed.');
+          return Response.json(await remind(entry, link));
+        }
+        case 'GET /expiring': {
+          const field = expiringField();
+          if (!field) return Response.json({ files: [] });
+          const days = Math.min(3650, Math.max(0, Number(url.searchParams.get('days') ?? (options.expiring || undefined)?.days ?? 15) || 0));
+          const scope = await find.withFieldUpTo(field, new Date(Date.parse(now()) + days * 86_400_000).toISOString().slice(0, 10), 2000);
+          if (!scope) return Response.json({ files: [] });
+          const drive = await load(scope);
+          const soon = core.expiringWithin(
+            [...drive.entries.values()].filter((entry) => !core.isTrashed(drive, entry.id)),
+            field,
+            now(),
+            days,
+          );
+          const mine = new Set(
+            (
+              await readable(
+                user,
+                soon.map((one) => one.entry),
+                drive,
+              )
+            ).map((entry) => entry.id),
+          );
+          return Response.json({ files: soon.filter((one) => mine.has(one.entry.id)).map(({ entry, expires, days }) => ({ entry, expires, days })) });
         }
         case 'GET /entries/:id/links/:link': {
           const drive = await load({ ids: [id] });
@@ -1606,6 +1957,8 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
       }),
     );
     const root = sealed?.purpose === 'link' ? core.linked(drive, sealed.link, now()) : null;
+    // A request closed, by its owner or by having all it asked for, says so: who was sending knows it is not a mistake.
+    if (!root && sealed?.purpose === 'link' && core.linkOf(drive, sealed.link)?.closed) throw new Refused(410, 'request-closed', 'This request for files is closed.');
     // One answer for a link changed, out of date, taken back or in the trash: which, is not for whoever holds it.
     if (!root) throw new Refused(404, 'no-link', 'This link does not work any more.');
     const link = core.linkOf(drive, sealed!.link)!;
@@ -1624,10 +1977,44 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         throw new Refused(401, 'link-password-wrong', 'That is not the password.');
       }
     }
+    // A link that shows who sees it: their name asked for at every request, as its password is; the first look kept.
+    const viewer = link.watermark ? decoded(request.headers.get('x-link-viewer') ?? '').slice(0, 100) : '';
+    if (link.watermark && rest !== 'uploads' && rest !== 'sent' && !viewer) throw new Refused(401, 'link-viewer', 'Say who you are to see it.');
+    if (link.watermark && viewer && rest === undefined && !url.searchParams.get('folder'))
+      await change(async (current) => ({ drive: core.viewedLink(current, link.id, viewer, now()), answer: null }), 'drive', { ids: [root.id] });
+    // Only to be seen: nothing of it saved through it.
+    const toSave = (rest === 'download' || rest === 'urls') && url.searchParams.get('inline') !== '1';
+    if (link.viewOnly && (toSave || rest === 'zip')) throw new Refused(403, 'view-only', 'This link is only to see what it shares.');
     /** One more use of a link that has a number of them: a file of it, or an archive of it, downloaded. Seeing a file in the page is not one. */
     const spend = async () => {
       if (link.uses !== undefined && (link.used ?? 0) < link.uses) await change(async (current) => ({ drive: core.useLink(current, link.id, now()), answer: null }), 'drive', { ids: [root.id] });
     };
+    // A file just sent taken back by who sent it, with the receipt its upload gave them: for a few minutes.
+    if (rest === 'sent' && request.method === 'DELETE') {
+      const receipt = openToken<ReceiptToken>(options.secret, decodeURIComponent(path.split('/')[4] ?? ''));
+      if (receipt?.purpose !== 'receipt' || receipt.link !== link.id) throw new Refused(403, 'bad-token', 'That file can no longer be taken back.');
+      const keys = await change(
+        async (current) => {
+          const file = core.getFile(current, receipt.file);
+          if (!core.isWithin(current, file.id, root.id)) throw new Refused(403, 'bad-token', 'That file can no longer be taken back.');
+          const trashed = core.moveToTrash(current, file.id, { by: `link:${link.id}`, at: now() });
+          let removed: { drive: Drive; keys: string[] };
+          try {
+            const gone = core.deleteForever(trashed, file.id, await keeping());
+            removed = { drive: gone.drive, keys: gone.keys };
+          } catch {
+            // Kept by a rule of days or a hold: in the trash of its owner, then.
+            removed = { drive: trashed, keys: [] };
+          }
+          const item = file.fields?.item ? link.request?.items?.find((one) => one.label === file.fields!.item)?.id : undefined;
+          return { drive: core.retracted(removed.drive, link.id, item), answer: removed.keys };
+        },
+        `link:${link.id}`,
+        { ids: [receipt.file] },
+      );
+      if (keys.length) await options.storage.remove(keys).catch((error) => log.error('The bytes of a file taken back could not be taken away:', error));
+      return Response.json({ ok: true });
+    }
     // A request for files: what is in it is not for whoever sends them.
     if (link.uploads === 'only' && rest !== undefined && rest !== 'uploads') throw new Refused(403, 'forbidden', 'This link only takes files.');
     if (rest === 'uploads') {
@@ -1635,8 +2022,20 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
       await throttle('uploads', `link:${link.id}`);
       // The routes of an upload, as one who may only put files in this folder; whose they are is its owner's.
       const who: User = { id: `link:${link.id}` };
-      const from = (request.headers.get('x-link-name') ?? '').trim().slice(0, 100);
-      throughLinks.set(who, { root, owner: root.owner, link, ...(from ? { from } : {}) });
+      // Sent encoded, so a name in any language goes in a header.
+      const from = decoded(request.headers.get('x-link-name') ?? '').slice(0, 100);
+      // What they wrote to its questions, as JSON, encoded the same.
+      const answers = (() => {
+        try {
+          const said = JSON.parse(decoded(request.headers.get('x-link-answers') ?? '') || '{}');
+          return typeof said === 'object' && said !== null && !Array.isArray(said) ? (said as Record<string, unknown>) : {};
+        } catch {
+          throw new Refused(400, 'bad-answers', 'What was written does not read.');
+        }
+      })();
+      const item = (request.headers.get('x-link-item') ?? '').trim();
+      const expires = (request.headers.get('x-link-expires') ?? '').trim();
+      throughLinks.set(who, { root, owner: root.owner, link, answers, ...(from ? { from } : {}), ...(item ? { item } : {}), ...(expires ? { expires } : {}) });
       const sub = path.split('/')[4];
       const inner = new Request(`${url.origin}${base}/uploads${sub ? `/${sub}` : ''}`, { method: request.method, headers: request.headers, body: await request.arrayBuffer() });
       linkUsers.set(inner, who);
@@ -1650,10 +2049,35 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
     if (rest === undefined) {
       const folder = inside(url.searchParams.get('folder'));
       const path = [...core.ancestors(drive, folder.id), folder].filter((entry) => core.isWithin(drive, entry.id, root.id));
-      const what = { uploads: link.uploads ?? null };
+      // What whoever opens it is told: what it takes and asks, what came of each document, whose it is, in their colour.
+      const ask = link.request;
+      const what = {
+        uploads: link.uploads ?? null,
+        ...(link.viewOnly ? { viewOnly: true } : {}),
+        ...(link.watermark ? { watermark: true } : {}),
+        owner: root.owner,
+        expires: link.expires,
+        brand: (await driveSettings()).brand,
+        company: (await driveSettings()).company ?? null,
+        ...(ask
+          ? {
+              request: {
+                ...(ask.title ? { title: ask.title } : {}),
+                ...(ask.message ? { message: ask.message } : {}),
+                ...(ask.askName ? { askName: true } : {}),
+                ...(ask.accept ? { accept: ask.accept } : {}),
+                ...(ask.maxSize ? { maxSize: ask.maxSize } : {}),
+                ...(ask.maxFiles ? { maxFiles: ask.maxFiles, left: Math.max(0, ask.maxFiles - (link.got?.files ?? 0)) } : {}),
+                // What a document is checked for is not its sender's to read.
+                ...(ask.items ? { items: ask.items.map((one) => ({ id: one.id, label: one.label, ...(one.expires ? { expires: true } : {}), received: link.got?.items?.[one.id] ?? 0 })) } : {}),
+                ...(ask.questions ? { questions: ask.questions.map((one) => ({ id: one.id, label: one.label, ...(one.required ? { required: true } : {}) })) } : {}),
+              },
+            }
+          : {}),
+      };
       // A request for files sees its folder, and nothing in it.
-      if (link.uploads === 'only') return Response.json({ root, folder: root, path: [root], entries: [], link: what });
-      return Response.json({ root, folder, path, entries: folder.kind === 'folder' ? core.children(drive, folder.id) : [], link: what });
+      if (link.uploads === 'only') return Response.json({ root: bare(root), folder: bare(root), path: [bare(root)], entries: [], link: what });
+      return Response.json({ root: bare(root), folder: bare(folder), path: path.map(bare), entries: folder.kind === 'folder' ? core.children(drive, folder.id).map(bare) : [], link: what });
     }
     if (rest === 'download') {
       const file = inside(url.searchParams.get('id'));

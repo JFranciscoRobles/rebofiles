@@ -44,6 +44,8 @@ export interface NewFolder {
   id: EntryId;
   name: string;
   parent: EntryId | null;
+  /** Whose it is: the one who made it unless said, as the owner of a folder a link put something in. */
+  owner?: string;
 }
 
 export function createFolder(drive: Drive, folder: NewFolder, context: Context): Drive {
@@ -52,9 +54,9 @@ export function createFolder(drive: Drive, folder: NewFolder, context: Context):
   const entry: FolderEntry = {
     kind: 'folder',
     id: folder.id,
-    name: free(drive, folder.parent, folder.name, undefined, context.by, { ifTaken: 'keep-both' }),
+    name: free(drive, folder.parent, folder.name, undefined, folder.owner ?? context.by, { ifTaken: 'keep-both' }),
     parent: folder.parent,
-    owner: context.by,
+    owner: folder.owner ?? context.by,
     created: context.at,
     modified: context.at,
     modifiedBy: context.by,

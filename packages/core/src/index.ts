@@ -12,6 +12,7 @@ export {
   type Role,
   type Share,
   type Link,
+  type LinkView,
   type FolderEntry,
   type FolderColor,
   FOLDER_COLORS,
@@ -74,6 +75,30 @@ export { type Changes, changes } from './changes';
 export { type Activity, type ActivityAction, activityOf, activityFor } from './activity';
 export { type Comment, COMMENT_LENGTH, commentText, mentionsOf, threads } from './comments';
 export { type Notice, MAX_NOTICES, noticesOf } from './notices';
+export {
+  type FileRequest,
+  type Received,
+  type RequestItem,
+  type RequestQuestion,
+  type RequestTemplate,
+  RESERVED_FIELDS,
+  accepts,
+  answersTo,
+  checkWritten,
+  expiringWithin,
+  fieldFor,
+  isDate,
+  missingOf,
+  readRequest,
+  readTemplates,
+  receivedThrough,
+  reminded,
+  remindersDue,
+  renamed,
+  requestDone,
+  retracted,
+  updateLink,
+} from './requests';
 export { type Sheet, type SheetLimits, readXlsx, textOfSheets } from './xlsx';
 export {
   type Action,
@@ -98,5 +123,7 @@ export {
   useLink,
   linkSpent,
   LINK_GRACE,
+  LINK_VIEWS,
+  viewedLink,
 } from './sharing';
 export { PART_SIZE, MAX_PARTS, partSizeOf, partsOf } from './parts';

@@ -30,6 +30,8 @@ export const PROPS: Prop[] = [
   { name: 'layout', type: "'full' | 'compact'", group: 'Look', does: '`compact`: no column on the left; New and the places in a strip over the list, for a drive in a smaller part of a page.' },
   { name: 'className', type: 'string', group: 'Look', does: 'A class of your own on `.rf-drive`, for its custom properties.' },
   { name: 'checkUploads', type: 'boolean', group: 'Files', does: '`false` uploads without looking for the same file, or one of its name, in the drive first: a taken name is made free with “(2)”.' },
+  { name: 'requestTemplates', type: 'boolean', group: 'Files', does: '`false` leaves out the templates of requests: to start one from, and to save one as.' },
+  { name: 'qr', type: 'boolean', group: 'Files', does: '`false` leaves out the QR code of a request made.' },
   { name: 'onOpen', type: '(file, url) => void', group: 'Files', does: 'A file opened by a double click or Enter, your own way. Unless given, the drive’s viewer shows it.' },
   {
     name: 'fields',
@@ -58,7 +60,7 @@ export const PROPS: Prop[] = [
     name: 'newDocument',
     type: '() => Uint8Array',
     group: 'Word documents',
-    does: '“Create document” over the files and “New document” in New: an empty .docx named by the person, in the folder they are in, then opened. `newDocx`.',
+    does: '“New document” in the Upload menu: an empty .docx named by the person, in the folder they are in, then opened. `newDocx`.',
   },
   { name: 'onChange', type: '() => void', group: 'Events', does: 'After every change made from the drive, for what else in the page shows it (mountDrive; in React, the provider tells the hooks).' },
   { name: 'live', type: 'boolean', group: 'Events', does: 'What others change, shown as it happens, from the server’s `/events`. `true` unless said; in React, the provider’s.' },
@@ -97,7 +99,7 @@ export interface Method {
   name: string;
   signature: string;
   does: string;
-  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live' | 'Comments' | 'Keeping' | 'Told' | 'Looking after';
+  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Requests' | 'Files' | 'Settings' | 'Live' | 'Comments' | 'Keeping' | 'Told' | 'Looking after';
 }
 
 /** The client of the routes, `createDriveClient({ base })`, and what `createMemoryClient` answers the same way. */
@@ -143,9 +145,20 @@ export const CLIENT: Method[] = [
   {
     group: 'Sharing',
     name: 'createLink',
-    signature: 'createLink(id, days, { password, once, uploads })',
-    does: 'A link to read it without signing in, and its token; of a folder, one that takes files too (`also`) or only (`only`).',
+    signature: 'createLink(id, days, { password, once, uploads, request })',
+    does: 'A link to read it without signing in, and its token; of a folder, one that takes files too (`also`) or only (`only`); with `request`, the documents it asks for, a folder for each person and the names they are kept by.',
   },
+  {
+    group: 'Sharing',
+    name: 'updateLink',
+    signature: 'updateLink(id, link, { days, uploads, request, closed })',
+    does: 'A link changed: for days from now, what it takes and asks; closed, or opened again.',
+  },
+  { group: 'Requests', name: 'received', signature: 'received()', does: 'What came through one’s requests for files, the newest first.' },
+  { group: 'Requests', name: 'requests', signature: 'requests()', does: 'One’s requests for files: each folder, its link, its token and what came.' },
+  { group: 'Requests', name: 'remind', signature: 'remind(id, link)', does: 'Whom a request was sent to, reminded now of what is missing, with the server’s `reminders`.' },
+  { group: 'Requests', name: 'expiring', signature: 'expiring(days?)', does: 'Files one may read whose field `expires` comes within so many days (15), or passed; the soonest first.' },
+  { group: 'Requests', name: 'review', signature: 'review(id, status, reason?)', does: 'A file that came accepted, or returned with a reason the sender’s page shows; looked at no more with null.' },
   { group: 'Sharing', name: 'linkToken', signature: 'linkToken(id, link)', does: 'The token of a link made before: the same every time.' },
   { group: 'Sharing', name: 'removeLink', signature: 'removeLink(id, link)', does: 'Taken back.' },
   { group: 'Files', name: 'url', signature: 'url(id, { version, inline, size })', does: 'An address to read a file from: a download, or to show it at a size.' },
@@ -170,6 +183,12 @@ export const CLIENT: Method[] = [
   },
   { group: 'Told', name: 'sawNotifications', signature: 'sawNotifications()', does: 'They looked: none is new any more.' },
   { group: 'Looking after', name: 'adminUsage', signature: 'adminUsage()', does: 'For who may configure: the files, folders and bytes of each person, and of the whole drive.' },
+  {
+    group: 'Looking after',
+    name: 'adminRequests',
+    signature: 'adminRequests()',
+    does: 'For who may configure: every request for files open, whom it was sent to and what is still missing, to remind them.',
+  },
   { group: 'Looking after', name: 'adminActivity', signature: 'adminActivity(limit?)', does: 'For who may configure: what was done anywhere in the drive, the newest first.' },
   {
     group: 'Live',
@@ -194,7 +213,11 @@ export const SERVER_OPTIONS: ServerOption[] = [
   { name: 'base', type: 'string', does: 'The path the routes are under: `/api/files`.' },
   { name: 'top', type: "'own' | 'everyone'", does: 'What My files shows at the top: each person’s own (the default), or everything one may read, for one drive of a whole team.' },
   { name: 'maxSize', type: 'number', does: 'The largest file taken, in bytes; 5 GiB unless said.' },
-  { name: 'settings', type: 'Partial<DriveSettings>', does: 'The defaults until someone changes them: language, theme, brand colour, pictures, `quota`, `trashDays`.' },
+  {
+    name: 'settings',
+    type: 'Partial<DriveSettings>',
+    does: 'The defaults until someone changes them: language, theme, brand colour, pictures, `quota`, `trashDays`, and `company`, the name the page of a request for files shows.',
+  },
   { name: 'cors', type: '{ origins: string[] }', does: 'Pages of other origins that may use the routes: the desktop window, a page of another domain.' },
   { name: 'onShare', type: '(event) => void', does: 'Each share kept, with who, by whom and whether it is the first: to tell the person.' },
   {
@@ -215,6 +238,19 @@ export const SERVER_OPTIONS: ServerOption[] = [
   },
   { name: 'onChange', type: '({ activity, entry }) => void', does: 'Each thing done to the drive, as its activity says it: for webhooks, an audit, another index, counting space.' },
   { name: 'onComment', type: '({ comment, entry, mentions, by }) => void', does: 'Each comment made, with whom it names with an @: to tell them.' },
+  {
+    name: 'onReceived',
+    type: '({ entry, from, item, request, got }) => void',
+    does: 'Each file that came through a request for files, with who sent it, for which document, and what came so far: to tell the owner.',
+  },
+  { name: 'onReview', type: '({ entry, status, reason, from, by }) => void', does: 'Each file accepted or returned: to tell whoever sent it.' },
+  {
+    name: 'reminders',
+    type: '{ send(reminder) }',
+    does: 'Whom a request was sent to, reminded every `remind` days of what is missing, and at once: `mailReminders({ mail: resend(…), url })`, or yours.',
+  },
+  { name: 'check', type: 'false | ({ entry, item, text }) => …', does: 'What is written in what came, against the `words` and `find` of its document: `checkWritten` unless yours; `false` for none.' },
+  { name: 'expiring', type: 'false | { field, days, onExpiring }', does: 'The owner of a file whose field `expires` comes within `days` (15) told in the bell, and `onExpiring`; `false` for none.' },
   { name: 'logger', type: 'Logger', does: 'Where what went wrong and was not answered for is written: `pino()`, `console` unless given.' },
   { name: 'onRequest', type: '(done) => void', does: 'After every request, its route, status, time and who: for metrics, as `openTelemetry(meter)`.' },
   { name: 'limits', type: 'Limits | false', does: 'How many uploads, archives, text searches, wrong passwords of a link and requests each may make; a 429 past them.' },

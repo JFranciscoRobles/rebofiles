@@ -4,7 +4,7 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REMINDERS_CODE, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
 import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ZH } from '../team';
 
@@ -423,15 +423,38 @@ export const sharing: DocPage = {
       title: '文件收集',
       badge: '上传',
       color: 'green',
-      lead: '文件夹的链接可以接收文件：“查看并添加文件”，或“仅发送文件”（不显示文件夹中任何内容的文件收集）。打开链接的人无需登录，可选填姓名后发送。',
+      lead: '在文件夹的菜单中（进入文件夹后在其名称旁）选择“收集文件”：创建可接收文件的链接，“仅发送文件”不显示文件夹中的任何内容，“查看并添加文件”则可查看。创建后自动复制，可直接打开或发送；打开链接的人无需登录，可选填姓名后发送。',
       body: (
         <>
           <Code code={REQUEST_CODE} />
           <List
             items={[
-              '收到的文件属于文件夹的所有者，计入其空间，并注明发送者（字段 “from”）。所有者会在铃铛中收到通知。',
-              '与其他文件一样分片直接上传到存储并接受检查；该链接不能做其他任何事。',
-              '有效期、密码和使用次数与其他链接相同。',
+              '发送者会看到所需的每份文件各自的位置，可“选择文件”或“拍照”：同一份文件的多张照片会合并为一个 PDF。发送后十分钟内可撤销，并可下载回执。',
+              '收到的文件属于文件夹的所有者，计入其空间，并注明发送者和对应的文件项。所有者会在铃铛中收到通知，在“已收到”中查看全部，并可接受或附原因退回。',
+              '文件夹在文件上方显示进行中的收集：每项收到了什么、还缺什么、到期时间。',
+              '与其他文件一样分片直接上传到存储，中断后可续传并接受检查；该链接不能做其他任何事。有效期和密码与其他链接相同。',
+              '链接页面会显示你的公司名称（设置 → company）和网盘的品牌色，让发送者知道是发给谁的。',
+            ]}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'reminders-and-checks',
+      title: '模板、提醒、检查与到期',
+      badge: '文件收集',
+      color: 'green',
+      lead: '文件收集除了接收文件之外还能做的事。除非网盘或服务器设为 false，否则都会开启；提醒需要提供发送方式。',
+      body: (
+        <>
+          <Code code={REMINDERS_CODE} />
+          <List
+            items={[
+              '模板：在请求对话框顶部“从模板开始”；有配置权限的人可“存为模板”（保存要求的内容和方式，不含发给谁）。在“设置 → 外观”中列出，可删除。界面的 requestTemplates: false 可关闭。',
+              '链接地址的二维码：在请求创建后的页面中，可给手机扫描或下载为 PNG；qr: false 可关闭。',
+              '提醒：只要请求仍开放且有缺失，每 2、3 或 7 天提醒收件人，也可点“立即提醒”。服务器没有 reminders 时，对话框不会提供该选项。',
+              '检查：文件应包含的词以及要从中提取的字段，与收到文件中的文字（文本或图片 OCR）比对。都不包含的会在“已收到”中标为“未包含 …”；模糊的照片会在发送前请对方重拍（链接页面的 checkBlur: false 可关闭）。',
+              '到期：文件项可以询问有效期。到期前十五天在铃铛中通知所有者；“已收到”和详情显示剩余天数，“重新索取”会只针对该文件发起新的请求。',
             ]}
           />
         </>

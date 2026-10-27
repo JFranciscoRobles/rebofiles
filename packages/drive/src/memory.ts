@@ -293,11 +293,58 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
           locked: Boolean(how.password),
           uses: how.once ? 1 : undefined,
           ...(how.uploads ? { uploads: how.uploads } : {}),
+          ...(how.uploads && how.request ? { request: core.readRequest(how.request) } : {}),
+          ...(how.viewOnly ? { viewOnly: true } : {}),
+          ...(how.watermark ? { watermark: true } : {}),
         };
         const next = core.addLink(current, entryId, link, context());
         return { drive: next, answer: { entry: core.getEntry(next, entryId), token: link.id } };
       }),
     linkToken: async (_entryId, link) => link,
+    updateLink: (entryId, link, how) =>
+      change((current) => {
+        const at = context().at;
+        const next = core.updateLink(
+          current,
+          entryId,
+          link,
+          {
+            ...(how.days ? { expires: new Date(Date.parse(at) + how.days * 86_400_000).toISOString() } : {}),
+            ...(how.uploads ? { uploads: how.uploads } : {}),
+            ...(how.request ? { request: core.readRequest(how.request) } : {}),
+            ...(how.closed === true ? { closed: at } : how.closed === false ? { closed: null } : {}),
+          },
+          at,
+        );
+        return one(next, entryId);
+      }),
+    review: (entryId, status, reason) =>
+      change((current) => one(core.setFields(current, entryId, { review: status, reviewReason: status === 'rejected' && reason ? reason : null }, context()), entryId)),
+    // One person alone: nothing comes through a link of theirs here.
+    received: async () => [],
+    // Nobody to remind here: a reminder is the server's to send.
+    remind: async () => {
+      throw new core.DriveError('invalid-share', 'This drive sends no reminders.');
+    },
+    expiring: (days = 15) =>
+      run(() =>
+        core
+          .expiringWithin(
+            [...drive.entries.values()].filter((entry) => !core.isTrashed(drive, entry.id)),
+            'expires',
+            new Date().toISOString(),
+            days,
+          )
+          .map(({ entry, expires, days }) => ({ entry, expires, days })),
+      ),
+    adminRequests: async () =>
+      [...drive.entries.values()].flatMap((entry) =>
+        (entry.links ?? [])
+          .filter((link) => link.uploads && link.request && !link.closed)
+          .map((link) => ({ folder: { id: entry.id, name: entry.name, owner: entry.owner }, link, token: link.id, missing: core.missingOf(link) })),
+      ),
+    requests: async () =>
+      [...drive.entries.values()].flatMap((entry) => (entry.links ?? []).filter((link) => link.uploads).map((link) => ({ folder: { id: entry.id, name: entry.name }, link, token: link.id }))),
     removeLink: (entryId, link) => change((current) => one(core.removeLink(current, entryId, link), entryId)),
     restoreVersion: (entryId, version) => change((current) => one(core.restoreVersion(current, entryId, version, id(), context()), entryId) as { drive: Drive; answer: FileEntry }),
     pack: (ids) => run(() => core.packOf(drive, ids)),

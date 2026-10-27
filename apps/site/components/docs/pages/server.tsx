@@ -451,11 +451,59 @@ await client.share(folder.id, 'auditor', 'editor');       // another role: the s
 await client.share(folder.id, 'auditor', 'editor', null); // for good`;
 
 export const REQUEST_CODE = `// A request for files: whoever opens it sends them, and sees nothing of what is there.
-const { token } = await client.createLink(folder.id, 30, { uploads: 'only' });
-// { uploads: 'also' }: they see the folder, and may add files to it.
+const { token } = await client.createLink(folder.id, 7, {
+  uploads: 'only', // or 'also': they see the folder, and may add to it
+  request: {
+    title: 'Northwind',
+    message: 'Send what is missing, please.',
+    askName: true,
+    email: 'carla@northwind.com',                    // for your app to remind her, and send a receipt
+    items: [{ id: 'contract', label: 'Signed contract' }, { id: 'id', label: 'ID' }],
+    closeWhenDone: true,                             // closed once both came
+    accept: ['application/pdf', 'image/*'],
+    maxSize: 25 * 1024 * 1024,
+    perSender: true,                                 // Northwind papers / Carla Ruiz / …
+    rename: '{item} - {name}',                       // "Signed contract - Carla Ruiz.pdf"
+    fields: { client: 'northwind' },                 // found by your CRM with withField
+  },
+});
 
-// In code, as the page of the link does:
-await createLinkClient({ base: '/api/files', token, from: () => 'Carla Ruiz' }).upload(file);`;
+createDriveHandler({
+  ...options,
+  onReceived: ({ entry, from, item, request, got }) => mail(request?.email, \`Received: \${item}\`),
+  onReview: ({ entry, status, reason, from }) => status === 'rejected' && tellToSendAgain(from, reason),
+});
+// A cron of yours: GET /admin/requests gives every request open, whom it was sent to and what is missing.`;
+
+export const REMINDERS_CODE = `import { createDriveHandler, mailReminders, resend } from '@rebofiles/server';
+
+createDriveHandler({
+  ...options,
+  // Whom a request was sent to, reminded every \`remind\` days of what is missing, and with "Remind now".
+  reminders: mailReminders({
+    mail: resend({ apiKey: process.env.RESEND_KEY!, from: 'Acme <files@acme.com>' }), // or (mail) => yourSmtp(mail)
+    url: (token) => \`https://files.acme.com/?link=\${token}\`,
+  }),
+  // Told 15 days before a file's field \`expires\`, in the bell and here; \`false\` for none.
+  expiring: { days: 15, onExpiring: ({ entry, expires }) => log(entry.name, expires) },
+  // What is written in what came, against its document's words and patterns: the core's, yours, or false.
+  // check: async ({ entry, item, text }) => ({ missing: [], fields: await readWithYourService(text) }),
+});
+
+await client.createLink(folder.id, 30, {
+  uploads: 'only',
+  request: {
+    email: 'carla@northwind.com',
+    remind: 3,
+    items: [
+      { id: 'id', label: 'ID', words: ['INE', 'passport'], expires: true },
+      { id: 'tax', label: 'Tax certificate', find: { rfc: '\\\\b([A-Z&Ñ]{3,4}\\\\d{6}[A-Z0-9]{3})\\\\b' } },
+    ],
+  },
+});
+
+// Templates, for everyone of the drive: saved from the dialog, or given as the defaults.
+createDriveHandler({ ...options, settings: { requestTemplates: [{ id: 'supplier', name: 'Supplier sign-up', request }] } });`;
 
 export const SHARE = `// The page a link goes to: app/shared/page.tsx
 'use client';
@@ -527,15 +575,38 @@ export const sharing: DocPage = {
       title: 'Requests for files',
       badge: 'Uploads',
       color: 'green',
-      lead: 'A link of a folder may take files: “See and add files”, or “Only send files”, a request for files that shows nothing of what is there. Whoever opens it signed out says who they are, if they want, and sends.',
+      lead: 'Request files, in the menu of a folder (and beside its name once in it): a link that takes files, “Only send files”, showing nothing of what is there, or “See and add files”. Made, it is copied, to open or send; whoever opens it signed out says who they are, if they want, and sends.',
       body: (
         <>
           <Code code={REQUEST_CODE} />
           <List
             items={[
-              'What arrives is the owner’s of the folder, counts against their space, and says who sent it (a field “from”). The owner is told in the bell.',
-              'It goes up as any file does, in parts straight to the storage, checked as any is; the link may do nothing else.',
-              'Its expiry, its password and its uses hold as for any link.',
+              'Whoever sends sees each document asked for in its own place, with “Choose a file” and “Take a photo”: the photos of one document go as one PDF. What they send they may take back for ten minutes, and they keep a receipt.',
+              'What arrives is the owner’s of the folder, counts against their space, and says who sent it and which document it is. The owner is told in the bell, finds it all in Received, and accepts it or turns it back with a reason.',
+              'The folder shows its requests open over its files: what came of each, what is missing, until when.',
+              'It goes up as any file does, in parts straight to the storage, resumed after a cut, checked as any is; the link may do nothing else. Its expiry and its password hold as for any link.',
+              'The page of the link carries the name of your company (Settings → company) and the colour of the drive’s brand, so whoever sends knows to whom.',
+            ]}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'reminders-and-checks',
+      title: 'Templates, reminders, checks, what expires',
+      badge: 'Requests',
+      color: 'green',
+      lead: 'What a request does besides taking files. Each is on unless the drive or the server says false, and reminders only with a way to send them.',
+      body: (
+        <>
+          <Code code={REMINDERS_CODE} />
+          <List
+            items={[
+              'Templates: “Start from a template” over the dialog of a request, and “Save as template” for who may configure the drive (what it asks and how, not to whom). Settings → Appearance lists them, to take one out. requestTemplates: false of the screen for none.',
+              'A QR code of the address, in the page of a request made, to show a phone or download as a PNG; qr: false for none.',
+              'Reminders: whom a request was sent to, every 2, 3 or 7 days while something is missing and it is open, and at once with “Remind now”. Without the server’s reminders, the dialog offers none.',
+              'Checks: the words a document should say and the fields to find in it, against what is written in what came (its text, or OCR of a picture). What says none is marked “Does not say …” in Received; a blurry photo is asked again before it goes (checkBlur: false of the link page for not).',
+              'What expires: a document may ask until when it is good. Its owner is told in the bell fifteen days before; Received and the details show the days left, and “Ask again” makes a request of it alone.',
             ]}
           />
         </>

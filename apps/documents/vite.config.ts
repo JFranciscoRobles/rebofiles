@@ -17,6 +17,9 @@ function backend(): Plugin {
         // Rebodocs' rooms, where several write in one document, and what lets each in.
         if (request.url?.startsWith('/collab')) return void together().then(({ collab }) => collab.handle(request, response, next), next);
         if (request.url?.startsWith('/api/collab/ticket')) return void together().then(({ ticket }) => ticket(request, response), next);
+        // Where the webhook of the drive is sent: this demo, as another application would be.
+        if (request.url?.startsWith('/api/hooks')) return void load().then(({ hooks }) => hooks(request, response), next);
+        if (request.url?.startsWith('/api/outbox')) return void load().then(({ mails }) => mails(request, response), next);
         if (!request.url?.startsWith('/api/files')) return next();
         load()
           .then(async (backend) => {

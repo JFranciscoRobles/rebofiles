@@ -5,6 +5,7 @@
 // or not right taken from the defaults.
 
 import { DriveError } from './errors';
+import { type RequestTemplate, readTemplates } from './requests';
 
 export type Language = 'en' | 'es' | 'zh';
 export type Theme = 'light' | 'dark' | 'auto';
@@ -25,6 +26,8 @@ export interface DriveSettings {
   theme: Theme;
   /** The colour of buttons and of what is selected, as #rrggbb; null for the drive's own green. */
   brand: string | null;
+  /** The name of the organisation the drive is of, over the pages of its requests for files; null for none. */
+  company?: string | null;
   images: ImageSettings;
   /** The bytes each person may keep, in the trash too; null for no limit. */
   quota: number | null;
@@ -32,6 +35,8 @@ export interface DriveSettings {
   trashDays: number | null;
   /** How many days since a file or folder was made before it may be deleted for good, by anyone or by the trash; null for no minimum. */
   retentionDays: number | null;
+  /** Requests for files kept to be made again with a click, for everyone of the drive. */
+  requestTemplates?: RequestTemplate[];
 }
 
 /** What a person changes for themselves; what they leave out is the drive's. */
@@ -49,10 +54,12 @@ export const DEFAULT_SETTINGS: DriveSettings = {
   language: 'en',
   theme: 'light',
   brand: null,
+  company: null,
   images: { sizes: [160, 480, 1024, 2048], format: 'jpeg', quality: 0.82, enabled: true },
   quota: null,
   trashDays: null,
   retentionDays: null,
+  requestTemplates: [],
 };
 
 const refuse = (message: string): never => {
@@ -69,6 +76,8 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
   const images = object(given.images, '"images"');
   const brand = given.brand === undefined ? over.brand : given.brand === null || given.brand === '' ? null : String(given.brand).toLowerCase();
   if (brand !== null && !/^#[0-9a-f]{6}$/.test(brand)) refuse('"brand" must be a colour as #rrggbb.');
+  const company = given.company === undefined ? (over.company ?? null) : given.company === null || String(given.company).trim() === '' ? null : String(given.company).trim();
+  if (company !== null && company.length > 80) refuse('"company" is a name of at most 80 characters.');
   let sizes = over.images.sizes;
   if (images.sizes !== undefined) {
     if (!Array.isArray(images.sizes) || images.sizes.length !== IMAGE_SIZES) refuse(`"images.sizes" must be ${IMAGE_SIZES} sizes in pixels.`);
@@ -91,6 +100,7 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
     language: oneOf(given.language, LANGUAGES, '"language"') ?? over.language,
     theme: oneOf(given.theme, THEMES, '"theme"') ?? over.theme,
     brand,
+    company,
     images: {
       sizes,
       format: oneOf(images.format, ['jpeg', 'original'], '"images.format"') ?? over.images.format,
@@ -100,6 +110,7 @@ export function readDriveSettings(value: unknown, over: DriveSettings = DEFAULT_
     quota,
     trashDays,
     retentionDays,
+    requestTemplates: given.requestTemplates === undefined ? (over.requestTemplates ?? []) : readTemplates(given.requestTemplates),
   };
 }
 
