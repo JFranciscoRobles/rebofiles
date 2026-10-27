@@ -42,7 +42,12 @@ export const PROPS: Prop[] = [
     group: 'Look',
     does: 'Where it is, each time that changes: the section, the folder and its path, what is searched, how many, the space; for your own bar.',
   },
-  { name: 'controls', type: 'RefObject<DriveControls>', group: 'Look', does: 'React: the drive’s `go`, `search`, `upload`, `newFolder` and `openSettings`, put in it while it is there.' },
+  {
+    name: 'controls',
+    type: 'RefObject<DriveControls>',
+    group: 'Look',
+    does: 'React: the drive’s `go`, `search`, `upload`, `newFolder`, `requestFiles`, `share` and `openSettings`, put in it while it is there.',
+  },
   { name: 'checkUploads', type: 'boolean', group: 'Files', does: '`false` uploads without looking for the same file, or one of its name, in the drive first: a taken name is made free with “(2)”.' },
   { name: 'requestTemplates', type: 'boolean', group: 'Files', does: '`false` leaves out the templates of requests: to start one from, and to save one as.' },
   { name: 'qr', type: 'boolean', group: 'Files', does: '`false` leaves out the QR code of a request made.' },

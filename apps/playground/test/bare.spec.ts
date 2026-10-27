@@ -38,7 +38,7 @@ test('without its own bar and sections, driven by the application’s and tellin
   await expect(page.getByRole('heading', { name: 'Trash', level: 2 })).toBeVisible();
 
   // Its search, the drive's: from the trash, back to the files, the one asked for.
-  await host.getByRole('button', { name: 'Files' }).click();
+  await host.getByRole('button', { name: 'Files', exact: true }).click();
   await host.getByRole('searchbox', { name: 'Search the files' }).fill(name);
   await expect(page.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(host.locator('output')).toHaveText('1 shown');
@@ -58,7 +58,11 @@ test('kept in a folder: it starts there, its path starts there, and nothing abov
   const crumbs = page.locator('.rf-crumbs');
   await expect(crumbs.getByRole('button')).toHaveText([top.name, 'Deeds']);
   await expect(crumbs.getByRole('button', { name: 'My files' })).toHaveCount(0);
+  // A request for files of the folder shown, from the application's button.
+  await host.getByRole('button', { name: 'Request files here' }).click();
+  await expect(page.getByRole('dialog', { name: 'Request files for “Deeds”' })).toBeVisible();
+  await page.keyboard.press('Escape');
   // Its own section of files goes back to it, not to the top of the drive.
-  await host.getByRole('button', { name: 'Files' }).click();
+  await host.getByRole('button', { name: 'Files', exact: true }).click();
   await expect(host.getByRole('heading', { level: 1 })).toHaveText(top.name);
 });

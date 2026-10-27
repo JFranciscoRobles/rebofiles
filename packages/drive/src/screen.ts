@@ -189,6 +189,10 @@ export interface MountedDrive {
   upload(what?: 'files' | 'folder'): void;
   /** The dialog of a new folder, in the folder shown. */
   newFolder(): void;
+  /** The dialog of a request for files of the folder shown, made or of those it has. */
+  requestFiles(): void;
+  /** The dialog of sharing the folder shown. */
+  share(): void;
   /** The screen of settings. */
   openSettings(): void;
   /** Other options, as a framework gives them again. */
@@ -4566,6 +4570,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // ---- The screen, and rendering it ----
 
   let afterRender: (() => void)[] = [];
+  /** The folder shown, as it was last drawn: what the application's own buttons act on. */
+  let shownHere: FolderEntry | null = null;
   /** What `onState` was told last, not to tell it again. */
   let toldState = '';
   let scrolledTo: EntryId | null = null;
@@ -4575,6 +4581,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     const { value, loading, error } = listing(key);
     const entries = arranged(value?.entries ?? []);
     const path = value?.path ?? [];
+    shownHere = section === 'files' && folder ? ((path.at(-1)?.id === folder ? path.at(-1) : null) as FolderEntry | null) : null;
     /** Kept in a folder, and in it: its path starts at it. */
     const rooted = Boolean(options.root) && section === 'files' && path.some((step) => step.id === options.root);
     shownEntries = entries;
@@ -5057,6 +5064,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     },
     upload: (what = 'files') => element.querySelector<HTMLInputElement>(what === 'folder' ? '.rf-folder-file' : '.rf-file')?.click(),
     newFolder: () => ((dialog = { kind: 'folder', name: '' }), render()),
+    requestFiles: () => shownHere && requestFiles(shownHere),
+    share: () => {
+      if (shownHere) (dialog = { kind: 'share', entry: shownHere, who: '', role: 'viewer' }), render();
+    },
     openSettings: () => openSettings(),
     update(next) {
       const moved = 'root' in next && next.root !== options.root;

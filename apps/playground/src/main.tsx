@@ -53,6 +53,9 @@ function HostBar({ controls, state }: { controls: { current: DriveControls | nul
       <button type="button" onClick={() => controls.current?.newFolder()}>
         New folder
       </button>
+      <button type="button" onClick={() => controls.current?.requestFiles()}>
+        Request files here
+      </button>
       <output aria-label="Shown">{state ? `${state.count} shown` : ''}</output>
     </section>
   );

@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 import { DriveProvider, type DriveProviderProps, useDrive, useOuterDrive } from './headless';
 
 /** What an application does to the drive from its own bar and sections, with `chrome={false}`. */
-export type DriveControls = Pick<MountedDrive, 'go' | 'search' | 'upload' | 'newFolder' | 'openSettings'>;
+export type DriveControls = Pick<MountedDrive, 'go' | 'search' | 'upload' | 'newFolder' | 'requestFiles' | 'share' | 'openSettings'>;
 
 export interface FileDriveProps extends Omit<DriveProviderProps, 'children'>, Omit<DriveOptions, 'base' | 'client' | 'headers' | 'language' | 'texts' | 'logo' | 'onChange' | 'live'> {
   /** What goes before the title; ReboFiles' mark unless given. */

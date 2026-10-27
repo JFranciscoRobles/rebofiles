@@ -53,6 +53,8 @@ drive.go('trash');            // a section, or a folder of My files: go('files',
 drive.search('contract');     // by name and by what is written inside
 drive.upload();               // the picker of files; upload('folder') for a folder
 drive.newFolder();
+drive.requestFiles();         // a request for files of the folder shown
+drive.share();                // sharing the folder shown
 drive.openSettings();
 // state: { section, folder, path, query, count, loading, usage, canConfigure, received, toReview, freshShared }
 ```

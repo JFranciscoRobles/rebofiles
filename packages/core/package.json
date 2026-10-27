@@ -1,6 +1,6 @@
 {
   "name": "@rebofiles/core",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "The model of a drive: folders, names, moving, the trash, versions and search. No DOM, no dependencies.",
   "license": "MIT",
   "private": true,
