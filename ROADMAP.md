@@ -90,7 +90,7 @@ Driven in Chrome on the playground and against Cloudflare R2: a Word document up
 
 ## What is not
 
-- `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet.
+- `Other buckets.` Cloudflare R2 only, on October 25, 2026: `npm run storage:check` from Node (one PUT, parts, versions, a download shown in the page, an upload given up, the deletion in one request), and the page by hand with its rule of origins. Not AWS, MinIO or Backblaze yet. Azure against Azurite only, Microsoft's emulator, from Node; Google Cloud Storage against an S3 kept in memory only: neither against the real service, nor from a page.
 - `Other browsers.` Chrome and WebKit (Safari's engine, the desktop window's) by the tests, every one in each. Firefox in the workflow only: Playwright's Firefox does not start on this Mac. Not on a real phone.
 - `Two processes on SQLite.` SQLite was opened by two handlers one after the other for changes; the events of one were seen by the other. For more than one process that writes, Postgres.
 - `Windows and Linux.` The Desktop workflow builds and tests the application on both; it has not run yet, and nobody has used it there.
@@ -178,8 +178,9 @@ server, the preview of a Word document, a strict typecheck.
 ### 0.5.0 · Big files and other storage
 
 16. ✅ Uploads that resume after a cut, and files of several gigabytes.
-17. Google Cloud Storage and Azure Blob. (R2, MinIO and Backblaze are S3
-    already.)
+17. ✅ Google Cloud Storage and Azure Blob: `gcsStorage` through GCS's XML
+    API, `azureStorage` with SAS addresses, tried against Azurite. (R2, MinIO
+    and Backblaze are S3 already.)
 
 ### 0.6.0 · The desktop
 
@@ -195,6 +196,48 @@ server, the preview of a Word document, a strict typecheck.
 
 20. **Use it in a real application,** and fix what that shows.
 21. The API settled, and kept from then on.
+
+### After 1.0 · Vaults, encrypted end to end
+
+A folder whose files the page encrypts before they go and decrypts when they
+come back: neither the server, nor the bucket, nor the database sees what is
+in them, and a leak of either gives away only ciphertext. Opt-in, a folder at
+a time ("New vault"), as it costs what the server does with the bytes: its
+pictures and text (`derive`), the checks (`inspect`), search by what is
+written, the same bytes found across the drive, the assistant. Holds, the
+days things are kept, the trash, versions, activity and quotas stay, being
+metadata. A package of its own, `@rebofiles/vault`.
+
+22. **A vault of one's own.** A key for each file (AES-256-GCM), wrapped by
+    the vault's, wrapped by the person's; each part encrypted apart, so
+    uploads straight to the bucket, resuming and `copyPart` go on as they
+    are, and blocks of 64 KiB inside a part for seeking in a video. The
+    person's key unlocked by a passkey (WebAuthn's PRF) or a phrase
+    (Argon2id), apart from the application's sign-in, with a recovery key to
+    keep; nothing brings it back without them, unless a drive chooses a key
+    of its administrator's. The pictures and text the page makes, encrypted
+    too; the hashes of parts keyed (HMAC), for only what changed to be sent.
+    Names stay readable by the server. WebCrypto only, the same code in the
+    page, Node and the desktop. Rebodocs makes, writes and reads in the page,
+    as it does now.
+23. **Shared.** Each person's public key on the server, and a vault's key
+    wrapped for each who may open it; groups with a key of their own; a
+    fingerprint to compare, as a server could hand over a key not theirs.
+    Taking someone out turns the vault's key over, for what comes after.
+    Links carry the key in the address's fragment (`#k=`), which never
+    reaches the server.
+24. **Names and comments encrypted too,** and search by name from an index
+    kept encrypted, read in the page.
+25. **Out of the browser:** the sync and the desktop with the keys in the
+    system's keychain, and an assistant given a vault's key by hand.
+
+What it does not keep from: a server that hands the page code of its own,
+as any encryption in a web page cannot; the desktop application, with its
+code inside it, does. Learnt from MEGA, whose keys were recovered in 2022
+through their own unauthenticated wrapping: authenticated encryption
+everywhere, keys wrapped included, a key for each use, formats with a
+version, and an audit by others before it is called secure. 22 first, tried
+in an application, before the rest.
 
 ## Contributing
 

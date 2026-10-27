@@ -20,6 +20,8 @@ export interface UploadPlan {
   parts: UploadPart[];
   /** What the storage needs to finish it, kept by the server meanwhile (in the upload's token). */
   state: string;
+  /** False for a storage that puts the parts together by their numbers alone (Azure): the page need not read an ETag. */
+  etags?: false;
 }
 
 export interface FinishedPart {

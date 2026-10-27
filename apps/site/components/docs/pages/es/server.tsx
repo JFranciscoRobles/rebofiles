@@ -5,8 +5,8 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, CORS, ENV, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
-import { GROUPS_CODE } from '../team';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ES } from '../team';
 
 const to = (slug: string) => docHref('es', slug);
@@ -169,8 +169,8 @@ export const authorize: DocPage = {
 };
 
 export const storage: DocPage = {
-  title: 'Almacenamiento: S3 y disco',
-  description: 'Los bytes en cualquier bucket que hable S3, sin SDK, o en una carpeta del disco: las claves, la regla de orígenes y lo que puede fallar.',
+  title: 'Almacenamiento: S3, GCS, Azure y disco',
+  description: 'Los bytes en un bucket que hable S3, en Google Cloud Storage o en Azure, sin SDK, o en el disco: las claves, la regla de orígenes y lo que puede fallar.',
   source: SOURCE,
   lead: (
     <>
@@ -204,6 +204,45 @@ export const storage: DocPage = {
         <>
           <Code lang="json" code={CORS} file="CORS policy" />
           <P>Una regla de ciclo de vida que aborta las subidas multiparte sin terminar tras un día evita que las partes de una subida nunca terminada se queden en el bucket.</P>
+        </>
+      ),
+    },
+    {
+      id: 'google-cloud-storage',
+      title: 'Google Cloud Storage',
+      badge: 'GCS',
+      color: 'purple',
+      lead: 'Por su API XML, que habla S3: las mismas direcciones, firmadas con una clave HMAC del bucket.',
+      body: (
+        <>
+          <Code code={GCS_CODE} />
+          <P>
+            Lo que esa API no hace se hace de otra forma: cada clave se borra por separado, y se envían todas las partes de una versión nueva, porque no copia ninguna. El CORS del bucket, puesto con{' '}
+            <C>gcloud storage buckets update --cors-file</C>, tiene que exponer <C>ETag</C>.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'azure-blob-storage',
+      title: 'Azure Blob Storage',
+      badge: 'Azure',
+      color: 'blue',
+      lead: 'Un contenedor de una cuenta de almacenamiento: direcciones firmadas con la clave de la cuenta (una SAS de cada blob, por minutos), cada parte un bloque, y el archivo hecho de su lista de bloques.',
+      body: (
+        <>
+          <Code code={AZURE_CODE} />
+          <List
+            items={[
+              'Subidas retomadas a partir de los bloques que lista Azure, y una versión nueva enviada solo con las partes que cambiaron (Put Block From URL).',
+              'Los bloques de una subida que nunca terminó se van solos a la semana: no hay nada que barrer.',
+              <>
+                El CORS de la cuenta (Uso compartido de recursos) deja entrar los orígenes de tus páginas, con <C>PUT</C>, <C>GET</C> y <C>HEAD</C>; no hace falta exponer ninguna cabecera, porque los
+                bloques se juntan por su número.
+              </>,
+              'Probado contra Azurite, el emulador de Microsoft, en los tests del servidor.',
+            ]}
+          />
         </>
       ),
     },
@@ -440,6 +479,35 @@ export const activity: DocPage = {
       color: 'yellow',
       lead: 'Junto a Compartido conmigo, el drive cuenta lo nuevo. Para avisar tú a la persona, dale onShare al servidor.',
       body: <Code code={ON_SHARE} />,
+    },
+    {
+      id: 'in-the-drive',
+      title: 'Avisado en el drive',
+      badge: 'Campana',
+      color: 'purple',
+      lead: 'Lo que se comparte con una persona, o con un grupo suyo, y un comentario que la nombra: en la campana sobre el drive, con cuántos son nuevos al lado, y cada uno abre donde está.',
+      body: (
+        <>
+          <Code code={NOTICES_CODE} />
+          <P>
+            Se guardan para cada persona y cada grupo (<C>inbox:&lt;quién&gt;</C>), los últimos doscientos; vistos, ya no hay nuevos (<C>POST /notifications/seen</C>). Lo que hizo uno mismo no se
+            avisa. Un correo sigue siendo cosa tuya, con <C>onShare</C> y <C>onComment</C>.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'the-whole-drive',
+      title: 'Todo el drive',
+      badge: 'Personas',
+      color: 'orange',
+      lead: 'Para quien puede configurar el drive, Ajustes → Personas: los archivos, carpetas y espacio de cada persona y de todo el drive, y la actividad más reciente de cualquier parte.',
+      body: (
+        <>
+          <Code code={ADMIN_CODE} />
+          <Callout title="El espacio de cada uno">se calcula con todo el drive, leído una vez cada vez que se pide: para quien lo administra, de vez en cuando, no para cada página.</Callout>
+        </>
+      ),
     },
     {
       id: 'know',

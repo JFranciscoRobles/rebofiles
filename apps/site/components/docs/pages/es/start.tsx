@@ -332,6 +332,19 @@ export const demos: DocPage = {
       ),
     },
     {
+      id: 'the-documents',
+      title: 'Documentos',
+      badge: 'npm run documents',
+      color: 'orange',
+      lead: 'Documentos de Word de principio a fin, todo con Rebodocs: Crear documento, su editor con varias personas en un documento a la vez, su visor y PDF. En http://localhost:5184.',
+      body: (
+        <P>
+          Abre un documento como <C>?as=ana</C> y, compartido con ella, como <C>?as=bea</C>: cada una ve el cursor de la otra y lo que escribe, y se guarda una versión cuando las dos se van. En{' '}
+          <C>apps/documents</C>, las salas sobre el drive son <C>server/collab.ts</C>.
+        </P>
+      ),
+    },
+    {
       id: 'the-desktop',
       title: 'El escritorio',
       badge: 'npm run desktop',

@@ -10,7 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FileEntry } from '@rebofiles/core';
 import { createDriveClient } from '@rebofiles/drive';
 import { type DriveServerOptions, createDriveHandler, diskStorage, memoryMetadata } from '../src';
-import { deriveAll, pdf, pictures, text } from '../src/derive';
+import { sampleXlsx } from '../../../tools/sample-xlsx';
+import { deriveAll, ocr, pdf, pictures, text } from '../src/derive';
 
 let folder = '';
 beforeAll(async () => {
@@ -104,6 +105,25 @@ describe('what the server makes of a file', () => {
     await handle.idle();
     expect((await client.searchText('budget')).map((f) => f.entry.name)).toEqual(['notes.md']);
     expect(((await client.entry(made.id)).entry as FileEntry).versions[0].renditions).toBeUndefined();
+  });
+
+  it('of an Excel workbook, what its cells say, found by a search', async () => {
+    const { handle, client } = drive({ derive: deriveAll() });
+    await client.upload(new File([sampleXlsx() as BlobPart], 'sales.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    await handle.idle();
+    const found = await client.searchText('call them on monday');
+    expect(found.map((f) => f.entry.name)).toEqual(['sales.xlsx']);
+  });
+
+  // Tesseract fetches the data of English the first time (a few MB), so it is tried where there is a network.
+  it.skipIf(process.env.REBOFILES_OFFLINE)('of a picture of a text, what it says, read by Tesseract', { timeout: 120_000 }, async () => {
+    const { handle, client } = drive({ derive: deriveAll(pictures(), ocr()) });
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="200"><rect width="100%" height="100%" fill="#fff"/><text x="40" y="120" font-family="Arial" font-size="72" fill="#000">INVOICE 4471</text></svg>';
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    await client.upload(new File([png], 'receipt.png', { type: 'image/png' }));
+    await handle.idle();
+    expect((await client.searchText('invoice 4471')).map((f) => f.entry.name)).toEqual(['receipt.png']);
   });
 
   it('is not made, and the upload is as it was, when what makes it fails', async () => {

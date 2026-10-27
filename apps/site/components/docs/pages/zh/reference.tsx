@@ -23,6 +23,8 @@ const GROUP_NAMES: Record<(typeof GROUPS)[number], string> = {
   Live: '实时',
   Comments: '评论',
   Keeping: '保留',
+  Told: '通知',
+  'Looking after': '管理',
 };
 const ROUTE_WORDS: [string, string, string, string] = ['路由', '链接的路由', '路由', '作用'];
 const IN_ENGLISH = <Callout title="英文内容：">实测数据和路线图只用英文编写一次，与 ROADMAP.md 相同。</Callout>;

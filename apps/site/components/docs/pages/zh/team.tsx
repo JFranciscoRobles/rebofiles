@@ -3,7 +3,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { COMMENTS_HOOK, EXPORT_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE } from '../team';
+import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE } from '../team';
 
 const hrefOf = (slug: string) => docHref('zh', slug);
 
@@ -191,6 +191,62 @@ export const keeping: DocPage = {
           <Callout title="导出他人的数据时，">
             导出包含其拥有的内容和操作记录；其文件字节由你的服务器从存储中读取，因为 <C>byRoles</C> 只允许本人下载。
           </Callout>
+        </>
+      ),
+    },
+  ],
+};
+
+export const organizing: DocPage = {
+  title: '星标与字段',
+  description: '每个人加星标的文件和文件夹，集中在自己的位置；以及应用在每个条目上的自有字段，用来关联你的记录并据此查找。',
+  source: 'packages/core/src/ops.ts',
+  lead: <>两种再次找到重要内容的方式：个人为自己加的星标，以及你的应用关联到自身记录的字段。</>,
+  sections: [
+    {
+      id: 'starred',
+      title: '星标',
+      badge: '个人',
+      color: 'yellow',
+      body: (
+        <>
+          <List
+            items={[
+              <>
+                在文件或文件夹的详情或菜单中点击<strong>加星标</strong>：它在任何显示的位置都会带有星标，并出现在<strong>已加星标</strong>中，最近加星标的排在前面。
+              </>,
+              '仅限自己：其他人看不到某人加了哪些星标。已在回收站、已删除或已无权读取的内容不会显示。',
+              <>
+                作为个人设置保存（<C>starred:&lt;id&gt;</C>），最多一千个：<C>GET /starred</C>，<C>PUT</C> 和 <C>DELETE /entries/:id/star</C>。
+              </>,
+            ]}
+          />
+          <Code code={STARRED_CODE} />
+        </>
+      ),
+    },
+    {
+      id: 'fields',
+      title: '自有字段',
+      badge: '你的记录',
+      color: 'blue',
+      lead: '条目上按名称保存的文字，由你的应用或用户设置，并可据此查找：把合同关联到 CRM 中的客户，把扫描件关联到案件。',
+      body: (
+        <>
+          <Code code={FIELDS_CODE} lang="tsx" />
+          <List
+            items={[
+              <>
+                名称由字母、数字和 <C>_ . -</C> 组成，最多 64 个字符；值为文字，最多 1000 个字符；每个条目最多五十个。由有重命名权限的人设置（<C>PATCH /entries/:id</C>，带 <C>fields</C>）。
+              </>,
+              <>
+                <C>GET /fields?name=&amp;value=</C> 查找具有该字段值且请求者可读取的内容：SQLite 和 Postgres 直接查询每个条目的 JSON，因此数千个条目的网盘不必整个读取。
+              </>,
+              <>
+                详情中会显示这些字段，除非设置 <C>fields=&#123;false&#125;</C>；<C>fields="edit"</C> 允许有重命名权限的人在详情中修改，每行一个字段。
+              </>,
+            ]}
+          />
         </>
       ),
     },

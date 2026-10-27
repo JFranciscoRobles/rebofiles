@@ -40,6 +40,7 @@ export interface View {
     withHashes(hashes: string[]): Promise<Scope>;
     owned(owner: string): Promise<Scope>;
     withLink(link: string): Promise<Scope>;
+    withField(name: string, value: string, limit: number): Promise<Scope>;
   };
 }
 
@@ -99,6 +100,7 @@ export function viewOf(store: MetadataStore): View {
         const entry = await q.withLink(link);
         return found(entry ? [entry] : []);
       },
+      withField: async (name, value, limit) => (q ? found(await q.withField(name, value, limit)) : {}),
     },
   };
 }

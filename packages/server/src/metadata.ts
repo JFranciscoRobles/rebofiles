@@ -33,6 +33,8 @@ export interface ScopedQueries {
   owned(owner: string): Promise<Entry[]>;
   /** The entry that has this link. */
   withLink(link: string): Promise<Entry | undefined>;
+  /** What has the field `name` set to `value` (`fields` of an entry), at most `limit`. */
+  withField(name: string, value: string, limit: number): Promise<Entry[]>;
 }
 
 export interface MetadataStore {
@@ -68,6 +70,8 @@ export interface MetadataStore {
   activityAfter?(cursor: string | undefined): Promise<{ lines: Activity[]; cursor: string }>;
   /** What someone did, the newest first, at most `limit`: for what is exported of a person. */
   activityBy?(user: string, limit: number): Promise<Activity[]>;
+  /** What was done anywhere in the drive, the newest first, at most `limit`: for who looks after it. */
+  activityLatest?(limit: number): Promise<Activity[]>;
   /**
    * The comments of an entry, and one by its id; a comment kept (made or changed) and taken away. Without them, the
    * comments last as long as the process.
@@ -175,6 +179,11 @@ export function scopedOver(current: () => Drive): ScopedQueries {
     async withLink(link) {
       return all().find((entry) => entry.links?.some((l) => l.id === link));
     },
+    async withField(name, value, limit) {
+      return all()
+        .filter((entry) => entry.fields?.[name] === value)
+        .slice(0, limit);
+    },
   };
 }
 
@@ -197,6 +206,9 @@ export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
         .filter((a) => a.by === user)
         .reverse()
         .slice(0, limit);
+    },
+    async activityLatest(limit) {
+      return lines.slice(-limit).reverse();
     },
     async comments(entry) {
       return [...said.values()].filter((c) => c.entry === entry);
@@ -321,6 +333,7 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const hashed = db.prepare('SELECT entry FROM rebofiles_entries WHERE sha IN (SELECT value FROM json_each(?))');
   const ownedBy = db.prepare('SELECT entry FROM rebofiles_entries WHERE owner = ?');
   const linkedBy = db.prepare('SELECT entry FROM rebofiles_entries WHERE id = (SELECT entry FROM rebofiles_links WHERE link = ?)');
+  const fielded = db.prepare('SELECT entry FROM rebofiles_entries WHERE json_extract(entry, ?) = ? LIMIT ?');
   const scoped: ScopedQueries = {
     entries: async (ids) => rows(byIds.all(JSON.stringify(ids))),
     ancestors: async (ids) => rows(above.all(JSON.stringify(ids))),
@@ -341,6 +354,8 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
     withHashes: async (hashes) => rows(hashed.all(JSON.stringify(hashes))),
     owned: async (owner) => rows(ownedBy.all(owner)),
     withLink: async (link) => rows(linkedBy.all(link))[0],
+    // A name is of letters, digits and `_ . -` (core's FIELD_NAME), so quoted it is a path of JSON as it is.
+    withField: async (name, value, limit) => rows(fielded.all(`$.fields."${name}"`, value, limit)),
   };
   db.exec('CREATE TABLE IF NOT EXISTS rebofiles_settings (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
   // One row, one number, one more at every save: what says whether the drive in memory is the one in the file.
@@ -363,6 +378,7 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   const byWhom = db.prepare("SELECT line FROM rebofiles_activity WHERE json_extract(line, '$.by') = ? ORDER BY seq DESC LIMIT ?");
   const lastSeq = db.prepare('SELECT coalesce(max(seq), 0) AS n FROM rebofiles_activity');
   const afterSeq = db.prepare('SELECT seq, line FROM rebofiles_activity WHERE seq > ? ORDER BY seq LIMIT 1000');
+  const latest = db.prepare('SELECT line FROM rebofiles_activity ORDER BY seq DESC LIMIT ?');
   // A comment per row, by the entry it is on and by who made it.
   db.exec('CREATE TABLE IF NOT EXISTS rebofiles_comments (id TEXT PRIMARY KEY, entry TEXT NOT NULL, by_whom TEXT NOT NULL, at TEXT NOT NULL, comment TEXT NOT NULL)');
   db.exec('CREATE INDEX IF NOT EXISTS rebofiles_comments_entry ON rebofiles_comments (entry, at)');
@@ -382,6 +398,9 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
     },
     async activityBy(user, limit) {
       return (byWhom.all(user, limit) as { line: string }[]).map((row) => JSON.parse(row.line) as Activity);
+    },
+    async activityLatest(limit) {
+      return (latest.all(limit) as { line: string }[]).map((row) => JSON.parse(row.line) as Activity);
     },
     async comments(entry) {
       return parsed(commentsOn.all(entry));
@@ -615,6 +634,7 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     withHashes: (hashes) => ask(`SELECT entry FROM ${table} WHERE sha = ANY($1::text[])`, [hashes]),
     owned: (owner) => ask(`SELECT entry FROM ${table} WHERE owner = $1`, [owner]),
     withLink: async (link) => (await ask(`SELECT entry FROM ${table} WHERE id = (SELECT entry FROM ${table}_links WHERE link = $1)`, [link]))[0],
+    withField: (name, value, limit) => ask(`SELECT entry FROM ${table} WHERE entry->'fields'->>$1 = $2 LIMIT $3`, [name, value, limit]),
   };
   return {
     async load() {
@@ -668,6 +688,10 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
     },
     async activityBy(user, limit) {
       const { rows } = await db.query(`SELECT line FROM ${table}_activity WHERE line->>'by' = $1 ORDER BY seq DESC LIMIT $2`, [user, limit]);
+      return (rows as { line: Activity | string }[]).map((row) => (typeof row.line === 'string' ? (JSON.parse(row.line) as Activity) : row.line));
+    },
+    async activityLatest(limit) {
+      const { rows } = await db.query(`SELECT line FROM ${table}_activity ORDER BY seq DESC LIMIT $1`, [limit]);
       return (rows as { line: Activity | string }[]).map((row) => (typeof row.line === 'string' ? (JSON.parse(row.line) as Activity) : row.line));
     },
     async comments(entry) {

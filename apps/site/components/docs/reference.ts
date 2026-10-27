@@ -31,6 +31,12 @@ export const PROPS: Prop[] = [
   { name: 'className', type: 'string', group: 'Look', does: 'A class of your own on `.rf-drive`, for its custom properties.' },
   { name: 'checkUploads', type: 'boolean', group: 'Files', does: '`false` uploads without looking for the same file, or one of its name, in the drive first: a taken name is made free with “(2)”.' },
   { name: 'onOpen', type: '(file, url) => void', group: 'Files', does: 'A file opened by a double click or Enter, your own way. Unless given, the drive’s viewer shows it.' },
+  {
+    name: 'fields',
+    type: "'show' | 'edit' | false",
+    group: 'Files',
+    does: 'The fields of your application on an entry, in its details: shown (as it comes), changed there by who may rename it (`edit`), or left out.',
+  },
   { name: 'previewDocument', type: '(bytes) => DocumentPreview', group: 'Word documents', does: 'The details of a .docx: its title and first paragraphs. `previewDocx`.' },
   { name: 'viewDocument', type: '(element, bytes) => ShownDocument', group: 'Word documents', does: 'The viewer of a .docx: its pages, one by one or all, with Rebodocs’ zoom and print. `viewDocx`.' },
   { name: 'thumbDocument', type: '(bytes) => Promise<HTMLElement>', group: 'Word documents', does: 'Its first page drawn in the grid, until a picture of it is made. `thumbDocx`.' },
@@ -42,6 +48,12 @@ export const PROPS: Prop[] = [
   },
   { name: 'textDocument', type: '(bytes) => string', group: 'Word documents', does: 'What is written in it, sent at upload, for a search to find it by. `textOfDocx`.' },
   { name: 'onOpenDocument', type: '(file, url) => void', group: 'Word documents', does: 'Gives a .docx an “Open in Rebodocs” button, called with an address to read it from.' },
+  {
+    name: 'newDocument',
+    type: '() => Uint8Array',
+    group: 'Word documents',
+    does: '“Create document” over the files and “New document” in New: an empty .docx named by the person, in the folder they are in, then opened. `newDocx`.',
+  },
   { name: 'onChange', type: '() => void', group: 'Events', does: 'After every change made from the drive, for what else in the page shows it (mountDrive; in React, the provider tells the hooks).' },
   { name: 'live', type: 'boolean', group: 'Events', does: 'What others change, shown as it happens, from the server’s `/events`. `true` unless said; in React, the provider’s.' },
 ];
@@ -79,7 +91,7 @@ export interface Method {
   name: string;
   signature: string;
   does: string;
-  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live' | 'Comments' | 'Keeping';
+  group: 'Reading' | 'Changing' | 'Uploads' | 'Sharing' | 'Files' | 'Settings' | 'Live' | 'Comments' | 'Keeping' | 'Told' | 'Looking after';
 }
 
 /** The client of the routes, `createDriveClient({ base })`, and what `createMemoryClient` answers the same way. */
@@ -94,10 +106,14 @@ export const CLIENT: Method[] = [
   { group: 'Reading', name: 'searchText', signature: 'searchText(query)', does: 'By what is written in files, each with a piece of its text.' },
   { group: 'Reading', name: 'activity', signature: 'activity(id, limit?)', does: 'Who did what to an entry, and in a folder; the newest first.' },
   { group: 'Reading', name: 'usage', signature: 'usage()', does: 'The bytes one keeps, and how many one may.' },
+  { group: 'Reading', name: 'starred', signature: 'starred()', does: 'What the one asking starred, the last starred first.' },
+  { group: 'Reading', name: 'withField', signature: 'withField(name, value)', does: 'What has a field set to a value, of what one may read: the files of a client, of a case.' },
   { group: 'Changing', name: 'createFolder', signature: 'createFolder(name, parent)', does: 'A folder; “(2)” when the name is taken.' },
   { group: 'Changing', name: 'rename', signature: "rename(id, name, 'keep-both'?)", does: 'Refused when the name is taken there, unless both are kept.' },
   { group: 'Changing', name: 'move', signature: "move(id, parent, 'keep-both'?)", does: 'Into another folder, or to the top.' },
   { group: 'Changing', name: 'setColor', signature: 'setColor(id, color | null)', does: 'A folder in one of the drive’s nine colours, or its own again.' },
+  { group: 'Changing', name: 'setFields', signature: 'setFields(id, { name: value | null })', does: 'Fields of your application on an entry, each to its text, or taken away with null.' },
+  { group: 'Changing', name: 'star', signature: 'star(id, starred?)', does: 'Starred by the one asking, or no longer with `false`: their own, seen by nobody else.' },
   { group: 'Changing', name: 'moveToTrash', signature: 'moveToTrash(id)', does: 'Into the trash, with what is inside it.' },
   { group: 'Changing', name: 'restore', signature: 'restore(id)', does: 'Out of the trash, back where it was.' },
   { group: 'Changing', name: 'deleteForever', signature: 'deleteForever(id)', does: 'Gone, its bytes too.' },
@@ -130,6 +146,15 @@ export const CLIENT: Method[] = [
   { group: 'Keeping', name: 'release', signature: 'release(id)', does: 'The hold taken off.' },
   { group: 'Keeping', name: 'exportPerson', signature: 'exportPerson(user?)', does: 'Everything of a person, for a .zip: what they own, said and did.' },
   {
+    group: 'Told',
+    name: 'notifications',
+    signature: 'notifications()',
+    does: 'What the one asking was told (shared with them or a group of theirs, named in a comment), the newest first, and how many are new.',
+  },
+  { group: 'Told', name: 'sawNotifications', signature: 'sawNotifications()', does: 'They looked: none is new any more.' },
+  { group: 'Looking after', name: 'adminUsage', signature: 'adminUsage()', does: 'For who may configure: the files, folders and bytes of each person, and of the whole drive.' },
+  { group: 'Looking after', name: 'adminActivity', signature: 'adminActivity(limit?)', does: 'For who may configure: what was done anywhere in the drive, the newest first.' },
+  {
     group: 'Live',
     name: 'watch',
     signature: 'watch(onChange, { onState })',
@@ -144,7 +169,7 @@ export interface ServerOption {
 }
 
 export const SERVER_OPTIONS: ServerOption[] = [
-  { name: 'storage', type: 'Storage', does: 'Where the bytes are: `s3Storage(s3OptionsFrom(process.env))` or `diskStorage({ folder, secret })`.' },
+  { name: 'storage', type: 'Storage', does: 'Where the bytes are: `s3Storage(s3OptionsFrom(process.env))`, `gcsStorage(…)`, `azureStorage(…)` or `diskStorage({ folder, secret })`.' },
   { name: 'metadata', type: 'MetadataStore', does: 'Where the entries are: `memoryMetadata()`, `sqliteMetadata(path)` or `postgresMetadata(pool)`.' },
   { name: 'identify', type: '(request) => User | null', does: 'Who is asking, from your session; null answers 401. `{ id, admin: true }` may configure the drive with `byRoles`.' },
   { name: 'authorize', type: '(user, action, entry, drive) => boolean', does: 'Asked on every route; false answers 403. `byRoles`, or rules of yours around it.' },
@@ -166,7 +191,11 @@ export const SERVER_OPTIONS: ServerOption[] = [
     does: 'Asked once the bytes arrived, before the file is listed, with a `read` of them: `checkType()`, `clamav()`, or yours. A refusal takes the bytes away.',
   },
   { name: 'live', type: 'false | { poll }', does: 'Changes told at `/events` as they happen; those of another process on the same store within `poll` ms (2000). `false` for none.' },
-  { name: 'derive', type: 'Derive', does: 'What the server makes of a file once kept, for what the page did not: pictures, a placeholder, its text. `deriveAll()` of `@rebofiles/server/derive`.' },
+  {
+    name: 'derive',
+    type: 'Derive',
+    does: 'What the server makes of a file once kept, for what the page did not: pictures, a placeholder, its text (of a PDF, a Word document, a workbook; of a picture with `ocr()`). `deriveAll()` of `@rebofiles/server/derive`.',
+  },
   { name: 'onChange', type: '({ activity, entry }) => void', does: 'Each thing done to the drive, as its activity says it: for webhooks, an audit, another index, counting space.' },
   { name: 'onComment', type: '({ comment, entry, mentions, by }) => void', does: 'Each comment made, with whom it names with an @: to tell them.' },
   { name: 'logger', type: 'Logger', does: 'Where what went wrong and was not answered for is written: `pino()`, `console` unless given.' },

@@ -45,6 +45,8 @@ export interface DocumentView {
   layout(mode: DocumentLayout): void;
   /** The browser's print dialog, with the pages as they are laid out: to paper, or to a PDF. */
   print(): void;
+  /** The document as a PDF, made in the page. */
+  pdf(): Promise<Uint8Array>;
   destroy(): void;
 }
 
@@ -64,6 +66,7 @@ export async function viewDocx(element: HTMLElement, bytes: Uint8Array, context:
     },
     layout: (mode) => viewer.setLayout(mode),
     print: () => viewer.print(),
+    pdf: () => viewer.editor.exportPdf(),
     destroy: () => viewer.destroy(),
   };
 }

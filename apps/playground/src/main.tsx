@@ -37,6 +37,7 @@ function Playground() {
         previewDocument={previewDocx}
         viewDocument={viewDocx}
         newDocument={newDocx}
+        fields="edit"
         thumbDocument={thumbDocx}
         textDocument={textOfDocx}
         pictureDocument={pictureOfDocx}

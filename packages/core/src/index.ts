@@ -42,7 +42,12 @@ export {
   emptyTrash,
   purgeTrash,
   usageOf,
+  usageByOwner,
   setColor,
+  setFields,
+  MAX_FIELDS,
+  MAX_FIELD_VALUE,
+  FIELD_NAME,
   setHold,
   heldBy,
   retainedUntil,
@@ -67,6 +72,8 @@ export { type SearchOptions, search, textMatch, wordsOf, foldText } from './sear
 export { type Changes, changes } from './changes';
 export { type Activity, type ActivityAction, activityOf, activityFor } from './activity';
 export { type Comment, COMMENT_LENGTH, commentText, mentionsOf, threads } from './comments';
+export { type Notice, MAX_NOTICES, noticesOf } from './notices';
+export { type Sheet, type SheetLimits, readXlsx, textOfSheets } from './xlsx';
 export {
   type Action,
   type Access,

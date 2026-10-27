@@ -8,6 +8,9 @@
 //   GET    /entries/:id                   one entry, and where it is
 //   GET    /recent                        the files changed last
 //   GET    /trash                         what is in the trash
+//   GET    /starred                       what the one asking starred, the last starred first
+//   PUT    /entries/:id/star              starred, by the one asking only
+//   DELETE /entries/:id/star              no longer
 //   GET    /search?q=…&within=…&trashed=1 found by name
 //   POST   /folders                       { name, parent }
 //   POST   /uploads                       { name, parent, type, size }, or { file, type, size } for a new version: where to send the parts;
@@ -15,7 +18,8 @@
 //   POST   /uploads/finish                { token, parts: [{ number, etag }] }: the file, once its bytes are there
 //   POST   /uploads/resume                { token }: an upload cut, gone on with: what arrived, and where to send the rest
 //   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
-//   PATCH  /entries/:id                   { name }, { parent } or { color }, with { ifTaken: 'keep-both' } to add "(2)"
+//   PATCH  /entries/:id                   { name }, { parent }, { color } or { fields }, with { ifTaken: 'keep-both' } to add "(2)"
+//   GET    /fields?name=…&value=…         what has that field set to that value, of what one may read
 //   POST   /entries/:id/trash             into the trash
 //   POST   /entries/:id/restore           out of it
 //   DELETE /entries/:id                   gone for good, from the trash
@@ -48,6 +52,10 @@
 //   DELETE /entries/:id/comments/:c       by its author, or by who may share the entry
 //   PUT    /entries/:id/hold              { reason }: on hold, for who may 'configure': not to be trashed or deleted
 //   DELETE /entries/:id/hold              released
+//   GET    /notifications                 what the one asking was told (shared with them or a group of theirs, named in a comment), the newest first, and how many are new
+//   POST   /notifications/seen            they looked: none is new any more
+//   GET    /admin/usage                   for who may 'configure': what each person keeps (files, folders, bytes), and the whole drive
+//   GET    /admin/activity?limit=         for who may 'configure': what was done anywhere in the drive, the newest first
 //   GET    /export?user=…                 everything of a person (oneself, or anyone for who may 'configure'), for a .zip
 //   GET    /events                        what changes, as it happens (server-sent events): the folders and entries of each change one may see
 //
@@ -262,6 +270,10 @@ const TEXT_KEPT = 100_000;
 /** An upload left halfway is good for this long. */
 const UPLOAD_LIFE = 24 * 60 * 60;
 const MAX_BODY = 1_000_000;
+/** How many entries a person may star; the oldest go past it. */
+const MAX_STARRED = 1000;
+/** A person's starred entries, as kept. */
+const starredOf = (kept: unknown): EntryId[] => (Array.isArray(kept) ? kept.filter((one): one is EntryId => typeof one === 'string') : []);
 
 /** A request's route as the list at the top says it, its ids as their names: `PATCH /entries/:id`. */
 export function routeOf(method: string, path: string): string {
@@ -506,6 +518,12 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
   const ownSettings = new Map<string, unknown>();
   const getSetting = (name: string) => (options.metadata.getSetting ? options.metadata.getSetting(name) : Promise.resolve(ownSettings.get(name)));
   const setSetting = (name: string, value: unknown) => (options.metadata.setSetting ? options.metadata.setSetting(name, value) : (ownSettings.set(name, value), Promise.resolve()));
+  /** Something told to a person, or to everyone of a group, kept for them to see in the drive. */
+  const notify = async (to: string, notice: Omit<core.Notice, 'id' | 'at'>) => {
+    if (to === '*' || to === notice.by) return;
+    const kept = core.noticesOf(await getSetting(`inbox:${to}`));
+    await setSetting(`inbox:${to}`, [{ id: newId(), at: now(), ...notice }, ...kept].slice(0, core.MAX_NOTICES));
+  };
   /** The drive's settings: what was kept, over the defaults the server was given. */
   const driveSettings = async () => core.readDriveSettings(await getSetting('drive'), defaults);
   const defaults = core.readDriveSettings(options.settings ?? {});
@@ -758,6 +776,33 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           const drive = await load(await find.recent(user.id, 100));
           return Response.json({ entries: await readable(user, core.recent(drive), drive) });
         }
+        case 'GET /fields': {
+          const name = url.searchParams.get('name') ?? '';
+          const value = url.searchParams.get('value') ?? '';
+          if (!core.FIELD_NAME.test(name)) throw new Refused(400, 'invalid-field', `"${name}" is not a name of a field.`);
+          const drive = await load(await find.withField(name, value, 1000));
+          const entries = [...drive.entries.values()].filter((entry) => entry.fields?.[name] === value && !core.isTrashed(drive, entry.id)).slice(0, 200);
+          return Response.json({ entries: await readable(user, entries, drive) });
+        }
+        case 'GET /starred': {
+          // Each person's own, kept as a setting; what is gone, in the trash or no longer theirs to read is left out.
+          const ids = starredOf(await getSetting(`starred:${user.id}`));
+          const drive = await load({ ids });
+          const entries = ids.flatMap((one) => {
+            const entry = drive.entries.get(one);
+            return entry && !core.isTrashed(drive, one) ? [entry] : [];
+          });
+          return Response.json({ entries: await readable(user, entries, drive) });
+        }
+        case 'PUT /entries/:id/star':
+        case 'DELETE /entries/:id/star': {
+          const drive = await load({ ids: [id] });
+          await allow(user, 'read', core.getEntry(drive, id), drive);
+          const ids = starredOf(await getSetting(`starred:${user.id}`)).filter((one) => one !== id);
+          const next = request.method === 'PUT' ? [id, ...ids].slice(0, MAX_STARRED) : ids;
+          await setSetting(`starred:${user.id}`, next);
+          return Response.json({ starred: request.method === 'PUT' });
+        }
         case 'GET /trash': {
           const drive = await load(await find.trashed({ user: user.id }));
           // One's own trash: what one owns or put there, not what others threw away in a folder shared with them.
@@ -772,6 +817,33 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           const since = (await getSetting(`seen-shared:${user.id}`)) as string | undefined;
           return Response.json({ count: (await readable(user, core.sharedSince(drive, user, since), drive)).length });
         }
+        case 'GET /admin/usage': {
+          await allow(user, 'configure', null, await load({}));
+          // The whole drive, read once: for who looks after it, now and then.
+          const people = core.usageByOwner(await options.metadata.load());
+          const total = people.reduce((sum, one) => ({ files: sum.files + one.files, folders: sum.folders + one.folders, bytes: sum.bytes + one.bytes }), { files: 0, folders: 0, bytes: 0 });
+          return Response.json({ people, total, quota: (await driveSettings()).quota });
+        }
+        case 'GET /admin/activity': {
+          await allow(user, 'configure', null, await load({}));
+          const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 100) || 100));
+          const lines = options.metadata.activityLatest ? await options.metadata.activityLatest(limit) : ownActivity.slice(-limit).reverse();
+          return Response.json({ activity: lines });
+        }
+        case 'GET /notifications': {
+          // One's own, and those of each group one is in, as `identify` says now.
+          const names = core.shareNamesOf(user).filter((name) => name !== '*');
+          const all = (await Promise.all(names.map(async (name) => core.noticesOf(await getSetting(`inbox:${name}`)))))
+            .flat()
+            .filter((notice) => notice.by !== user.id)
+            .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+            .slice(0, 50);
+          const seen = (await getSetting(`inbox-seen:${user.id}`)) as string | undefined;
+          return Response.json({ notifications: all, unseen: all.filter((notice) => seen === undefined || notice.at > seen).length });
+        }
+        case 'POST /notifications/seen':
+          await setSetting(`inbox-seen:${user.id}`, now());
+          return Response.json({ ok: true });
         case 'POST /shared/seen':
           await setSetting(`seen-shared:${user.id}`, now());
           return Response.json({ ok: true });
@@ -910,7 +982,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             const key = `${file.id}/${version.id}@${rendition.size}`;
             const plan = await options.storage.startUpload(key, type, size, base);
             const made: Pending = { versionId: version.id, size, type, user: user.id, rendition, key, state: plan.state };
-            return Response.json({ token: sealToken(options.secret, made, UPLOAD_LIFE), parts: plan.parts });
+            return Response.json({ token: sealToken(options.secret, made, UPLOAD_LIFE), parts: plan.parts, ...(plan.etags === false ? { etags: false } : {}) });
           }
           if (asked.file) {
             const file = core.getFile(drive, asked.file);
@@ -976,6 +1048,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             token: sealToken(options.secret, { ...pending, key, state: plan.state } satisfies Pending, UPLOAD_LIFE),
             parts: plan.parts.filter((part) => !copied.has(part.number)),
             ...(copied.size ? { copied: [...copied] } : {}),
+            ...(plan.etags === false ? { etags: false } : {}),
           });
         }
 
@@ -1035,7 +1108,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           try {
             const plan = await options.storage.resumeUpload(pending.key, pending.state, pending.size, base);
             const left = plan.parts.reduce((sum, part) => sum + part.to - part.from, 0);
-            return Response.json({ token: asked.token, done: plan.done, parts: plan.parts, sent: pending.size - left });
+            return Response.json({ token: asked.token, done: plan.done, parts: plan.parts, sent: pending.size - left, ...(options.storage.label.startsWith('azure://') ? { etags: false } : {}) });
           } catch (error) {
             if (error instanceof UploadGone) throw new Refused(410, 'upload-gone', 'That upload is no longer in the storage: start it again.');
             throw error;
@@ -1053,7 +1126,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         }
 
         case 'PATCH /entries/:id': {
-          const asked = await body<{ name?: string; parent?: EntryId | null; color?: core.FolderColor | null; ifTaken?: 'refuse' | 'keep-both' }>();
+          const asked = await body<{ name?: string; parent?: EntryId | null; color?: core.FolderColor | null; fields?: Record<string, string | null>; ifTaken?: 'refuse' | 'keep-both' }>();
           const ifTaken = asked.ifTaken === 'keep-both' ? 'keep-both' : 'refuse';
           return Response.json(
             await change(
@@ -1073,6 +1146,11 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
                 if (asked.color !== undefined) {
                   await allow(user, 'rename', entry, drive);
                   next = core.setColor(next, id, asked.color);
+                }
+                // The application's own fields, as one who may rename it may set them.
+                if (asked.fields !== undefined) {
+                  await allow(user, 'rename', entry, drive);
+                  next = core.setFields(next, id, asked.fields, context());
                 }
                 return { drive: next, answer: { entry: core.getEntry(next, id) } };
               },
@@ -1195,6 +1273,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             { ids: [id] },
           );
           const before = answer.entry.shares?.find((s) => s.with === who);
+          if (first && before) await notify(who, { kind: 'shared', entry: id, name: answer.entry.name, by: user.id, role: before.role });
           if (options.onShare && before)
             void Promise.resolve()
               .then(() => options.onShare!({ entry: answer.entry, with: who, role: before.role, by: user, first }))
@@ -1279,6 +1358,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           await keepComment(comment);
           await saidOf(entry, user.id);
           const mentions = core.mentionsOf(text).filter((who) => who !== user.id);
+          for (const who of mentions) await notify(who, { kind: 'mentioned', entry: id, name: entry.name, by: user.id, text: text.slice(0, 200) });
           if (options.onComment) void Promise.resolve(options.onComment({ comment, entry, mentions, by: user })).catch((error) => log.error('onComment failed:', error));
           return Response.json({ comment });
         }

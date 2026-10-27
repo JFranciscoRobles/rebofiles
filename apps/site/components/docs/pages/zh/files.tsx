@@ -1,9 +1,9 @@
 // 文件：如何上传、如何显示、如何查找、如何保存、如何打包下载，以及借助 Rebodocs 处理 Word 文档。
 
 import { docHref } from '@/lib/site';
-import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { DOCX, QUEUE, RESUME, SAVE, SIZES, SPACE } from '../files';
-import { DERIVE_CODE } from '../team';
+import { C, Code, type DocPage, List, P, Table } from '../../ui';
+import { DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
+import { DERIVE_CODE, OCR_CODE } from '../team';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/files.tsx';
@@ -138,6 +138,7 @@ export const previews: DocPage = {
             ['Word 文档', '标题和开头几段，或第一页', '逐页或全部显示；Rebodocs 的缩放；打印'],
             ['PDF', '由浏览器显示第一页', '浏览器自带的查看器'],
             ['视频、音频', '—', '播放'],
+            ['Excel 工作簿（.xlsx）', '卡片上显示前几行', '每个工作表显示为表格'],
             ['文本、Markdown、CSV、JSON、代码', '开头部分', '完整显示，有大小上限'],
           ]}
         />
@@ -199,11 +200,26 @@ export const previews: DocPage = {
                 <C>pdf()</C>：用 <C>pdfjs-dist</C> 和 <C>@napi-rs/canvas</C> 绘制 PDF 第一页，并提取前五十页的文字用于搜索。
               </>,
               <>
-                <C>docx()</C> 和 <C>text()</C>：用 Rebodocs 读取 Word 文档的文字，以及文本文件的文字。
+                <C>docx()</C>、<C>xlsx()</C> 和 <C>text()</C>：用 Rebodocs 读取 Word 文档的文字，读取 Excel 工作簿的单元格，以及文本文件的文字。
               </>,
             ]}
           />
           <P>页面会说明自己生成了什么，服务器只生成其余部分；每个库在首次需要时才加载，因此只需安装用到的库。页面会根据事件显示新生成的内容。</P>
+        </>
+      ),
+    },
+    {
+      id: 'read-in-pictures',
+      title: '图片中的文字',
+      badge: 'OCR',
+      color: 'pink',
+      lead: '收据照片、扫描的合同：由 Tesseract 识别其中的文字后即可搜索。deriveAll() 默认不包含它，因为首次使用时会下载语言数据。',
+      body: (
+        <>
+          <Code code={OCR_CODE} />
+          <P>
+            <C>ocr()</C> 读取图片，以及没有文字层的 PDF 的前几页（在 <C>pdf()</C> 之后运行，有文字的 PDF 由 <C>pdf()</C> 读取）。<C>langPath</C> 和 <C>cachePath</C> 指定语言数据的来源和保存位置。
+          </P>
         </>
       ),
     },
@@ -235,7 +251,10 @@ export const search: DocPage = {
             items={[
               <>按类型或名称识别的文本文件：读取前 2 MiB。</>,
               <>
-                Word 文档：使用 <C>textDocument=&#123;textOfDocx&#125;</C>，由 Rebodocs 的引擎读取。
+                Word 文档：使用 <C>textDocument=&#123;textOfDocx&#125;</C>，由 Rebodocs 的引擎读取；Excel 工作簿按单元格读取。
+              </>,
+              <>
+                PDF、图片和扫描件由服务器读取，使用 <a href={`${docHref('zh', 'previews')}#made-by-the-server`}>derive</a> 和 <C>ocr()</C>。
               </>,
               <>保存前 100,000 个字符；没有自己文字的新版本不会被旧版本的文字搜到。</>,
             ]}
@@ -255,7 +274,6 @@ export const search: DocPage = {
         </P>
       ),
     },
-    { id: 'not-yet', title: '暂不支持', badge: '须知', color: 'pink', body: <Callout title="暂不读取 PDF。">它们的文字将通过 pdf.js 获取，第一页的缩略图也是如此。</Callout> },
   ],
 };
 
@@ -367,6 +385,47 @@ export const word: DocPage = {
           <Code lang="tsx" code={SAVE} />
           <P>
             playground 中的 <C>apps/playground/src/Editor.tsx</C> 就是这样做的：⌘S 保存，网盘会把该文档显示为它的下一个版本。
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'create-a-document',
+      title: '创建文档',
+      badge: '新建',
+      color: 'yellow',
+      body: (
+        <>
+          <Code lang="tsx" code={NEW_DOC} />
+          <P>
+            <C>newDocument</C> 用于生成空文档：Rebodocs 的 <C>newDocx</C>，或你自己的模板。没有 <C>onOpenDocument</C> 时，新文档在查看器中打开。
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'as-a-pdf',
+      title: '导出为 PDF',
+      badge: 'PDF',
+      color: 'orange',
+      body: (
+        <P>
+          Word 文档的查看器在“打印”旁有 <strong>PDF</strong> 按钮：由 Rebodocs 在页面中根据显示的页面生成并下载（<C>viewDocx</C> 返回对象的 <C>pdf()</C>）。编辑器也可以用 <C>editor.exportPdf()</C>{' '}
+          生成。
+        </P>
+      ),
+    },
+    {
+      id: 'together',
+      title: '多人同时编辑',
+      badge: '协作',
+      color: 'pink',
+      lead: '借助 Rebodocs 的协作服务器，网盘中的每个文档都是一个房间：打开它的人可以与其他人同时编写，各自有自己的光标；只能读取的人只能观看。',
+      body: (
+        <>
+          <Code lang="tsx" code={TOGETHER} />
+          <P>
+            文档演示（<C>npm run documents</C>，<C>apps/documents</C>）完整实现了这一点：基于网盘的房间、根据每个人对文件的权限签发的票据，以及所有人离开后保存的新版本。
           </P>
         </>
       ),

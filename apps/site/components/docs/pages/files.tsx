@@ -2,8 +2,8 @@
 // and Word documents with Rebodocs.
 
 import { hrefOf } from '@/lib/site';
-import { C, Callout, Code, type DocPage, List, P, Table } from '../ui';
-import { DERIVE_CODE } from './team';
+import { C, Code, type DocPage, List, P, Table } from '../ui';
+import { DERIVE_CODE, OCR_CODE } from './team';
 
 export const RESUME = `// A file cut halfway, or left when the page closed, is uploaded again:
 await client.upload(file, { parent });  // asks the server what arrived, sends the rest`;
@@ -154,6 +154,7 @@ export const previews: DocPage = {
             ['Word documents', 'Title and first paragraphs, or the first page', 'Page by page, or all; Rebodocs’ zoom; print'],
             ['PDF', 'Its first page, by the browser', 'The browser’s own'],
             ['Video, audio', '—', 'Played'],
+            ['Excel workbooks (.xlsx)', 'Its first rows, on its card', 'Each sheet as a table'],
             ['Text, Markdown, CSV, JSON, code', 'The start of it', 'Whole, up to a size'],
           ]}
         />
@@ -216,13 +217,29 @@ export const previews: DocPage = {
                 <C>pdf()</C>: a PDF’s first page drawn, and the text of its first fifty pages for a search, with <C>pdfjs-dist</C> and <C>@napi-rs/canvas</C>.
               </>,
               <>
-                <C>docx()</C> and <C>text()</C>: what is written in a Word document, with Rebodocs, and in a file of text.
+                <C>docx()</C>, <C>xlsx()</C> and <C>text()</C>: what is written in a Word document, with Rebodocs, in the cells of a workbook, and in a file of text.
               </>,
             ]}
           />
           <P>
             The page says what it makes itself, and the server makes only the rest; each library is asked for when first needed, so only what is used is installed. The page shows what comes, as the
             events tell it.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'read-in-pictures',
+      title: 'What pictures say',
+      badge: 'OCR',
+      color: 'pink',
+      lead: 'A photo of a receipt, a contract scanned: found by their words, read by Tesseract. Not among those deriveAll() makes unless given, as it fetches the data of a language the first time.',
+      body: (
+        <>
+          <Code code={OCR_CODE} />
+          <P>
+            <C>ocr()</C> reads a picture, and the first pages of a PDF with no text of its own (after <C>pdf()</C>, which reads those that have it). <C>langPath</C> and <C>cachePath</C> say where the
+            data of each language comes from and is kept.
           </P>
         </>
       ),
@@ -255,7 +272,10 @@ export const search: DocPage = {
             items={[
               <>Text files by their type or their name: the first 2 MiB.</>,
               <>
-                Word documents with <C>textDocument=&#123;textOfDocx&#125;</C>, by Rebodocs’ engine.
+                Word documents with <C>textDocument=&#123;textOfDocx&#125;</C>, by Rebodocs’ engine; Excel workbooks by their cells.
+              </>,
+              <>
+                PDFs, pictures and scans by the server, with <a href={`${hrefOf('previews')}#made-by-the-server`}>derive</a> and <C>ocr()</C>.
               </>,
               <>The first 100,000 characters are kept; a new version without text of its own is not found by the old one’s.</>,
             ]}
@@ -276,7 +296,6 @@ export const search: DocPage = {
         </P>
       ),
     },
-    { id: 'not-yet', title: 'Not yet', badge: 'Know', color: 'pink', body: <Callout title="PDFs are not read.">Their text would come with pdf.js, as their first page would.</Callout> },
   ],
 };
 
@@ -402,6 +421,21 @@ import { useActions } from '@rebofiles/react';
 const { upload } = useActions();
 <DocsEditor docx={bytes} onSave={(docx) => upload(new File([docx], file.name), { file: file.id })} />`;
 
+export const NEW_DOC = `import { newDocx } from '@rebofiles/react/rebodocs';
+
+// "Create document" over the files, and "New document" in New: an empty .docx,
+// named by the person, in the folder they are in, and opened with onOpenDocument.
+<FileDrive base="/api/files" newDocument={newDocx} viewDocument={viewDocx} onOpenDocument={open} />`;
+
+export const TOGETHER = `import { createCollabServer } from '@rebodocs/collab/server';
+
+// A room for each document of the drive, named by its id: opened from the file,
+// kept as a new version of it once everybody has left (apps/documents/server/collab.ts).
+const collab = createCollabServer({ storage: roomsOverTheDrive });
+app.use('/collab', collab.handle);
+
+<DocsEditor collab={{ url: location.origin, room: file.id, ticket }} onSave={saveAsVersion} />`;
+
 export const word: DocPage = {
   title: 'Word documents',
   description: 'With Rebodocs installed: .docx read by its engine for the details, the viewer, the grid and the search, opened in its editor, and each save a version.',
@@ -425,6 +459,48 @@ export const word: DocPage = {
           <Code lang="tsx" code={SAVE} />
           <P>
             The playground does it, in <C>apps/playground/src/Editor.tsx</C>: ⌘S saves, and the drive shows the document as its next version.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'create-a-document',
+      title: 'Create a document',
+      badge: 'New',
+      color: 'yellow',
+      body: (
+        <>
+          <Code lang="tsx" code={NEW_DOC} />
+          <P>
+            <C>newDocument</C> is what makes an empty one: <C>newDocx</C> of Rebodocs, or a template of yours. Without <C>onOpenDocument</C>, the new document opens in the viewer.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'as-a-pdf',
+      title: 'As a PDF',
+      badge: 'PDF',
+      color: 'orange',
+      body: (
+        <P>
+          The viewer of a Word document has <strong>PDF</strong> beside Print: made in the page by Rebodocs, from the pages shown, and downloaded (<C>pdf()</C> of what <C>viewDocx</C> gives). The
+          editor makes one too, with <C>editor.exportPdf()</C>.
+        </P>
+      ),
+    },
+    {
+      id: 'together',
+      title: 'Several people at once',
+      badge: 'Collab',
+      color: 'pink',
+      lead: 'With Rebodocs’ collaboration server, each document of the drive is a room: whoever opens it writes with the others at once, each with a caret of their own, and who may only read it watches.',
+      body: (
+        <>
+          <Code lang="tsx" code={TOGETHER} />
+          <P>
+            The demo of documents (<C>npm run documents</C>, <C>apps/documents</C>) does it whole: the rooms over the drive, a ticket signed for each person from what they may do with the file, and a
+            version kept when everybody leaves.
           </P>
         </>
       ),

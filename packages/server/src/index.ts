@@ -6,6 +6,8 @@ export { type Logger, type RequestDone, type MeterLike, type Limit, type Limits,
 export { nodeHandler } from './node';
 export { type Storage, type UploadPart, type UploadPlan, type FinishedPart, type ResumePlan, UploadGone, PART_SIZE, MAX_PARTS, partSizeOf } from './storage';
 export { type S3Options, s3Storage, s3OptionsFrom } from './s3';
+export { type GcsOptions, gcsStorage, gcsOptionsFrom } from './gcs';
+export { type AzureOptions, azureStorage, azureOptionsFrom } from './azure';
 export { type DiskOptions, diskStorage } from './disk';
 export { type MetadataStore, type KeptText, type PostgresClient, type PostgresPool, type PostgresOptions, memoryMetadata, sqliteMetadata, postgresMetadata } from './metadata';
 export { Refused } from './refused';

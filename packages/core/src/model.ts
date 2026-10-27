@@ -102,6 +102,11 @@ interface Base {
    * released. Its versions stay; new ones may come.
    */
   hold?: Hold;
+  /**
+   * Fields of the application's own, by name: what ties it to its records (`client: 'acme'`, `case: '2026-114'`), to
+   * find it by with `withField`. Names of letters, digits and `_ . -`; values text.
+   */
+  fields?: Readonly<Record<string, string>>;
 }
 
 export interface Hold {

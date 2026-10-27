@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMcpHandler } from '@rebofiles/mcp';
 import { byRoles, checkType, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
-import { deriveAll } from '@rebofiles/server/derive';
+import { deriveAll, docx, ocr, pdf, pictures, text, xlsx } from '@rebofiles/server/derive';
 
 const ENV = resolve(import.meta.dirname, '../.env');
 if (!existsSync(ENV)) throw new Error('No apps/storage/.env yet: copy .env.example beside it and fill it in.');
@@ -50,7 +50,7 @@ export const handle = createDriveHandler({
   secret,
   base: '/api/files',
   // What the page does not make of a file, made here and kept in the bucket: a PDF's first page, its text.
-  derive: deriveAll(),
+  derive: deriveAll(pictures(), pdf(), docx(), xlsx(), text(), ocr({ languages: ['eng', 'spa'] })),
   // A program, or a file whose bytes are not what its name says, refused once it is in the bucket, and taken out.
   inspect: checkType(),
   // The desktop application, as `npm run desktop` opens it, against this bucket.

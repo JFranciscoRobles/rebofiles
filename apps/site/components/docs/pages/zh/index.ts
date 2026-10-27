@@ -26,6 +26,7 @@ export const DOC_PAGES_ZH: Partial<Record<string, DocPage>> = {
   search: files.search,
   live: running.live,
   comments: team.comments,
+  organizing: team.organizing,
   versions: files.versions,
   zip: files.zip,
   word: files.word,

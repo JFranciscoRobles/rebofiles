@@ -46,6 +46,16 @@ const AT_ONCE = 40;
 
 type Picker = (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{ createWritable(): Promise<WritableStream<Uint8Array>> }>;
 
+/** Bytes made in the page saved as a file named `name`, as a download is. */
+export function saveBlob(blob: Blob, name: string): void {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  link.click();
+  // Long enough for the browser to have taken it.
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+}
+
 export async function downloadZip(client: ZipSource, ids: EntryId[], options: ZipDownloadOptions): Promise<ZipDownload> {
   const name = /\.zip$/i.test(options.name) ? options.name : `${options.name}.zip`;
   const packed = await client.pack(ids);
@@ -66,14 +76,7 @@ export async function downloadZip(client: ZipSource, ids: EntryId[], options: Zi
   } else {
     const kept = blobSink();
     sink = kept;
-    finish = async () => {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(kept.blob());
-      link.download = name;
-      link.click();
-      // Long enough for the browser to have taken it.
-      setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-    };
+    finish = async () => saveBlob(kept.blob(), name);
   }
 
   async function* items(): AsyncGenerator<ZipItem> {

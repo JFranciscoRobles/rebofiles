@@ -21,7 +21,6 @@ export const isGroup = (who: string) => who.startsWith(GROUP);
 /** Someone, and the groups they are in: a plain id is someone in none. */
 export type Who = string | { id: string; groups?: readonly string[] };
 const idOf = (who: Who) => (typeof who === 'string' ? who : who.id);
-/** What a share may name to reach `who`: their id, everyone, and each of their groups. */
 /** The names a share may give to reach someone: their id, everyone, and each of their groups. */
 export const shareNamesOf = (who: Who): string[] => [...namesOf(who)];
 const namesOf = (who: Who): Set<string> => new Set([idOf(who), EVERYONE, ...(typeof who === 'string' ? [] : (who.groups ?? []).map(groupOf))]);

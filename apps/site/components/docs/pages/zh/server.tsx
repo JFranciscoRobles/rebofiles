@@ -4,8 +4,8 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, CORS, ENV, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
-import { GROUPS_CODE } from '../team';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ZH } from '../team';
 
 const to = (slug: string) => docHref('zh', slug);
@@ -165,8 +165,8 @@ export const authorize: DocPage = {
 };
 
 export const storage: DocPage = {
-  title: '存储：S3 与磁盘',
-  description: '文件内容可存放在任何兼容 S3 的存储桶中（无需 SDK），或磁盘上的文件夹中：密钥、跨域规则，以及可能出现的问题。',
+  title: '存储：S3、GCS、Azure 与磁盘',
+  description: '文件内容可存放在任何兼容 S3 的存储桶、Google Cloud Storage 或 Azure Blob Storage 中（无需 SDK），或磁盘上的文件夹中：密钥、跨域规则，以及可能出现的问题。',
   source: SOURCE,
   lead: <>文件内容从浏览器直接发送到存储桶并从中读回，使用服务器签名、有效期几分钟的地址。这对存储桶有两个要求：一个用于签名的密钥，以及一条允许你的页面访问的规则。</>,
   sections: [
@@ -195,6 +195,44 @@ export const storage: DocPage = {
         <>
           <Code lang="json" code={CORS} file="CORS policy" />
           <P>再加一条生命周期规则，在一天后中止未完成的分片上传，就能避免从未完成的上传分片一直留在存储桶中。</P>
+        </>
+      ),
+    },
+    {
+      id: 'google-cloud-storage',
+      title: 'Google Cloud Storage',
+      badge: 'GCS',
+      color: 'purple',
+      lead: '通过兼容 S3 的 XML API：同样的地址，用存储桶的 HMAC 密钥签名。',
+      body: (
+        <>
+          <Code code={GCS_CODE} />
+          <P>
+            该 API 不支持的操作换一种方式完成：逐个删除对象；新版本的所有分片都会上传，因为它不支持复制分片。存储桶的 CORS（用 <C>gcloud storage buckets update --cors-file</C> 设置）必须公开{' '}
+            <C>ETag</C>。
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'azure-blob-storage',
+      title: 'Azure Blob Storage',
+      badge: 'Azure',
+      color: 'blue',
+      lead: '存储帐户中的一个容器：地址用帐户密钥签名（每个 blob 的 SAS，有效几分钟），每个分片是一个块，文件由块列表组成。',
+      body: (
+        <>
+          <Code code={AZURE_CODE} />
+          <List
+            items={[
+              '根据 Azure 列出的块继续中断的上传；新版本只上传变化的分片（Put Block From URL）。',
+              '从未完成的上传留下的块会在一周后自动清除：无需清理。',
+              <>
+                帐户的 CORS（资源共享）需允许你的页面来源，并允许 <C>PUT</C>、<C>GET</C> 和 <C>HEAD</C>；无需公开任何响应头，因为块按编号组合。
+              </>,
+              '已在服务器的测试中用微软的模拟器 Azurite 验证。',
+            ]}
+          />
         </>
       ),
     },
@@ -421,6 +459,35 @@ export const activity: DocPage = {
       color: 'yellow',
       lead: '网盘会在“与我共享”旁统计新内容。如果你想自己通知对方，请为服务器提供 onShare。',
       body: <Code code={ON_SHARE} />,
+    },
+    {
+      id: 'in-the-drive',
+      title: '在网盘中通知',
+      badge: '铃铛',
+      color: 'purple',
+      lead: '与某人或其所在组共享的内容，以及提到某人的评论：显示在网盘上方的铃铛中，旁边显示新通知数量，点击即可打开对应位置。',
+      body: (
+        <>
+          <Code code={NOTICES_CODE} />
+          <P>
+            为每个人和每个组保存（<C>inbox:&lt;who&gt;</C>），最多两百条；查看后不再有新通知（<C>POST /notifications/seen</C>）。自己做的操作不会通知自己。发送邮件仍由你的应用通过 <C>onShare</C> 和{' '}
+            <C>onComment</C> 完成。
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'the-whole-drive',
+      title: '整个网盘',
+      badge: '成员',
+      color: 'orange',
+      lead: '有配置权限的人可在“设置 → 成员”中查看：每个人和整个网盘的文件数、文件夹数和占用空间，以及网盘中任何位置的最新动态。',
+      body: (
+        <>
+          <Code code={ADMIN_CODE} />
+          <Callout title="每人的空间">每次请求时读取整个网盘来计算：供管理员偶尔查看，而不是每个页面都调用。</Callout>
+        </>
+      ),
     },
     {
       id: 'know',

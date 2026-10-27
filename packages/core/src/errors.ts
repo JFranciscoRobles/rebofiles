@@ -14,6 +14,7 @@ export type DriveErrorCode =
   | 'invalid-share'
   | 'invalid-settings'
   | 'invalid-color'
+  | 'invalid-field'
   | 'invalid-comment'
   | 'on-hold'
   | 'retained';

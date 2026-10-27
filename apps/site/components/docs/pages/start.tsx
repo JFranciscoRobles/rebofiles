@@ -365,6 +365,19 @@ export const demos: DocPage = {
       ),
     },
     {
+      id: 'the-documents',
+      title: 'Documents',
+      badge: 'npm run documents',
+      color: 'orange',
+      lead: 'Word documents from start to end, all with Rebodocs: Create document, its editor with several people in one document at once, its viewer, and PDF. At http://localhost:5184.',
+      body: (
+        <P>
+          Open a document as <C>?as=ana</C> and, shared with her, as <C>?as=bea</C>: each sees the other’s caret and what they write, and a version is kept when both have left. In{' '}
+          <C>apps/documents</C>, the rooms over the drive are <C>server/collab.ts</C>.
+        </P>
+      ),
+    },
+    {
       id: 'the-desktop',
       title: 'The desktop',
       badge: 'npm run desktop',

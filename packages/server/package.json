@@ -19,7 +19,8 @@
     "sharp": ">=0.33",
     "pdfjs-dist": ">=4",
     "@napi-rs/canvas": ">=0.1",
-    "@rebodocs/core": ">=0.12.0"
+    "@rebodocs/core": ">=0.12.0",
+    "tesseract.js": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "sharp": {
@@ -32,6 +33,9 @@
       "optional": true
     },
     "@rebodocs/core": {
+      "optional": true
+    },
+    "tesseract.js": {
       "optional": true
     }
   }

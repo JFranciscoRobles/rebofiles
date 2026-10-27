@@ -52,6 +52,8 @@ async function filled(metadata: MetadataStore) {
   await bea.ask('POST', `/api/files/entries/${contract.id}/trash`);
   await bea.ask('POST', `/api/files/entries/${contract.id}/restore`);
   await ana.ask('PATCH', `/api/files/entries/${deep.id}`, { parent: clients.id, name: 'Deeper' });
+  await ana.ask('PATCH', `/api/files/entries/${contract.id}`, { fields: { client: 'northwind', 'case.no': '2026-114' } });
+  await ana.ask('PATCH', `/api/files/entries/${north.id}`, { fields: { client: 'northwind' } });
   return { clients, north, deep, contract, old };
 }
 
@@ -94,6 +96,9 @@ describe.each([
     const link = (drive.entries.get(made.contract.id) as Entry).links![0].id;
     expect(await same('withLink', link)).toBe(made.contract.id);
     expect(await same('withLink', 'no such link')).toBeUndefined();
+    expect(await same('withField', 'client', 'northwind', 10)).toHaveLength(2);
+    expect(await same('withField', 'case.no', '2026-114', 10)).toHaveLength(1);
+    expect(await same('withField', 'client', 'acme', 10)).toHaveLength(0);
   });
 });
 

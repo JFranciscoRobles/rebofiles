@@ -23,7 +23,11 @@ assistant; changes shown as they happen and folders of thousands, the drive
 read a piece at a time; comments; groups; pictures and text of PDFs made by
 the server; files checked by their bytes and by ClamAV; limits; retention,
 legal holds and a person's data exported; only the changed parts of a file
-sent; and a desktop application that keeps a folder in sync.
+sent; starred files; fields of your own on each entry; notifications in the
+drive; the space of each person for who looks after it; Excel workbooks shown
+and searched; pictures read with OCR; Google Cloud Storage and Azure besides
+S3; Word documents created, written by several at once and downloaded as PDF;
+and a desktop application that keeps a folder in sync.
 [ROADMAP.md](ROADMAP.md) says what is next and what is checked.
 
 ## Quick start
@@ -63,6 +67,7 @@ export { handle as GET, handle as POST, handle as PATCH, handle as DELETE, handl
 npm install
 npm run dev         # the playground, at http://localhost:5180: the drive on this computer, in storage/
 npm run demo        # the demo of the landing, at http://localhost:5181: entirely in the browser
+npm run documents   # Word documents made, written by several at once and read, at http://localhost:5184
 npm run site        # the landing page, at http://localhost:5182 (Next.js; npm run build:site makes it static, in apps/site/out,
                     # with the sitemap, llms.txt and a .md of each page, and fails on a page without its SEO)
 npm test            # Vitest

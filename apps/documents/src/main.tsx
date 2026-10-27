@@ -1,7 +1,8 @@
 // Word documents from start to end in the drive, all of them Rebodocs':
 // "Create document" (and New → New document) makes an empty one in the folder
-// one is in and opens it in the editor; each save is a new version. A double
-// click shows a document in its pages, in the viewer, read only, with "Open in
+// one is in and opens it in Rebodocs' editor, where whoever else opens it
+// writes with them at once; each save is a new version, as everybody leaving
+// is, and "PDF" downloads it as one. A double click shows a document in its pages, in the viewer, read only, with "Open in
 // Rebodocs" to write in it again; the grid shows each one's first page.
 // `?lang=es` (or `zh`) shows it in Spanish, `?as=bea` as Bea sees it.
 
@@ -27,6 +28,7 @@ function Documents() {
         title={{ en: 'Documents', es: 'Documentos', zh: '文档' }[language ?? 'en']}
         defaultView={params.get('view') === 'list' ? 'list' : 'grid'}
         newDocument={newDocx}
+        fields="edit"
         viewDocument={viewDocx}
         previewDocument={previewDocx}
         thumbDocument={thumbDocx}
@@ -36,7 +38,7 @@ function Documents() {
       />
       {open && (
         <Suspense fallback={null}>
-          <Editor file={open.file} url={open.url} language={language ?? 'en'} onClose={() => setOpen(null)} />
+          <Editor file={open.file} url={open.url} language={language ?? 'en'} headers={headers} onClose={() => setOpen(null)} />
         </Suspense>
       )}
     </DriveProvider>

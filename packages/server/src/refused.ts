@@ -31,6 +31,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'invalid-share': 400,
   'invalid-settings': 400,
   'invalid-color': 400,
+  'invalid-field': 400,
   'invalid-comment': 400,
   'on-hold': 409,
   retained: 409,

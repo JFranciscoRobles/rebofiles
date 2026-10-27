@@ -2,9 +2,9 @@
 // juntos, y los documentos de Word con Rebodocs.
 
 import { docHref } from '@/lib/site';
-import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { DOCX, QUEUE, RESUME, SAVE, SIZES, SPACE } from '../files';
-import { DERIVE_CODE } from '../team';
+import { C, Code, type DocPage, List, P, Table } from '../../ui';
+import { DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
+import { DERIVE_CODE, OCR_CODE } from '../team';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/files.tsx';
@@ -148,6 +148,7 @@ export const previews: DocPage = {
             ['Documentos de Word', 'Título y primeros párrafos, o la primera página', 'Página a página, o todas; el zoom de Rebodocs; imprimir'],
             ['PDF', 'Su primera página, por el navegador', 'El del propio navegador'],
             ['Vídeo, audio', '—', 'Se reproduce'],
+            ['Libros de Excel (.xlsx)', 'Sus primeras filas, en su tarjeta', 'Cada hoja como una tabla'],
             ['Texto, Markdown, CSV, JSON, código', 'El comienzo', 'Entero, hasta un tamaño'],
           ]}
         />
@@ -210,13 +211,29 @@ export const previews: DocPage = {
                 <C>pdf()</C>: la primera página de un PDF dibujada, y el texto de sus primeras cincuenta páginas para la búsqueda, con <C>pdfjs-dist</C> y <C>@napi-rs/canvas</C>.
               </>,
               <>
-                <C>docx()</C> y <C>text()</C>: lo que tiene escrito un documento de Word, con Rebodocs, y un archivo de texto.
+                <C>docx()</C>, <C>xlsx()</C> y <C>text()</C>: lo que tiene escrito un documento de Word, con Rebodocs, las celdas de un libro de Excel y un archivo de texto.
               </>,
             ]}
           />
           <P>
             La página dice lo que hace ella misma, y el servidor hace solo el resto; cada biblioteca se pide al necesitarla, así que solo se instala lo que se usa. La página muestra lo que llega, como
             lo avisan los eventos.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'read-in-pictures',
+      title: 'Lo que dicen las imágenes',
+      badge: 'OCR',
+      color: 'pink',
+      lead: 'La foto de un recibo, un contrato escaneado: encontrados por sus palabras, leídas por Tesseract. No está entre lo que hace deriveAll() si no se da, porque la primera vez descarga los datos de un idioma.',
+      body: (
+        <>
+          <Code code={OCR_CODE} />
+          <P>
+            <C>ocr()</C> lee una imagen, y las primeras páginas de un PDF sin texto propio (después de <C>pdf()</C>, que lee los que sí lo tienen). <C>langPath</C> y <C>cachePath</C> dicen de dónde
+            vienen y dónde se guardan los datos de cada idioma.
           </P>
         </>
       ),
@@ -249,7 +266,10 @@ export const search: DocPage = {
             items={[
               <>Archivos de texto por su tipo o su nombre: los primeros 2 MiB.</>,
               <>
-                Documentos de Word con <C>textDocument=&#123;textOfDocx&#125;</C>, con el motor de Rebodocs.
+                Documentos de Word con <C>textDocument=&#123;textOfDocx&#125;</C>, con el motor de Rebodocs; libros de Excel por sus celdas.
+              </>,
+              <>
+                PDF, imágenes y escaneos, por el servidor, con <a href={`${docHref('es', 'previews')}#made-by-the-server`}>derive</a> y <C>ocr()</C>.
               </>,
               <>Se guardan los primeros 100 000 caracteres; una versión nueva sin texto propio no se encuentra por el de la anterior.</>,
             ]}
@@ -270,7 +290,6 @@ export const search: DocPage = {
         </P>
       ),
     },
-    { id: 'not-yet', title: 'Todavía no', badge: 'A saber', color: 'pink', body: <Callout title="Los PDF no se leen.">Su texto llegaría con pdf.js, como su primera página.</Callout> },
   ],
 };
 
@@ -390,6 +409,48 @@ export const word: DocPage = {
           <Code lang="tsx" code={SAVE} />
           <P>
             El playground lo hace, en <C>apps/playground/src/Editor.tsx</C>: ⌘S guarda, y el drive muestra el documento como su siguiente versión.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'create-a-document',
+      title: 'Crear un documento',
+      badge: 'Nuevo',
+      color: 'yellow',
+      body: (
+        <>
+          <Code lang="tsx" code={NEW_DOC} />
+          <P>
+            <C>newDocument</C> es lo que hace uno vacío: <C>newDocx</C> de Rebodocs, o una plantilla tuya. Sin <C>onOpenDocument</C>, el documento nuevo se abre en el visor.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'as-a-pdf',
+      title: 'Como PDF',
+      badge: 'PDF',
+      color: 'orange',
+      body: (
+        <P>
+          El visor de un documento de Word tiene <strong>PDF</strong> junto a Imprimir: lo hace Rebodocs en la página, a partir de las páginas que se ven, y se descarga (<C>pdf()</C> de lo que da{' '}
+          <C>viewDocx</C>). El editor también lo hace, con <C>editor.exportPdf()</C>.
+        </P>
+      ),
+    },
+    {
+      id: 'together',
+      title: 'Varias personas a la vez',
+      badge: 'Colaboración',
+      color: 'pink',
+      lead: 'Con el servidor de colaboración de Rebodocs, cada documento del drive es una sala: quien lo abre escribe con los demás a la vez, cada uno con su cursor, y quien solo puede leerlo mira.',
+      body: (
+        <>
+          <Code lang="tsx" code={TOGETHER} />
+          <P>
+            La demo de documentos (<C>npm run documents</C>, <C>apps/documents</C>) lo hace completo: las salas sobre el drive, un ticket firmado para cada persona según lo que puede hacer con el
+            archivo, y una versión guardada cuando todos se van.
           </P>
         </>
       ),

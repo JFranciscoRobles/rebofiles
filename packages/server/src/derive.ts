@@ -9,7 +9,7 @@
 
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
-import { splitName } from '@rebofiles/core';
+import { readXlsx, splitName, textOfSheets } from '@rebofiles/core';
 import type { Derive, Derived, ToDerive } from './made';
 
 export type { Derive, Derived, ToDerive } from './made';
@@ -123,7 +123,9 @@ export function pdf(options: { pages?: number } = {}): Derive {
           said.push(content.items.map((item) => ('str' in item ? item.str + (item.hasEOL ? '\n' : ' ') : '')).join(''));
           if (said.join('\n').length > TEXT_UP_TO) break;
         }
-        made.text = said.join('\n').slice(0, TEXT_UP_TO);
+        // A page scanned has no text: none said, for what reads pictures (`ocr`) to read it.
+        const written = said.join('\n').trim();
+        if (written) made.text = written.slice(0, TEXT_UP_TO);
       }
       if (want.pictures) {
         const page = await doc.getPage(1);
@@ -170,6 +172,78 @@ export function docx(): Derive {
   };
 }
 
+/** What is written in an Excel workbook, its cells a row a line: read by core, with nothing to install. */
+export function xlsx(): Derive {
+  return async ({ file, read, want }) => {
+    if (!want.text || !small(file) || !(extensionOf(file.name) === 'xlsx' || file.type.includes('spreadsheetml'))) return;
+    return { text: textOfSheets(await readXlsx(await read(), { rows: 5000, columns: 100 })).slice(0, TEXT_UP_TO) };
+  };
+}
+
+const OCR_PICTURES = /^image\/(png|jpeg|webp|bmp|x-portable-bitmap)$/;
+
+/** The first pages of a PDF drawn as PNG, their longest side `size` pixels: for what reads pictures. */
+async function pagesOfPdf(bytes: Uint8Array, pages: number, size: number): Promise<Uint8Array[]> {
+  const { getDocument } = await loadPdf();
+  const loading = getDocument({ data: bytes, standardFontDataUrl: standardFonts(), verbosity: 0 });
+  const doc = await loading.promise;
+  try {
+    const drawn: Uint8Array[] = [];
+    for (let n = 1; n <= Math.min(doc.numPages, pages); n++) {
+      const page = await doc.getPage(n);
+      const natural = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: size / Math.max(natural.width, natural.height) });
+      const { canvas, context } = (doc.canvasFactory as { create(w: number, h: number): unknown }).create(Math.round(viewport.width), Math.round(viewport.height)) as unknown as {
+        canvas: { encode(format: string): Promise<Uint8Array> };
+        context: { fillStyle: string; fillRect(x: number, y: number, w: number, h: number): void };
+      };
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, viewport.width, viewport.height);
+      await page.render({ canvasContext: context as never, viewport, canvas: canvas as never }).promise;
+      drawn.push(new Uint8Array(await canvas.encode('png')));
+    }
+    return drawn;
+  } finally {
+    await loading.destroy();
+  }
+}
+
+export interface OcrOptions {
+  /** The languages written in the pictures, as Tesseract names them: `['eng']` unless said; `['eng', 'spa']`. */
+  languages?: string[];
+  /** How many pages of a PDF without text are read: 3 unless said. */
+  pages?: number;
+  /** Where the data of each language is fetched from: Tesseract's own on a CDN unless said, a folder or an address of yours. */
+  langPath?: string;
+  /** Where that data is kept once fetched, not to fetch it again: the system's folder of temporary files unless said. */
+  cachePath?: string;
+}
+
+/**
+ * What is written in a picture, and in a PDF scanned (with no text of its own), read by Tesseract (`tesseract.js`):
+ * a photo of a receipt, a contract scanned, found by their words. Not among those `deriveAll()` makes unless given,
+ * as the data of a language is fetched the first time: `deriveAll(pictures(), pdf(), docx(), xlsx(), text(), ocr())`.
+ * After `pdf()`, so it reads only a PDF that had no text.
+ */
+export function ocr(options: OcrOptions = {}): Derive {
+  return async ({ file, read, want }) => {
+    if (!want.text || !small(file)) return;
+    const pictures = OCR_PICTURES.test(file.type) ? [await read()] : isPdf(file) ? await pagesOfPdf(await read(), options.pages ?? 3, 2000) : [];
+    if (!pictures.length) return;
+    const { createWorker } = await import('tesseract.js');
+    const { tmpdir } = await import('node:os');
+    const worker = await createWorker((options.languages ?? ['eng']).join('+'), 1, { langPath: options.langPath, cachePath: options.cachePath ?? tmpdir() });
+    try {
+      const said: string[] = [];
+      for (const picture of pictures) said.push((await worker.recognize(Buffer.from(picture))).data.text);
+      const written = said.join('\n').trim();
+      return written ? { text: written.slice(0, TEXT_UP_TO) } : undefined;
+    } finally {
+      await worker.terminate();
+    }
+  };
+}
+
 /** What is written in a file of text: its first megabyte, unless it is not text after all. */
 export function text(): Derive {
   return async ({ file, read, want }) => {
@@ -182,11 +256,11 @@ export function text(): Derive {
 
 /**
  * Several, one after another: the pictures and the placeholder of the first that makes them, the text of the first
- * that reads it. One that fails is passed over, so a missing library leaves only what it makes unmade. All four
+ * that reads it. One that fails is passed over, so a missing library leaves only what it makes unmade. All five
  * unless said.
  */
 export function deriveAll(...derives: Derive[]): Derive {
-  const all = derives.length ? derives : [pictures(), pdf(), docx(), text()];
+  const all = derives.length ? derives : [pictures(), pdf(), docx(), xlsx(), text()];
   return async (asked) => {
     const made: Derived = {};
     for (const one of all) {

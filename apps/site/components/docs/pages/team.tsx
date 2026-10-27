@@ -319,3 +319,87 @@ import { deriveAll } from '@rebofiles/server/derive';
 
 // npm install sharp pdfjs-dist @napi-rs/canvas   (each only for what it makes)
 createDriveHandler({ ...options, derive: deriveAll() });`;
+
+export const OCR_CODE = `import { deriveAll, docx, ocr, pdf, pictures, text, xlsx } from '@rebofiles/server/derive';
+
+// npm install tesseract.js   (the data of each language is fetched once, then kept)
+createDriveHandler({
+  ...options,
+  derive: deriveAll(pictures(), pdf(), docx(), xlsx(), text(), ocr({ languages: ['eng', 'spa'] })),
+});`;
+
+export const STARRED_CODE = `const starred = await client.starred();   // the last starred first
+await client.star(file.id);                // and client.star(file.id, false) to take it out`;
+
+export const FIELDS_CODE = `// The files of a client of your CRM, tied to it by a field of your own:
+await client.setFields(file.id, { client: 'acme', stage: 'won' });
+await client.setFields(file.id, { stage: null });          // taken away
+const ofAcme = await client.withField('client', 'acme');   // of what the one asking may read
+
+// In the drive: shown in the details, and changed there with fields="edit".
+<FileDrive base="/api/files" fields="edit" />`;
+
+export const NOTICES_CODE = `const { notifications, unseen } = await client.notifications();
+// [{ kind: 'shared', entry, name: 'Budget', by: 'ana', role: 'editor', at }, { kind: 'mentioned', text, … }]
+await client.sawNotifications();   // none is new any more`;
+
+export const ADMIN_CODE = `// For who may 'configure': what each keeps, and what was done anywhere.
+const { people, total, quota } = await client.adminUsage();   // GET /admin/usage
+const latest = await client.adminActivity(100);                // GET /admin/activity`;
+
+export const organizing: DocPage = {
+  title: 'Starred and fields',
+  description: 'Each person’s starred files and folders, in a place of their own; and fields of your application on each entry, to tie it to your records and find it by them.',
+  source: 'packages/core/src/ops.ts',
+  lead: <>Two ways to find again what matters: what a person stars for themselves, and what your application ties to its own records.</>,
+  sections: [
+    {
+      id: 'starred',
+      title: 'Starred',
+      badge: 'Each person',
+      color: 'yellow',
+      body: (
+        <>
+          <List
+            items={[
+              <>
+                <strong>Add to starred</strong> in the details of a file or a folder, or in its menu: it is marked with a star wherever it is shown, and is in <strong>Starred</strong>, the last
+                starred first.
+              </>,
+              'One’s own: nobody else sees what a person starred. What is in the trash, gone, or no longer theirs to read is left out.',
+              <>
+                Kept as a setting of the person (<C>starred:&lt;id&gt;</C>), up to a thousand: <C>GET /starred</C>, <C>PUT</C> and <C>DELETE /entries/:id/star</C>.
+              </>,
+            ]}
+          />
+          <Code code={STARRED_CODE} />
+        </>
+      ),
+    },
+    {
+      id: 'fields',
+      title: 'Fields of your own',
+      badge: 'Your records',
+      color: 'blue',
+      lead: 'Text under a name on an entry, set by your application or by people, and found by: what ties a contract to a client of your CRM, a scan to a case.',
+      body: (
+        <>
+          <Code code={FIELDS_CODE} lang="tsx" />
+          <List
+            items={[
+              <>
+                Names of letters, digits and <C>_ . -</C>, up to 64; values text, up to 1000; fifty an entry. Set by who may rename it (<C>PATCH /entries/:id</C> with <C>fields</C>).
+              </>,
+              <>
+                <C>GET /fields?name=&amp;value=</C> finds what has one, of what the one asking may read: SQLite and Postgres ask the JSON of each entry, so a drive of thousands is not read whole.
+              </>,
+              <>
+                The details show them unless <C>fields=&#123;false&#125;</C>; <C>fields="edit"</C> lets who may rename it change them there, a field a line.
+              </>,
+            ]}
+          />
+        </>
+      ),
+    },
+  ],
+};

@@ -8,6 +8,42 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Added
 
+- **Create document, and a document as a PDF.** `newDocument` (`newDocx` of
+  `@rebofiles/drive/rebodocs`) gives the files a "Create document" button and
+  New a "New document": an empty .docx, named by the person, in the folder
+  they are in, opened with `onOpenDocument`. The viewer of a Word document has
+  "PDF" beside Print, made in the page by Rebodocs (`pdf()` of `viewDocx`).
+- **Starred.** Each person's own, from the details or the menu, marked with a
+  star wherever shown and in a place of their own, the last first
+  (`GET /starred`, `PUT`/`DELETE /entries/:id/star`, `client.star`).
+- **Fields of your own.** Text under a name on an entry (`client: acme`), set
+  with `PATCH /entries/:id { fields }` by who may rename it, found by with
+  `GET /fields?name=&value=` (each store asks its JSON; `withField` of
+  `scoped`), shown in the details and changed there with `fields="edit"`.
+- **Notifications in the drive.** A bell over it: what was shared with the
+  person or a group of theirs, and comments that name them, how many are new,
+  each opening where it is (`GET /notifications`, `POST /notifications/seen`).
+- **The whole drive, for who looks after it.** Settings → People: the files,
+  folders and space of each person and of the drive, and the latest activity
+  anywhere (`GET /admin/usage`, `GET /admin/activity`, `activityLatest` of a
+  store).
+- **Excel workbooks.** Read by core with nothing to install (`readXlsx`): the
+  first rows on a card, each sheet as a table in the viewer, and found by what
+  their cells say, read in the page at upload and by the server (`xlsx()`).
+- **What pictures say.** `ocr()` of `@rebofiles/server/derive` reads pictures
+  and the pages of a PDF scanned with Tesseract (`tesseract.js`, an optional
+  peer), for a search to find them; given to `deriveAll()`, not in it unless
+  given. A PDF with no text of its own no longer counts as read.
+- **Google Cloud Storage and Azure Blob Storage.** `gcsStorage`, through its
+  XML API with an HMAC key (each key deleted by itself, no part copied);
+  `azureStorage`, with SAS addresses signed with the account's key, each part
+  a block, uploads resumed from the blocks listed, and a part copied with Put
+  Block From URL. Tried against Azurite. A storage may say its parts need no
+  ETag (`etags: false` of an upload's plan).
+- **`apps/documents`.** Word documents made, written and read in the drive,
+  all with Rebodocs: Create document, its editor with several people in one
+  document at once (`@rebodocs/collab`, a room for each file, a version kept
+  when everybody leaves), its viewer, and PDF (`npm run documents`).
 - **The drive a piece at a time.** SQLite, Postgres and the store in memory
   answer what each request needs (`scoped` of a store: an entry and the
   folders above it, what is in a folder, a search, the trash…), and the drive
@@ -480,6 +516,8 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Fixed
 
+- **Open in Rebodocs, from the viewer.** The viewer is closed first: open, it
+  left inert what the application opened over the drive, which took no keys.
 - **A view said loading while it is.** In the render after the view changes,
   `useEntries` gave the last view's entries as if they were this one's; and
   `useEntry(id)` the last entry until the one asked for came, so what was

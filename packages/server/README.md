@@ -149,8 +149,17 @@ folder in 22 ms. A store of your own without `scoped` is held whole.
 
 `derive: deriveAll()` of `@rebofiles/server/derive` makes what no page made:
 pictures and a placeholder with sharp, a PDF's first page and its text with
-pdf.js, the text of Word documents and text files. Each library is optional,
-imported when first needed.
+pdf.js, the text of Word documents, Excel workbooks and text files. `ocr()`
+reads pictures and scanned PDFs with Tesseract, given to `deriveAll(…)`. Each
+library is optional, imported when first needed.
+
+## Starred, fields, notifications, the whole drive
+
+`/starred` and `/entries/:id/star`, each person's own; fields of your
+application on an entry (`PATCH /entries/:id { fields }`, `GET /fields`);
+`/notifications` of what was shared with a person or a group of theirs and of
+comments that name them; and, for who may configure, `/admin/usage` and
+`/admin/activity`.
 
 ## Comments, groups, retention
 
@@ -183,7 +192,7 @@ what is in them, for the page to make it.
 | **Routes** | Listing, search, folders, uploads in parts, renaming, moving, the trash, versions, downloads. The list is at the top of `src/api.ts`. |
 | **Who may** | `identify(request)` says who is asking; `authorize(user, action, entry, drive)` is asked on every route, also again when an upload finishes. `byRoles` is one from the drive itself: owners, and the roles of those it is shared with. |
 | **Sharing** | `/shared`, `/entries/:id/shares`, and links: `/entries/:id/links` to make and take back, `/links/:token` to read without signing in, with a password or for one download if wanted. `/shared/new` counts what is new since one looked; `onShare` is called with each share, to tell the person as your application does. `top: 'own'` (the default) shows each person their own top of the drive; `'everyone'`, one drive for a team. |
-| **Bytes** | `s3Storage` for AWS S3, Cloudflare R2, MinIO, Backblaze B2; `diskStorage` for a folder. |
+| **Bytes** | `s3Storage` for AWS S3, Cloudflare R2, MinIO, Backblaze B2; `gcsStorage` for Google Cloud Storage; `azureStorage` for Azure Blob Storage; `diskStorage` for a folder. |
 | **Text** | Files found by what is written in them: `PUT /entries/:id/text` with what the page read, `GET /search/text`. SQLite's full-text search, Postgres's `tsvector`. |
 | **Activity** | Who did what, from each change: `GET /entries/:id/activity`, kept by the store in a table of its own. |
 | **Looks** | A folder's colour (`PATCH /entries/:id { color }`), and a picture's placeholder, the tiny one shown blurred while it comes (`PUT /entries/:id/placeholder`). |
@@ -201,7 +210,8 @@ against AWS or MinIO yet. Not on npm yet.
 
 ## Where it can improve
 
-- **Other buckets.** R2 is checked; AWS and MinIO not yet.
+- **Other buckets.** R2 is checked; AWS and MinIO not yet. Azure against
+  Azurite, its emulator; Google Cloud Storage against an S3 kept in memory.
 - **One process on SQLite.** Changes are put in order inside a process; for
   more, Postgres with a pool.
 - **The whole drive in memory.** It is read once and held, read again only

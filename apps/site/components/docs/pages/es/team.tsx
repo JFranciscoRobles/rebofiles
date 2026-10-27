@@ -4,7 +4,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { COMMENTS_HOOK, EXPORT_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE } from '../team';
+import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE } from '../team';
 
 const hrefOf = (slug: string) => docHref('es', slug);
 
@@ -198,6 +198,65 @@ export const keeping: DocPage = {
           <Callout title="De otra persona,">
             la exportación da lo que posee e hizo, como lo guarda el drive; sus bytes los lee del almacenamiento tu servidor, porque <C>byRoles</C> no deja descargarlos a nadie más que a ella.
           </Callout>
+        </>
+      ),
+    },
+  ],
+};
+
+export const organizing: DocPage = {
+  title: 'Destacados y campos',
+  description: 'Los archivos y carpetas que cada persona destaca, en un lugar propio; y campos de tu aplicación en cada entrada, para atarla a tus registros y encontrarla por ellos.',
+  source: 'packages/core/src/ops.ts',
+  lead: <>Dos formas de volver a encontrar lo que importa: lo que una persona destaca para sí, y lo que tu aplicación ata a sus propios registros.</>,
+  sections: [
+    {
+      id: 'starred',
+      title: 'Destacados',
+      badge: 'Cada persona',
+      color: 'yellow',
+      body: (
+        <>
+          <List
+            items={[
+              <>
+                <strong>Destacar</strong> en los detalles de un archivo o carpeta, o en su menú: lleva una estrella dondequiera que se muestre, y está en <strong>Destacados</strong>, lo último
+                destacado primero.
+              </>,
+              'Lo de cada uno: nadie más ve lo que una persona destacó. Lo que está en la papelera, ya no está o ya no puede leer se deja fuera.',
+              <>
+                Se guarda como un ajuste de la persona (<C>starred:&lt;id&gt;</C>), hasta mil: <C>GET /starred</C>, <C>PUT</C> y <C>DELETE /entries/:id/star</C>.
+              </>,
+            ]}
+          />
+          <Code code={STARRED_CODE} />
+        </>
+      ),
+    },
+    {
+      id: 'fields',
+      title: 'Campos propios',
+      badge: 'Tus registros',
+      color: 'blue',
+      lead: 'Texto bajo un nombre en una entrada, puesto por tu aplicación o por las personas, y encontrado por él: lo que ata un contrato a un cliente de tu CRM, un escaneo a un caso.',
+      body: (
+        <>
+          <Code code={FIELDS_CODE} lang="tsx" />
+          <List
+            items={[
+              <>
+                Nombres de letras, dígitos y <C>_ . -</C>, hasta 64; valores de texto, hasta 1000; cincuenta por entrada. Los pone quien puede renombrarla (<C>PATCH /entries/:id</C> con <C>fields</C>
+                ).
+              </>,
+              <>
+                <C>GET /fields?name=&amp;value=</C> encuentra lo que tiene uno, de lo que puede leer quien pregunta: SQLite y Postgres consultan el JSON de cada entrada, así que un drive de miles no
+                se lee entero.
+              </>,
+              <>
+                Los detalles los muestran salvo con <C>fields=&#123;false&#125;</C>; <C>fields="edit"</C> deja que quien puede renombrarla los cambie ahí, un campo por línea.
+              </>,
+            ]}
+          />
         </>
       ),
     },

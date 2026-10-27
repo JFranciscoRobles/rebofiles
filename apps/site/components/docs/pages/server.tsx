@@ -4,7 +4,7 @@
 import { hrefOf } from '@/lib/site';
 import { SERVER_OPTIONS } from '../reference';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../ui';
-import { GROUPS_CODE } from './team';
+import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from './team';
 import { SCALE_NUMBERS } from './team';
 
 export const optionId = (name: string) => `option-${name}`;
@@ -222,9 +222,20 @@ S3_PREFIX=files/
 # What tokens are signed with: long, random, the same in every process
 REBOFILES_SECRET=…`;
 
+export const GCS_CODE = `import { gcsOptionsFrom, gcsStorage } from '@rebofiles/server';
+
+// An HMAC key of the bucket: Cloud Storage → Settings → Interoperability.
+// GCS_BUCKET, GCS_ACCESS_KEY_ID (GOOG1…), GCS_SECRET_ACCESS_KEY, GCS_PREFIX
+createDriveHandler({ ...options, storage: gcsStorage(gcsOptionsFrom(process.env)) });`;
+
+export const AZURE_CODE = `import { azureOptionsFrom, azureStorage } from '@rebofiles/server';
+
+// AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_STORAGE_CONTAINER, AZURE_STORAGE_PREFIX
+createDriveHandler({ ...options, storage: azureStorage(azureOptionsFrom(process.env)) });`;
+
 export const storage: DocPage = {
-  title: 'Storage: S3 and disk',
-  description: 'The bytes in any bucket that speaks S3, with no SDK, or in a folder of the disk: the keys, the rule of origins, and what goes wrong.',
+  title: 'Storage: S3, GCS, Azure and disk',
+  description: 'The bytes in a bucket that speaks S3, in Google Cloud Storage or in Azure, with no SDK, or on the disk: the keys, the rule of origins, and what goes wrong.',
   source: 'apps/site/components/docs/pages/server.tsx',
   lead: (
     <>
@@ -258,6 +269,45 @@ export const storage: DocPage = {
         <>
           <Code lang="json" code={CORS} file="CORS policy" />
           <P>A lifecycle rule that aborts multipart uploads left unfinished after a day keeps the parts of an upload never finished from staying in the bucket.</P>
+        </>
+      ),
+    },
+    {
+      id: 'google-cloud-storage',
+      title: 'Google Cloud Storage',
+      badge: 'GCS',
+      color: 'purple',
+      lead: 'Through its XML API, which speaks S3: the same addresses, signed with an HMAC key of the bucket.',
+      body: (
+        <>
+          <Code code={GCS_CODE} />
+          <P>
+            What that API does not do is done otherwise: each key deleted by itself, and every part of a new version sent, as it copies none. The bucket’s CORS, set with{' '}
+            <C>gcloud storage buckets update --cors-file</C>, has to expose <C>ETag</C>.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'azure-blob-storage',
+      title: 'Azure Blob Storage',
+      badge: 'Azure',
+      color: 'blue',
+      lead: 'A container of a storage account: addresses signed with the account’s key (a SAS of each blob, for minutes), each part a block, the file made of its list of blocks.',
+      body: (
+        <>
+          <Code code={AZURE_CODE} />
+          <List
+            items={[
+              'Uploads resumed from the blocks Azure lists, and a new version sent with only its parts that changed (Put Block From URL).',
+              'Blocks of an upload never finished go by themselves after a week: there is nothing to sweep.',
+              <>
+                The account’s CORS (Resource sharing) lets in the origins of your pages, with <C>PUT</C>, <C>GET</C> and <C>HEAD</C>; no header has to be exposed, as the blocks are put together by
+                their numbers.
+              </>,
+              'Tried against Azurite, Microsoft’s emulator, in the tests of the server.',
+            ]}
+          />
         </>
       ),
     },
@@ -486,7 +536,7 @@ export const ON_SHARE = `createDriveHandler({
 
 export const activity: DocPage = {
   title: 'Activity and notifications',
-  description: 'Who did what to every file and folder, kept as each change is, and telling people what was shared with them.',
+  description: 'Who did what to every file and folder; telling people what was shared with them, in the drive and by mail; and the whole drive, for who looks after it.',
   source: 'apps/site/components/docs/pages/server.tsx',
   lead: <>Every change is kept as activity, whatever made it: a route, an assistant, the trash emptying itself. It is told from the drive before and after the change, so nothing is left out.</>,
   sections: [
@@ -523,6 +573,35 @@ export const activity: DocPage = {
       color: 'yellow',
       lead: 'Beside Shared with me the drive counts what is new. To tell the person yourself, give the server onShare.',
       body: <Code code={ON_SHARE} />,
+    },
+    {
+      id: 'in-the-drive',
+      title: 'Told in the drive',
+      badge: 'Bell',
+      color: 'purple',
+      lead: 'What is shared with a person, or with a group they are in, and a comment that names them: in the bell over the drive, how many are new beside it, each opening where it is.',
+      body: (
+        <>
+          <Code code={NOTICES_CODE} />
+          <P>
+            Kept for each person and each group (<C>inbox:&lt;who&gt;</C>), the last two hundred; looked at, none is new (<C>POST /notifications/seen</C>). What one did oneself is not told. A mail is
+            still yours to send, with <C>onShare</C> and <C>onComment</C>.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'the-whole-drive',
+      title: 'The whole drive',
+      badge: 'People',
+      color: 'orange',
+      lead: 'For who may configure the drive, Settings → People: the files, folders and space of each person and of the whole drive, and the latest activity anywhere in it.',
+      body: (
+        <>
+          <Code code={ADMIN_CODE} />
+          <Callout title="The space of each">is reckoned from the whole drive, read once each time it is asked: for who looks after it, now and then, not for every page.</Callout>
+        </>
+      ),
     },
     {
       id: 'know',

@@ -47,6 +47,7 @@ const STATUS: Record<DriveErrorCode, number> = {
   'invalid-share': 400,
   'invalid-settings': 400,
   'invalid-color': 400,
+  'invalid-field': 400,
   'invalid-comment': 400,
   'on-hold': 409,
   retained: 409,
@@ -112,6 +113,7 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
   let saved = options.settings !== undefined;
   let mine: core.PersonalSettings = {};
   let seenShared: string | undefined;
+  let starred: EntryId[] = [];
   const texts = new Map<EntryId, { version: string; text: string }>();
 
   const client: DriveClient = {
@@ -141,6 +143,24 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     entry: (entryId) => run(() => ({ entry: core.getEntry(drive, entryId), path: core.ancestors(drive, entryId), trashed: core.isTrashed(drive, entryId) })),
     recent: () => run(() => core.recent(drive)),
     trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
+    setFields: (entryId, fields) => change((current) => one(core.setFields(current, entryId, fields, context()), entryId)),
+    withField: (name, value) => run(() => [...drive.entries.values()].filter((entry) => entry.fields?.[name] === value && !core.isTrashed(drive, entry.id))),
+    adminUsage: async () => {
+      const people = core.usageByOwner(drive);
+      const total = people.reduce((sum, one) => ({ files: sum.files + one.files, folders: sum.folders + one.folders, bytes: sum.bytes + one.bytes }), { files: 0, folders: 0, bytes: 0 });
+      return { people, total, quota: settings.quota };
+    },
+    adminActivity: async (limit = 100) => lines.slice(-limit).reverse(),
+    // One person alone: nobody shares with them nor names them.
+    notifications: async () => ({ notifications: [], unseen: 0 }),
+    sawNotifications: async () => undefined,
+    starred: () => run(() => starred.flatMap((one) => (drive.entries.has(one) && !core.isTrashed(drive, one) ? [drive.entries.get(one)!] : []))),
+    star: (entryId, on = true) =>
+      run(() => {
+        core.getEntry(drive, entryId);
+        starred = on ? [entryId, ...starred.filter((one) => one !== entryId)] : starred.filter((one) => one !== entryId);
+        return on;
+      }),
     shared: () => run(() => core.sharedWith(drive, user)),
     searchText: async (query, limit = 50) => {
       const found: { entry: FileEntry; snippet: string }[] = [];

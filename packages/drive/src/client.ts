@@ -6,7 +6,7 @@
 // file uploaded again goes on from where it was.
 
 import { partsOf } from '@rebofiles/core';
-import type { Activity, Comment, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Packed, PersonalSettings, Role } from '@rebofiles/core';
+import type { Activity, Comment, DriveSettings, Entry, FolderColor, EntryId, FileEntry, FolderEntry, ImageSettings, Notice, Packed, PersonalSettings, Role } from '@rebofiles/core';
 import { type MadeRendition, placeholderOf, renditionsOf } from './images';
 
 export interface ClientOptions {
@@ -338,6 +338,23 @@ export function createDriveClient(options: ClientOptions) {
     entry: (id: EntryId) => ask<{ entry: Entry; path: FolderEntry[]; trashed: boolean }>('GET', `/entries/${encodeURIComponent(id)}`),
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
     trash: async () => (await ask<{ entries: Entry[] }>('GET', '/trash')).entries,
+    /** Fields of the application's own set, each to its text, or taken away with null; those not named stay. */
+    setFields: (id: EntryId, fields: Record<string, string | null>) => one('PATCH', `/entries/${encodeURIComponent(id)}`, { fields }),
+    /** What has the field `name` set to `value`, of what one may read: the files of a client, of a case. */
+    withField: async (name: string, value: string) => (await ask<{ entries: Entry[] }>('GET', `/fields${q({ name, value })}`)).entries,
+    /** For who may configure the drive: what each person keeps in it, the most first, and the whole of it. */
+    adminUsage: () =>
+      ask<{ people: { owner: string; files: number; folders: number; bytes: number }[]; total: { files: number; folders: number; bytes: number }; quota: number | null }>('GET', '/admin/usage'),
+    /** For who may configure the drive: what was done anywhere in it, the newest first. */
+    adminActivity: async (limit = 100) => (await ask<{ activity: Activity[] }>('GET', `/admin/activity${q({ limit: String(limit) })}`)).activity,
+    /** What the one asking was told: shared with them, named in a comment; the newest first, and how many are new. */
+    notifications: () => ask<{ notifications: Notice[]; unseen: number }>('GET', '/notifications'),
+    /** They looked: none is new any more. */
+    sawNotifications: async () => void (await ask('POST', '/notifications/seen')),
+    /** What the one asking starred, the last starred first. */
+    starred: async () => (await ask<{ entries: Entry[] }>('GET', '/starred')).entries,
+    /** Starred, or no longer with `false`: one's own, seen by nobody else. */
+    star: async (id: EntryId, starred = true) => (await ask<{ starred: boolean }>(starred ? 'PUT' : 'DELETE', `/entries/${encodeURIComponent(id)}/star`)).starred,
     search: async (query: string, options: { within?: EntryId; trashed?: boolean } = {}) =>
       (await ask<{ entries: Entry[] }>('GET', `/search${q({ q: query, within: options.within, trashed: options.trashed ? '1' : undefined })}`)).entries,
     info: () => ask<{ storage: string; maxSize: number }>('GET', '/info'),
@@ -437,7 +454,8 @@ export function createDriveClient(options: ClientOptions) {
       const signal = options.signal;
       const key = JSON.stringify([base, options.rendition ?? options.file ?? options.parent ?? null, name, file.size, file.lastModified ?? null, type]);
 
-      type Plan = { token: string; parts: Part[]; done: { number: number; etag: string }[] };
+      // `etags: false` of a storage that puts the parts together by their numbers alone, as Azure does.
+      type Plan = { token: string; parts: Part[]; done: { number: number; etag: string }[]; etags?: false };
       const resume = (token: string) => ask<Plan>('POST', '/uploads/resume', { token }, signal);
       // The same file to the same place, left halfway: gone on with, when the server still has it.
       let plan: Plan | null = null;
@@ -448,7 +466,7 @@ export function createDriveClient(options: ClientOptions) {
         const asked = options.rendition
           ? { rendition: options.rendition, type, size: file.size }
           : { name, parent: options.parent ?? null, file: options.file, type, size: file.size, sha256: options.sha256, partHashes, madeHere: options.madeHere };
-        const start = await ask<{ token: string; parts: Part[] }>('POST', '/uploads', asked, signal);
+        const start = await ask<{ token: string; parts: Part[]; etags?: false }>('POST', '/uploads', asked, signal);
         plan = { ...start, done: [] };
         memory.set(key, plan.token);
       }
@@ -472,7 +490,7 @@ export function createDriveClient(options: ClientOptions) {
             try {
               const etag = await sendPart(part.url, file.slice(part.from, part.to, type), (n) => (sent.set(number, n), report()), signal);
               // A bucket that lets the page in but not its ETag: the parts arrived, and cannot be put together.
-              if (!etag && several) throw new RequestError(0, 'no-etag', 'The bucket did not let the page read the ETag of a part. Its rule of origins has to expose ETag.');
+              if (!etag && several && plan.etags !== false) throw new RequestError(0, 'no-etag', 'The bucket did not let the page read the ETag of a part. Its rule of origins has to expose ETag.');
               finished.set(number, etag);
               failures = 0;
             } catch (error) {

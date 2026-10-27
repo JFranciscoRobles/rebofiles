@@ -1,5 +1,6 @@
 // As the playground: Vite serves the page, and hands what is under
-// `/api/files` to `server/documents.ts`.
+// `/api/files` to `server/documents.ts`, and what is under `/collab` to
+// Rebodocs' collaboration server, in `server/collab.ts`.
 
 import react from '@vitejs/plugin-react';
 import { type Plugin, defineConfig } from 'vite';
@@ -11,7 +12,11 @@ function backend(): Plugin {
     name: 'rebofiles-documents-backend',
     configureServer(server) {
       const load = async () => (await server.ssrLoadModule('/server/documents.ts')) as typeof import('./server/documents');
+      const together = async () => (await server.ssrLoadModule('/server/collab.ts')) as typeof import('./server/collab');
       server.middlewares.use((request, response, next) => {
+        // Rebodocs' rooms, where several write in one document, and what lets each in.
+        if (request.url?.startsWith('/collab')) return void together().then(({ collab }) => collab.handle(request, response, next), next);
+        if (request.url?.startsWith('/api/collab/ticket')) return void together().then(({ ticket }) => ticket(request, response), next);
         if (!request.url?.startsWith('/api/files')) return next();
         load()
           .then(async (backend) => {

@@ -20,8 +20,11 @@ import {
   type EntryId,
   type FileEntry,
   type FolderEntry,
+  type Notice,
   type PersonalSettings,
   type Role,
+  type Sheet,
+  readXlsx,
   splitName,
   versionNumber,
 } from '@rebofiles/core';
@@ -33,7 +36,7 @@ import { TEXTS, type Texts, type Translate, formatDate, formatSize, translator }
 import { type IconName, icon, logo as mark } from './icons';
 import { type DocumentPreview, type Kind, TEXT_EXTENSIONS, badgeOf, kindOf } from './kinds';
 import { type MadeRendition, renditionsOf } from './images';
-import { downloadZip } from './download';
+import { downloadZip, saveBlob } from './download';
 import { type Picked, readChosen, readDropped } from './folders';
 import { type UploadItem, createUploads, formatDuration, lookInDrive } from './uploads';
 import { textOf } from './text';
@@ -102,6 +105,11 @@ export interface DriveOptions {
   theme?: 'light' | 'dark' | 'auto';
   /** `'compact'`: no column on the left; New and the places in a strip over the list, for a drive in a smaller part of a page. `'full'` unless given. */
   layout?: 'full' | 'compact';
+  /**
+   * The application's own fields of an entry (`client: acme`), in its details: shown (`'show'`, as it comes), changed
+   * there too by who may rename it (`'edit'`), or left out (false).
+   */
+  fields?: 'show' | 'edit' | false;
   /** False to leave out the settings of the server, and the button that changes them. */
   settings?: boolean;
   /** Each file looked for in the drive before it goes, and asked about when its bytes or its name are there already: true unless said. */
@@ -117,7 +125,7 @@ export interface DriveOptions {
 }
 
 /** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
-export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void } | undefined;
+export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void; pdf?(): Promise<Uint8Array> } | undefined;
 
 export interface MountedDrive {
   readonly client: DriveClient;
@@ -128,10 +136,11 @@ export interface MountedDrive {
   destroy(): void;
 }
 
-type Section = 'files' | 'recent' | 'shared' | 'trash';
+type Section = 'files' | 'recent' | 'starred' | 'shared' | 'trash';
 type Dialog =
   | { kind: 'folder'; name: string }
   | { kind: 'document'; name: string }
+  | { kind: 'fields'; entry: Entry; text: string }
   | { kind: 'rename'; entry: Entry; name: string }
   | { kind: 'move'; entries: Entry[]; at: EntryId | null }
   | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean }
@@ -148,6 +157,8 @@ const WAVE = [10, 22, 14, 30, 18, 36, 24, 12, 28, 16, 34, 20, 8, 26, 14, 22];
 const LINES = [62, 100, 100, 84, 100, 58];
 /** How much of a text the viewer reads: enough for any file a person reads, not a log of a year. */
 const VIEW_LIMIT = 2 * 1024 * 1024;
+/** The largest workbook a card reads whole for its first rows. */
+const CARD_BOOK = 2 * 1024 * 1024;
 const ROLES: Role[] = ['viewer', 'commenter', 'editor'];
 const defaultAddress = (token: string) => `${location.origin}${location.pathname}?link=${encodeURIComponent(token)}`;
 /** An id inside a selector's quotes. */
@@ -304,7 +315,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     };
   }
 
-  type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' | 'shared' | 'trash' } | { section: 'search'; query: string; trashed: boolean };
+  type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' | 'starred' | 'shared' | 'trash' } | { section: 'search'; query: string; trashed: boolean };
   const viewOf = (): View => (query ? { section: 'search', query, trashed: section === 'trash' } : section === 'files' ? { section, folder } : { section });
   // What was found by what is written in a file, beside what was found by its name: a piece of the text for each.
   let snippets = new Map<EntryId, string>();
@@ -317,7 +328,16 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const listing = resource((key) => {
     const view = JSON.parse(key) as View;
     if (view.section === 'files') return client.list(view.folder);
-    const asked = view.section === 'search' ? searchBoth(view.query, view.trashed) : view.section === 'recent' ? client.recent() : view.section === 'shared' ? client.shared() : client.trash();
+    const asked =
+      view.section === 'search'
+        ? searchBoth(view.query, view.trashed)
+        : view.section === 'recent'
+          ? client.recent()
+          : view.section === 'starred'
+            ? client.starred()
+            : view.section === 'shared'
+              ? client.shared()
+              : client.trash();
     return asked.then((entries) => ({ folder: null, entries, path: [] as FolderEntry[] }));
   });
   const detail = resource((id) => client.entry(id));
@@ -326,6 +346,16 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const remarks = resource((id) => client.comments(id));
   // The space one keeps: asked again after each change, as uploads and the trash change it.
   const usage = resource(() => client.usage());
+  // For who looks after the drive, in its settings: what each keeps, and what was done anywhere.
+  const everyoneUsage = resource(() => client.adminUsage());
+  const everyoneActivity = resource(() => client.adminActivity(100));
+  // What the one asking starred, to mark it wherever it is shown.
+  const stars = resource(() => client.starred().then((entries) => new Set(entries.map((entry) => entry.id))));
+  const isStarred = (id: EntryId) => stars('').value?.has(id) ?? false;
+  const toggleStar = (entry: Entry) => {
+    const on = !isStarred(entry.id);
+    return attempt(() => client.star(entry.id, on), on ? t('nowStarred', { name: entry.name }) : t('nowUnstarred', { name: entry.name }));
+  };
   const moving = resource((key) => client.list(JSON.parse(key) as EntryId | null));
   // Addresses to show a file in the page, by its version and the size it is shown at: kept until a minute before they
   // are no longer good, and asked for together, those of one rendering in one request.
@@ -496,6 +526,28 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         WAVE.map((height) => h('span', { style: `height:${height}px` })),
       );
     const ext = splitName(file.name).ext.slice(1).toLowerCase();
+    // A workbook's first rows, of one small enough to read whole for a card.
+    const book = ext === 'xlsx' && file.versions[0].size <= CARD_BOOK ? sheetsOf(file, urlOf(file), { rows: 9, columns: 4, sheets: 1 }) : undefined;
+    if (Array.isArray(book) && book[0]?.rows.length)
+      return h(
+        'div',
+        { class: 'rf-paper', 'aria-hidden': 'true' },
+        h(
+          'table',
+          null,
+          h(
+            'tbody',
+            null,
+            book[0].rows.map((row) =>
+              h(
+                'tr',
+                null,
+                row.map((cell) => h('td', null, cell)),
+              ),
+            ),
+          ),
+        ),
+      );
     const table = kind === 'sheet' && (ext === 'csv' || ext === 'tsv');
     const head = kind === 'text' || table ? headOf(file) : undefined;
     if (typeof head === 'string' && head.trim()) {
@@ -625,11 +677,43 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // How many of what others shared is new since one looked at Shared with me: asked after each change, when the page is
   // seen again, and every minute, as what others do comes with no change of one's own.
   let freshShared = 0;
-  const askShared = () =>
+  const askShared = () => {
+    askNotices();
     void client.sharedNew().then(
       (n) => alive && n !== freshShared && ((freshShared = n), render()),
       () => undefined,
     );
+  };
+  // What one was told (shared with them, named in a comment), asked when Shared with me is; none for a server without it.
+  let notices: { notifications: Notice[]; unseen: number } | null = null;
+  let noticesOpen = false;
+  const askNotices = () =>
+    void client.notifications().then(
+      (told) => alive && JSON.stringify(told) !== JSON.stringify(notices) && ((notices = told), render()),
+      () => undefined,
+    );
+  const openNotices = () => {
+    noticesOpen = !noticesOpen;
+    if (noticesOpen && notices?.unseen) {
+      notices = { ...notices, unseen: 0 };
+      void client.sawNotifications().catch(() => undefined);
+    }
+    render();
+  };
+  /** Where what one was told about is: its folder, or Shared with me, with it selected; a comment's in its tab. */
+  const goToNotice = async (notice: Notice) => {
+    noticesOpen = false;
+    try {
+      const { entry, path } = await client.entry(notice.entry);
+      const parent = path.at(-1)?.id ?? null;
+      if (notice.kind === 'shared' || (parent === null && entry.owner !== settings?.you)) go('shared');
+      else go('files', parent);
+      select(entry.id);
+      if (notice.kind === 'mentioned') (tab = 'comments'), render();
+    } catch (error) {
+      say(said(error));
+    }
+  };
   const onSeen = () => document.visibilityState === 'visible' && askShared();
   document.addEventListener('visibilitychange', onSeen);
   const sharedTimer = setInterval(onSeen, 60_000);
@@ -1024,7 +1108,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   /** An entry's name, and, of one found by what is written in it, a piece of that under it. */
   const named = (entry: Entry) => {
     const snippet = query ? snippets.get(entry.id) : undefined;
-    return snippet ? h('span', { class: 'rf-name-lines' }, h('span', null, entry.name), h('small', { class: 'rf-snippet' }, snippet)) : h('span', null, entry.name);
+    const star = isStarred(entry.id) && h('span', { class: 'rf-star', role: 'img', 'aria-label': t('starred'), title: t('starred') }, icon('star', 14));
+    return snippet ? h('span', { class: 'rf-name-lines' }, h('span', null, entry.name, star), h('small', { class: 'rf-snippet' }, snippet)) : h('span', null, entry.name, star);
   };
 
   // A folder of many: only what is in sight is in the page, and a little around it, with the room of the rest kept
@@ -1330,6 +1415,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           one && act(t('rename'), 'pencil', () => ((dialog = { kind: 'rename', entry: one, name: one.name }), render())),
           act(t('move'), 'move', () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render())),
           one && act(t('share'), 'users', () => ((dialog = { kind: 'share', entry: one, who: '', role: 'viewer' }), render())),
+          one && act(isStarred(one.id) ? t('unstar') : t('star'), 'star', () => void toggleStar(one)),
           act(t('moveToTrash'), 'trash', () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), true),
           many.every((entry) => entry.kind === 'folder') && swatches(many as FolderEntry[], 'menuitemradio', () => closeContext(false)),
         ];
@@ -1519,6 +1605,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 button(withIcon('pencil', t('rename')), () => ((dialog = { kind: 'rename', entry, name: entry.name }), render()), { class: 'rf-btn' }),
                 button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entries: [entry], at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
                 button(withIcon('users', t('share')), () => ((dialog = { kind: 'share', entry, who: '', role: 'viewer' }), render()), { class: 'rf-btn' }),
+                button(withIcon('star', isStarred(entry.id) ? t('unstar') : t('star')), () => void toggleStar(entry), { class: 'rf-btn', 'aria-pressed': isStarred(entry.id) }),
                 button(withIcon('trash', t('moveToTrash')), () => void each([entry], (one) => client.moveToTrash(one.id), 'trashedMany'), {
                   class: 'rf-btn rf-text rf-danger',
                 }),
@@ -1584,8 +1671,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${whoName(s.with)} · ${roleName(s.role)}`).join(', ')) : null,
                   row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
                   where && row(t('location'), where),
+                  options.fields !== false && Object.entries(entry.fields ?? {}).map(([name, value]) => row(name, value)),
                   file && row(t('key'), h('code', null, file.versions[0].key)),
                 ),
+        options.fields === 'edit' &&
+          shown === 'details' &&
+          !inTrash &&
+          button(withIcon('pencil', t('editFields')), () => ((dialog = { kind: 'fields', entry, text: fieldsText(entry) }), render()), { class: 'rf-btn rf-small rf-edit-fields' }),
       ),
     );
   }
@@ -1804,6 +1896,50 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
 
+  /** An entry's fields as they are written in their dialog: a line each, `name: value`. */
+  const fieldsText = (entry: Entry) =>
+    Object.entries(entry.fields ?? {})
+      .map(([name, value]) => `${name}: ${value}`)
+      .join('\n');
+  function fieldsDialog(entry: Entry, text: string) {
+    const save = () => {
+      // What is written now: typing changes the dialog without drawing it again.
+      const written = dialog?.kind === 'fields' ? dialog.text : text;
+      const given: Record<string, string> = {};
+      for (const line of written.split('\n')) {
+        const at = line.indexOf(':');
+        if (at > 0) given[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+      }
+      // Those no longer written taken away; the rest set as they are.
+      const fields: Record<string, string | null> = { ...given };
+      for (const name of Object.keys(entry.fields ?? {})) if (!(name in given)) fields[name] = null;
+      closeDialog();
+      void attempt(() => client.setFields(entry.id, fields), t('fieldsSaved'));
+    };
+    return modal(
+      t('editFields'),
+      h(
+        'form',
+        { onSubmit: (event: Event) => (event.preventDefault(), save()) },
+        h('h2', null, t('editFields')),
+        h('p', { class: 'rf-hint', id: 'rf-fields-hint', style: 'margin: 0' }, t('fieldsHint')),
+        h('textarea', {
+          class: 'rf-fields-text',
+          rows: 6,
+          'aria-label': t('editFields'),
+          'aria-describedby': 'rf-fields-hint',
+          value: text,
+          placeholder: 'client: acme',
+          onInput: (event: Event) => {
+            if (dialog?.kind === 'fields') dialog.text = (event.target as HTMLTextAreaElement).value;
+          },
+          mount: (field: HTMLElement) => field.focus(),
+        }),
+        actionsRow(cancel(), h('button', { type: 'submit', class: 'rf-btn rf-primary' }, t('save'))),
+      ),
+    );
+  }
+
   function confirmDialog(text: string, action: string, onConfirm: () => void) {
     return modal(
       action,
@@ -2017,15 +2153,69 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   let zoomed = false;
   /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
   const fullTexts = new Map<string, string | null | Error>();
+  // Workbooks read, by version and how much of them; and the sheet shown of the one in the viewer.
+  const books = new Map<string, Sheet[] | null | Error>();
+  let sheetShown = 0;
+  function sheetsOf(file: FileEntry, url: string | null, limits?: { rows: number; columns: number; sheets: number }) {
+    const key = `${file.id}:${file.versions[0].id}:${limits ? 'card' : 'all'}`;
+    if (url && !books.has(key)) {
+      books.set(key, null);
+      fetch(url)
+        .then(async (answer) => {
+          if (!answer.ok) throw new Error(`${answer.status}`);
+          return readXlsx(new Uint8Array(await answer.arrayBuffer()), limits);
+        })
+        .then(
+          (sheets) => (books.set(key, sheets), render()),
+          (error: Error) => (books.set(key, error), render()),
+        );
+    }
+    return books.get(key);
+  }
   /** The document shown in pages, to take down before the next. */
-  let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void } | undefined;
+  let shownDocument: { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void; pdf?(): Promise<Uint8Array> } | undefined;
   const undoDocument = () => {
     shownDocument?.destroy();
     shownDocument = undefined;
   };
 
+  /** Rows shown as a table, the first as its head: of a CSV, or a sheet of a workbook. */
+  const tableView = (rows: string[][]) => {
+    const [first = [], ...rest] = rows;
+    return h(
+      'div',
+      { class: 'rf-view-table' },
+      h(
+        'table',
+        null,
+        h(
+          'thead',
+          null,
+          h(
+            'tr',
+            null,
+            first.map((cell) => h('th', { scope: 'col' }, cell)),
+          ),
+        ),
+        h(
+          'tbody',
+          null,
+          rest.map((row) =>
+            h(
+              'tr',
+              null,
+              row.map((cell) => h('td', null, cell)),
+            ),
+          ),
+        ),
+      ),
+      rows.length >= 1000 && h('p', { class: 'rf-view-cut' }, t('shownRows', { n: 1000 })),
+    );
+  };
+
   const view = (id: EntryId) => {
     viewing = id;
+    sheetShown = 0;
     zoomed = false;
     if (picked.size <= 1) select(id);
     afterRender.push(() => element.querySelector<HTMLElement>('.rf-view')?.focus());
@@ -2093,6 +2283,24 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         h('audio', { key: url, src: url, controls: true, preload: 'metadata' }),
       );
     }
+    if (ext === 'xlsx') {
+      if (file.versions[0].size > VIEW_LIMIT * 20) return none(t('tooLargeToShow'));
+      const sheets = sheetsOf(file, urlOf(file));
+      if (sheets === undefined || sheets === null) return h('div', { class: 'rf-view-wait' }, t('loading'));
+      if (sheets instanceof Error || !sheets.length) return none(t('couldNotRead'));
+      const at = Math.min(sheetShown, sheets.length - 1);
+      return h(
+        'div',
+        { class: 'rf-view-book' },
+        sheets.length > 1 &&
+          h(
+            'div',
+            { class: 'rf-sheet-tabs', role: 'group', 'aria-label': t('sheets') },
+            sheets.map((sheet, i) => button(sheet.name, () => ((sheetShown = i), render()), { key: `${i}`, class: 'rf-btn rf-small', 'aria-pressed': i === at })),
+          ),
+        tableView(sheets[at].rows),
+      );
+    }
     const reads = kind === 'text' || ext === 'csv' || ext === 'tsv';
     if (reads && file.versions[0].size > VIEW_LIMIT * 5) return none(t('tooLargeToShow'));
     if (reads) {
@@ -2101,39 +2309,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       if (text instanceof Error) return none(t('couldNotRead'));
       const cut = file.versions[0].size > VIEW_LIMIT && h('p', { class: 'rf-view-cut' }, t('shownFirst', { size: formatSize(VIEW_LIMIT, locale) }));
       if (ext === 'md' || ext === 'markdown') return h('div', { class: 'rf-view-doc' }, h('article', { class: 'rf-view-sheet' }, markdown(text)), cut);
-      if (ext === 'csv' || ext === 'tsv') {
-        const rows = rowsOf(text, ext === 'tsv' ? '\t' : ',');
-        const [first = [], ...rest] = rows;
-        return h(
-          'div',
-          { class: 'rf-view-table' },
-          h(
-            'table',
-            null,
-            h(
-              'thead',
-              null,
-              h(
-                'tr',
-                null,
-                first.map((cell) => h('th', { scope: 'col' }, cell)),
-              ),
-            ),
-            h(
-              'tbody',
-              null,
-              rest.map((row) =>
-                h(
-                  'tr',
-                  null,
-                  row.map((cell) => h('td', null, cell)),
-                ),
-              ),
-            ),
-          ),
-          rows.length >= 1000 && h('p', { class: 'rf-view-cut' }, t('shownRows', { n: 1000 })),
-        );
-      }
+      if (ext === 'csv' || ext === 'tsv') return tableView(rowsOf(text, ext === 'tsv' ? '\t' : ','));
       let shown = text;
       if (ext === 'json') {
         try {
@@ -2230,10 +2406,30 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         files.length > 1 && h('span', { class: 'rf-view-count', 'aria-live': 'polite' }, t('nOfM', { n: at + 1, m: files.length })),
         options.onOpenDocument &&
           kind === 'docx' &&
-          button(withIcon('doc', t('openInRebodocs')), () => void attempt(async () => options.onOpenDocument?.(file, await client.url(file.id, { inline: true }))), {
-            class: 'rf-btn rf-docs rf-small',
-          }),
+          button(
+            withIcon('doc', t('openInRebodocs')),
+            () =>
+              void attempt(async () => {
+                const url = await client.url(file.id, { inline: true });
+                // The viewer is modal: closed, so what the application opens over the drive takes the keys.
+                closeView();
+                options.onOpenDocument?.(file, url);
+              }),
+            { class: 'rf-btn rf-docs rf-small' },
+          ),
         button(icon('download', 18), () => void attempt(() => downloadEach([file])), { class: 'rf-btn rf-icon', 'aria-label': t('download'), title: t('download') }),
+        // As a PDF, made in the page from the pages shown.
+        kind === 'docx' &&
+          shownDocument?.pdf &&
+          button(
+            withIcon('download', 'PDF'),
+            () =>
+              void attempt(async () => {
+                const pdf = await shownDocument?.pdf?.();
+                if (pdf) saveBlob(new Blob([pdf as BlobPart], { type: 'application/pdf' }), `${file.name.replace(/\.docx$/i, '')}.pdf`);
+              }),
+            { class: 'rf-btn rf-small', 'aria-label': t('downloadPdf'), title: t('downloadPdf') },
+          ),
         // A document shown in its pages prints as it is shown; anything else opens in a tab of its own.
         kind === 'docx' && shownDocument?.print
           ? button(icon('printer', 18), () => shownDocument?.print?.(), { class: 'rf-btn rf-icon', 'aria-label': t('print'), title: t('print') })
@@ -2252,7 +2448,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   // ---- The settings: a screen of their own over the drive, as Rebodocs' menu is over a document ----
 
-  type SettingsPart = 'language' | 'appearance' | 'pictures' | 'storage';
+  type SettingsPart = 'language' | 'appearance' | 'pictures' | 'storage' | 'people';
   let settingsPart: SettingsPart | null = null;
   let settingsNote: { text: string; error: boolean } | null = null;
   /** What is typed in the sizes, before it is saved. */
@@ -2324,6 +2520,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         ? ([
             ['pictures', 'image', t('pictures')],
             ['storage', 'drive', t('storageSettings')],
+            ['people', 'users', t('peopleSettings')],
           ] as [SettingsPart, IconName, string][])
         : []),
     ];
@@ -2462,6 +2659,72 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         number(t('trashDaysLabel'), t('trashDaysHint'), drive.trashDays, t('days'), (days) => saveDrive({ trashDays: days }), '1'),
         number(t('retentionLabel'), t('retentionHint'), drive.retentionDays ?? null, t('days'), (days) => saveDrive({ retentionDays: days }), '1'),
       ];
+    } else if (part === 'people') {
+      // What each keeps, and what was done anywhere: asked each time the part is shown, for who looks after the drive.
+      intro = t('peopleIntro');
+      const kept = everyoneUsage('');
+      const done = everyoneActivity('');
+      const failed = kept.error ?? done.error;
+      body = failed
+        ? h('p', { class: 'rf-set-hint rf-set-warn', role: 'alert' }, said(failed))
+        : [
+            h(
+              'section',
+              { class: 'rf-set-group', 'aria-labelledby': `${prefix}-people-usage` },
+              h('h3', { id: `${prefix}-people-usage` }, t('spaceByPerson')),
+              kept.value
+                ? h(
+                    'table',
+                    { class: 'rf-people' },
+                    h(
+                      'thead',
+                      null,
+                      h('tr', null, h('th', { scope: 'col' }, t('person')), h('th', { scope: 'col' }, t('filesCount')), h('th', { scope: 'col' }, t('folders')), h('th', { scope: 'col' }, t('space'))),
+                    ),
+                    h(
+                      'tbody',
+                      null,
+                      kept.value.people.map((one) =>
+                        h(
+                          'tr',
+                          { key: one.owner },
+                          h('th', { scope: 'row' }, one.owner),
+                          h('td', null, String(one.files)),
+                          h('td', null, String(one.folders)),
+                          h('td', null, formatSize(one.bytes, locale), kept.value!.quota ? h('small', null, ` / ${formatSize(kept.value!.quota, locale)}`) : null),
+                        ),
+                      ),
+                    ),
+                    h(
+                      'tfoot',
+                      null,
+                      h(
+                        'tr',
+                        null,
+                        h('th', { scope: 'row' }, t('wholeDrive')),
+                        h('td', null, String(kept.value.total.files)),
+                        h('td', null, String(kept.value.total.folders)),
+                        h('td', null, formatSize(kept.value.total.bytes, locale)),
+                      ),
+                    ),
+                  )
+                : h('p', { class: 'rf-set-hint' }, t('loading')),
+            ),
+            h(
+              'section',
+              { class: 'rf-set-group', 'aria-labelledby': `${prefix}-people-activity` },
+              h('h3', { id: `${prefix}-people-activity` }, t('activityEverywhere')),
+              done.value
+                ? done.value.length
+                  ? h(
+                      'ol',
+                      { class: 'rf-activity', 'aria-labelledby': `${prefix}-people-activity` },
+                      done.value.map((a, i) => h('li', { key: `${a.at}${a.action}${a.entry}${i}` }, h('span', null, activityText(a)), h('small', null, formatDate(a.at, locale)))),
+                    )
+                  : h('p', { class: 'rf-set-hint' }, t('noActivity'))
+                : h('p', { class: 'rf-set-hint' }, t('loading')),
+            ),
+          ];
     } else {
       intro = t('picturesIntro');
       const images = drive.images;
@@ -2697,6 +2960,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         const into = folder;
         return nameDialog(t('newFolder'), t('folderName'), '', t('create'), dialog.name, (name) => void attempt(() => client.createFolder(name, into).then((made) => (selected = made.id))));
       }
+      case 'fields':
+        return fieldsDialog(dialog.entry, dialog.text);
       case 'document': {
         const into = folder;
         return nameDialog(t('newDocument'), t('documentName'), '', t('create'), dialog.name, (name) => void attempt(() => makeDocument(name, into)));
@@ -2740,7 +3005,17 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     shownEntries = entries;
     const pickedEntries = entries.filter((entry) => picked.has(entry.id));
     const selectedEntry = pickedEntries.length > 1 ? null : (entries.find((entry) => entry.id === selected) ?? null);
-    const heading = query ? t('resultsFor', { q: query }) : section === 'recent' ? t('recent') : section === 'shared' ? t('sharedWithMe') : section === 'trash' ? t('trash') : null;
+    const heading = query
+      ? t('resultsFor', { q: query })
+      : section === 'recent'
+        ? t('recent')
+        : section === 'starred'
+          ? t('starred')
+          : section === 'shared'
+            ? t('sharedWithMe')
+            : section === 'trash'
+              ? t('trash')
+              : null;
     const count = entries.length === 1 ? t('item') : t('items', { n: entries.length });
     const title = options.title ?? 'Files';
     const nav = (name: IconName, text: string, current: boolean, onClick: () => void, { badge, ...extra }: Record<string, unknown> = {}) =>
@@ -2780,6 +3055,55 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           }),
           typed && button(icon('close', 16), () => setTyped(''), { 'aria-label': t('cancel') }),
         ),
+        notices &&
+          h(
+            'div',
+            { class: 'rf-bell-box' },
+            button([icon('bell'), notices.unseen > 0 && h('span', { class: 'rf-bell-n', 'aria-hidden': 'true' }, String(notices.unseen))], openNotices, {
+              class: 'rf-gear rf-bell',
+              'aria-label': notices.unseen ? `${t('notifications')} · ${t('newNotices', { n: notices.unseen })}` : t('notifications'),
+              title: t('notifications'),
+              'aria-expanded': noticesOpen,
+            }),
+            noticesOpen &&
+              h(
+                'div',
+                {
+                  class: 'rf-notices',
+                  role: 'region',
+                  'aria-label': t('notifications'),
+                  onKeydown: (event: KeyboardEvent) => {
+                    if (event.key !== 'Escape') return;
+                    event.preventDefault();
+                    noticesOpen = false;
+                    render();
+                    element.querySelector<HTMLButtonElement>('.rf-bell')?.focus();
+                  },
+                },
+                h('strong', null, t('notifications')),
+                notices.notifications.length
+                  ? h(
+                      'ul',
+                      null,
+                      notices.notifications.map((notice) =>
+                        h(
+                          'li',
+                          { key: notice.id },
+                          button(
+                            [
+                              h('span', null, notice.kind === 'shared' ? t('noticeShared', { by: notice.by, name: notice.name }) : t('noticeMentioned', { by: notice.by, name: notice.name })),
+                              notice.text && h('small', { class: 'rf-notice-text' }, notice.text),
+                              h('small', null, formatDate(notice.at, locale)),
+                            ],
+                            () => void goToNotice(notice),
+                            { class: 'rf-notice', mount: (node: HTMLElement) => node === element.querySelector('.rf-notice') && node.focus() },
+                          ),
+                        ),
+                      ),
+                    )
+                  : h('p', { class: 'rf-hint' }, t('noNotices')),
+              ),
+          ),
         settings &&
           button(icon('settings'), openSettings, { class: 'rf-gear', 'aria-label': t('settings'), title: t('settings'), 'aria-haspopup': 'dialog', mount: (node: HTMLElement) => (gear = node) }),
       ),
@@ -2818,6 +3142,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             badge: freshShared,
           }),
           nav('clock', t('recent'), section === 'recent' && !query, () => go('recent')),
+          nav('star', t('starred'), section === 'starred' && !query, () => go('starred')),
           nav('trash', t('trash'), section === 'trash' && !query, () => go('trash'), {
             onDragover: (event: DragEvent) => event.dataTransfer?.types.includes(DRAGGED) && (event.preventDefault(), (event.currentTarget as HTMLElement).classList.add('rf-drop')),
             onDragleave: (event: DragEvent) => (event.currentTarget as HTMLElement).classList.remove('rf-drop'),
@@ -2971,9 +3296,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   ? t('trashIsEmpty')
                   : section === 'recent'
                     ? t('noRecent')
-                    : section === 'shared'
-                      ? t('noShared')
-                      : t('emptyFolder'),
+                    : section === 'starred'
+                      ? t('noStarred')
+                      : section === 'shared'
+                        ? t('noShared')
+                        : t('emptyFolder'),
           ),
           dropping && h('div', { class: 'rf-dropzone' }, t('dropHere')),
         ),
@@ -3041,6 +3368,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   const closeMenu = (event: MouseEvent) => {
     if (contextMenu && !element.querySelector('.rf-ctx')?.contains(event.target as Node)) closeContext(false);
+    if (noticesOpen && !element.querySelector('.rf-bell-box')?.contains(event.target as Node)) {
+      noticesOpen = false;
+      render();
+    }
     if (menuOpen && !element.querySelector('.rf-menu')?.contains(event.target as Node) && !element.querySelector('.rf-new')?.contains(event.target as Node)) {
       menuOpen = false;
       render();

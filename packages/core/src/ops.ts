@@ -96,6 +96,29 @@ export function setColor(drive: Drive, id: EntryId, color: FolderColor | null): 
   return { entries: new Map(drive.entries).set(id, color ? { ...rest, color } : rest) };
 }
 
+/** How many fields an entry may have, how long a name and a value may be, and what a name is made of. */
+export const MAX_FIELDS = 50;
+export const MAX_FIELD_VALUE = 1000;
+export const FIELD_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/;
+
+/** Fields of an entry set, each to its text, or taken away with null; those not named stay as they are. */
+export function setFields(drive: Drive, id: EntryId, fields: Readonly<Record<string, string | null>>, context: Context): Drive {
+  const entry = getEntry(drive, id);
+  if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) throw new DriveError('invalid-field', 'The fields are an object of names and texts.');
+  const next: Record<string, string> = { ...entry.fields };
+  for (const [name, value] of Object.entries(fields)) {
+    if (!FIELD_NAME.test(name)) throw new DriveError('invalid-field', `"${name}" is not a name of a field: letters, digits and _ . -, at most 64.`);
+    if (value === null) delete next[name];
+    else if (typeof value !== 'string' || value.length > MAX_FIELD_VALUE) throw new DriveError('invalid-field', `The field "${name}" is a text of at most ${MAX_FIELD_VALUE} characters.`);
+    else next[name] = value;
+  }
+  if (Object.keys(next).length > MAX_FIELDS) throw new DriveError('invalid-field', `An entry has at most ${MAX_FIELDS} fields.`);
+  const { fields: _, ...rest } = entry;
+  const same = JSON.stringify(entry.fields ?? {}) === JSON.stringify(next);
+  if (same) return drive;
+  return put(drive, { ...rest, ...(Object.keys(next).length ? { fields: next } : {}), modified: context.at, modifiedBy: context.by } as Entry);
+}
+
 export function rename(drive: Drive, id: EntryId, name: string, context: Context, options: NameOptions = {}): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
@@ -204,6 +227,18 @@ export function purgeTrash(drive: Drive, before: string, keep: Keep = {}): Remov
  * The bytes kept for what `owner` owns, in the trash too: every version and every smaller picture of it, each key
  * once, as a version brought back shares the bytes of the one it was.
  */
+/** What each owner keeps in the drive: their files, folders and bytes (as `usageOf` counts them), the most first. */
+export function usageByOwner(drive: Drive): { owner: string; files: number; folders: number; bytes: number }[] {
+  const owners = new Map<string, { files: number; folders: number }>();
+  for (const entry of drive.entries.values()) {
+    const counts = owners.get(entry.owner) ?? { files: 0, folders: 0 };
+    if (entry.kind === 'file') counts.files++;
+    else counts.folders++;
+    owners.set(entry.owner, counts);
+  }
+  return [...owners].map(([owner, counts]) => ({ owner, ...counts, bytes: usageOf(drive, owner) })).sort((a, b) => b.bytes - a.bytes || (a.owner < b.owner ? -1 : 1));
+}
+
 export function usageOf(drive: Drive, owner: string): number {
   const keys = new Map<string, number>();
   for (const entry of drive.entries.values())

@@ -19,7 +19,7 @@ npm install @rebofiles/drive
 
 ```ts
 import { mountDrive } from '@rebofiles/drive';
-import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
+import { newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
 
 const drive = mountDrive(document.getElementById('files')!, {
   base: '/api/files',
@@ -31,7 +31,9 @@ const drive = mountDrive(document.getElementById('files')!, {
   thumbDocument: thumbDocx, // the grid: its first page, until a picture of it is made
   pictureDocument: pictureOfDocx, // that picture, made at upload
   textDocument: textOfDocx, // what is written in it, to find it by
+  newDocument: newDocx, // "Create document": an empty one, named, then opened
   onOpenDocument: (file, url) => openInRebodocs(file, url),
+  fields: 'edit', // your application's fields of an entry, changed in its details
 });
 
 drive.refresh();  // after a change made elsewhere
@@ -54,10 +56,15 @@ arrows, ⌘/Ctrl+A, and Space. A bar over the list then does to all of them
 what can be done: download, move, the trash, restore, delete for good.
 
 A file opened, by a double click or Enter, is shown over the drive: pictures,
-PDF, video, audio, Markdown, CSV, JSON, code and text, and Word documents in
-their pages with `viewDocument: viewDocx` (from `@rebofiles/drive/rebodocs`,
-with `@rebodocs/viewer` installed); ← and → go to the next. `onOpen` opens
-files your own way instead.
+PDF, video, audio, Markdown, CSV, JSON, code and text, Excel workbooks a sheet
+at a time, and Word documents in their pages with `viewDocument: viewDocx`
+(from `@rebofiles/drive/rebodocs`, with `@rebodocs/viewer` installed), printed
+or downloaded as a PDF; ← and → go to the next. `onOpen` opens files your own
+way instead.
+
+Starred holds what each person stars, the bell over the drive what was shared
+with them and the comments that name them, and Settings → People, for who may
+configure the drive, the space of each person and the latest activity.
 
 ## Uploads
 
