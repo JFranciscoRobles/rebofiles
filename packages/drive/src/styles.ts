@@ -831,6 +831,8 @@ ${Object.keys(FOLDERS)
   .rf-details-on { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border: 0; background: rgba(var(--rf-shade),.45); animation: rf-scrim .18s ease-out; }
   .rf-body[inert] .rf-details-on { display: none; }
   .rf-details-on .rf-details-in { position: relative; max-height: 86%; overflow-y: auto; padding: 8px 20px calc(24px + env(safe-area-inset-bottom)); background: var(--rf-bg); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 30px rgba(var(--rf-shade),.18); animation: rf-sheet-up .24s cubic-bezier(.2,.8,.2,1); }
+  /* The sheet scrolls: what is in it keeps its height, none squeezed to fit. */
+  .rf-details-on .rf-details-in > * { flex-shrink: 0; }
   .rf-sheet-grip { display: block; align-self: center; flex: none; width: 40px; height: 5px; border-radius: 3px; background: var(--rf-border-strong); }
   .rf-details-on .rf-sheet-x { display: grid; place-items: center; position: absolute; top: 16px; right: 14px; width: 44px; height: 44px; border: 0; border-radius: 22px; background: var(--rf-surface); color: var(--rf-ink); }
   .rf-details-on h2 { padding-right: 52px; font-size: 18px; line-height: 1.35; }
@@ -841,11 +843,11 @@ ${Object.keys(FOLDERS)
   .rf-details-on .rf-actions .rf-btn:is(.rf-act-open, .rf-act-download, .rf-act-share, .rf-act-star) { grid-column: auto; flex-direction: column; justify-content: flex-start; gap: 6px; height: auto; padding: 0 0 8px; font-size: 12px; white-space: normal; text-align: center; }
   .rf-details-on .rf-actions .rf-btn:is(.rf-act-open, .rf-act-download, .rf-act-share, .rf-act-star) svg { width: 52px; height: 52px; padding: 15px; box-sizing: border-box; border-radius: 16px; background: var(--rf-brand-light); color: var(--rf-brand); }
   .rf-details-on .rf-actions .rf-act-open { order: -4; }
-  .rf-details-on .rf-actions .rf-act-open svg { background: var(--rf-brand); color: var(--rf-on-brand); }
+  .rf-details-on .rf-actions .rf-btn.rf-act-open svg { background: var(--rf-brand); color: var(--rf-on-brand); }
   .rf-details-on .rf-actions .rf-act-download { order: -3; }
   .rf-details-on .rf-actions .rf-act-share { order: -2; }
   .rf-details-on .rf-actions .rf-act-star { order: -1; }
-  .rf-details-on .rf-actions .rf-act-star[aria-pressed='true'] svg { color: #c58a12; }
+  .rf-details-on .rf-actions .rf-btn.rf-act-star[aria-pressed='true'] svg { color: #c58a12; }
 
   .rf-details-on .rf-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .rf-details-on .rf-tabs button { white-space: nowrap; flex: none; }

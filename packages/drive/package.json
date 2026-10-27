@@ -1,6 +1,6 @@
 {
   "name": "@rebofiles/drive",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A file drive for the browser without a framework: the whole interface mounted on an element, and the client of @rebofiles/server it is built on. No dependencies but core.",
   "license": "MIT",
   "private": true,
@@ -11,7 +11,7 @@
     "./rebodocs": "./src/rebodocs.ts"
   },
   "dependencies": {
-    "@rebofiles/core": "0.8.0"
+    "@rebofiles/core": "0.8.1"
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.12.0",

@@ -4,6 +4,14 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## 0.8.1 — 2026-10-27
+
+### Fixed
+
+- **The sheet of what is chosen, on a phone.** What is in it kept its height:
+  in a sheet taller than the screen, its tabs and its preview were squeezed
+  to a line. And Open is the one filled with the brand's colour, as meant.
+
 ## 0.8.0 — 2026-10-27
 
 ### Added
