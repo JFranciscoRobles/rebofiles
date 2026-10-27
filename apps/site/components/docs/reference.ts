@@ -267,6 +267,11 @@ export const SERVER_OPTIONS: ServerOption[] = [
   { name: 'check', type: 'false | ({ entry, item, text }) => …', does: 'What is written in what came, against the `words` and `find` of its document: `checkWritten` unless yours; `false` for none.' },
   { name: 'expiring', type: 'false | { field, days, onExpiring }', does: 'The owner of a file whose field `expires` comes within `days` (15) told in the bell, and `onExpiring`; `false` for none.' },
   {
+    name: 'onRead',
+    type: '({ action, user, link, entries, path }) => void',
+    does: 'Each thing opened, seen or taken: a folder listed, a file seen or downloaded, an archive; by someone or through a link. For an audit.',
+  },
+  {
     name: 'people',
     type: '{ search(query, user), names?(ids, user) }',
     does: 'Who is who, from your directory: the people and groups that match what is typed where something is shared, and their names, shown in place of ids.',

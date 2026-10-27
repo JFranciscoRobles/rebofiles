@@ -337,3 +337,44 @@ describe('sharing with a group', () => {
     expect((await carl.ask('GET', `/api/files/entries?folder=${sales.id}`)).status).toBe(403);
   });
 });
+
+describe('what is read, told', () => {
+  it('a folder listed, a file seen or downloaded, an archive, and through a link: with where each is', async () => {
+    const told: { action: string; user: string | null; link?: string; names: string[]; path: string[] }[] = [];
+    const d = drive({
+      onRead: ({ action, user, link, entries, path }) =>
+        void told.push({ action, user: user?.id ?? null, ...(link ? { link } : {}), names: entries.map((one) => one.name), path: path.map((one) => one.name) }),
+    });
+    const { clients, northwind, contract } = await anasClients(d);
+    const settle = () => new Promise((done) => setTimeout(done, 0));
+
+    await d.ana.ask('GET', `/api/files/entries?folder=${northwind.id}`);
+    await d.ana.ask('GET', `/api/files/entries/${contract.id}/download?inline=1`);
+    await d.ana.ask('GET', `/api/files/entries/${contract.id}/download`);
+    // A smaller picture for a list, and the top of the drive: not reading anything.
+    await d.ana.ask('GET', `/api/files/entries/${contract.id}/download?size=320`);
+    await d.ana.ask('GET', '/api/files/entries');
+    await d.ana.ask('POST', '/api/files/zip', { ids: [northwind.id] });
+    // What she may not read is not told as read.
+    await d.bea.ask('GET', `/api/files/entries/${contract.id}/download`);
+    await settle();
+    expect(told).toEqual([
+      { action: 'list', user: 'ana', names: ['Northwind'], path: ['Clients'] },
+      { action: 'view', user: 'ana', names: ['contract.txt'], path: ['Clients', 'Northwind'] },
+      { action: 'download', user: 'ana', names: ['contract.txt'], path: ['Clients', 'Northwind'] },
+      { action: 'zip', user: 'ana', names: ['Northwind'], path: ['Clients'] },
+    ]);
+
+    told.length = 0;
+    const made = await d.ana.ask('POST', `/api/files/entries/${clients.id}/links`, { days: 7 });
+    const token = encodeURIComponent(made.body.token as string);
+    const link = made.body.entry.links![0].id;
+    await d.handle(new Request(`http://drive.test/api/files/links/${token}/download?id=${contract.id}`));
+    await d.handle(new Request(`http://drive.test/api/files/links/${token}/zip`));
+    await settle();
+    expect(told).toEqual([
+      { action: 'download', user: null, link, names: ['contract.txt'], path: ['Clients', 'Northwind'] },
+      { action: 'zip', user: null, link, names: ['Clients'], path: [] },
+    ]);
+  });
+});

@@ -162,6 +162,16 @@ counted on it (`got`), closed when all came if it says so. `onReceived`,
 `PUT /entries/:id/review` and `onReview`, `GET /received`, `GET /requests`
 and `GET /admin/requests` for reminders.
 
+## Who read what
+
+`onRead({ action, user, link, entries, path, request })` is told of each
+thing opened, seen or taken: a folder listed (`list`), a file seen in the page
+(`view`) or downloaded (`download`), an archive of some of it (`zip`), by
+someone signed in or through a link (`user` null, `link` its id), with the
+folders above it. For an audit; a smaller picture for a list is not one, and
+what one may not read is not told. What is changed is in the activity
+(`metadata.record`).
+
 ## Who is who
 
 `people: { search(query, user), names?(ids, user) }` is your directory: the

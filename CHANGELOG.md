@@ -4,6 +4,17 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## 0.10.0 — 2026-10-27
+
+### Added
+
+- **Who read what.** `onRead` of the server is told of each thing opened,
+  seen or taken: a folder listed, a file seen in the page or downloaded, an
+  archive of some of it (with what it was asked of), by someone signed in or
+  through a link, with the folders above it. For an audit of reading, beside
+  the activity of what is changed. A smaller picture for a list is not one,
+  and what one may not read is not told.
+
 ## 0.9.0 — 2026-10-27
 
 ### Added

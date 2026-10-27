@@ -124,6 +124,22 @@ export interface User {
   groups?: readonly string[];
 }
 
+/**
+ * Something of the drive opened, seen or taken, as an audit keeps it: a folder listed, a file seen in the page or
+ * downloaded, an archive of some of it; by someone signed in, or through a link (`user` null, `link` its id).
+ */
+export interface ReadEvent {
+  action: 'list' | 'view' | 'download' | 'zip';
+  user: User | null;
+  /** The link it was read through, when it was. */
+  link?: string;
+  /** The folder listed, the file, or what the archive was asked of. */
+  entries: Entry[];
+  /** The folders above the first of them, from the top. */
+  path: Entry[];
+  request: Request;
+}
+
 /** Someone found to share with: a person by their id, or a group as `group:<id>`, and how they are called. */
 export interface Someone {
   id: string;
@@ -215,6 +231,11 @@ export interface DriveServerOptions {
    * the drive `days` before (15), and to `onExpiring`. `false` for none.
    */
   expiring?: false | { field?: string; days?: number; onExpiring?: (event: { entry: Entry; expires: string; days: number }) => void | Promise<void> };
+  /**
+   * Told of each thing opened, seen or taken (`ReadEvent`): a folder listed, a file seen or downloaded, an archive;
+   * for an audit of who read what. A smaller picture of a file for a list is not one. Its failure is not the request's.
+   */
+  onRead?: (event: ReadEvent) => void | Promise<void>;
   /**
    * Who is who, from the application: the people and groups (`group:sales`) that match what is typed where an entry is
    * shared, and how each is called, for the drive to show names where it would show ids. Without it, the drive shows
@@ -641,6 +662,16 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
   const ownSettings = new Map<string, unknown>();
   const getSetting = (name: string) => (options.metadata.getSetting ? options.metadata.getSetting(name) : Promise.resolve(ownSettings.get(name)));
   const setSetting = (name: string, value: unknown) => (options.metadata.setSetting ? options.metadata.setSetting(name, value) : (ownSettings.set(name, value), Promise.resolve()));
+  /** What was read, told to `onRead` after the answer: never in its way. */
+  const toldRead = (event: Omit<ReadEvent, 'path'> & { drive: Drive }) => {
+    if (!options.onRead) return;
+    const { drive, ...told } = event;
+    const first = told.entries[0];
+    const path = first ? core.ancestors(drive, first.id) : [];
+    void Promise.resolve()
+      .then(() => options.onRead!({ ...told, path }))
+      .catch((error) => log.error('onRead failed:', error));
+  };
   /** Something told to a person, or to everyone of a group, kept for them to see in the drive. */
   const notify = async (to: string, notice: Omit<core.Notice, 'id' | 'at'>) => {
     if (to === '*' || to === notice.by) return;
@@ -941,6 +972,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           const inside = core.children(drive, folder?.id ?? null);
           // At the top, unless it is one drive for everyone, only one's own: what others share is in Shared with me.
           const shown = folder || options.top === 'everyone' ? inside : inside.filter((entry) => entry.owner === user.id);
+          if (folder) toldRead({ action: 'list', user, entries: [folder], drive, request });
           return Response.json({
             folder,
             path: folder ? await pathOf(user, drive, [...core.ancestors(drive, folder.id), folder]) : [],
@@ -1581,7 +1613,10 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           await allow(user, 'download', file, drive);
           const wanted = url.searchParams.get('version');
           const size = url.searchParams.has('size') ? Number(url.searchParams.get('size')) : undefined;
-          return Response.json(await addressOf(file, url.searchParams.get('inline') === '1', size, wanted ?? undefined));
+          const inline = url.searchParams.get('inline') === '1';
+          // A smaller picture of it, for a list, is not reading it.
+          if (size === undefined) toldRead({ action: inline ? 'view' : 'download', user, entries: [file], drive, request });
+          return Response.json(await addressOf(file, inline, size, wanted ?? undefined));
         }
 
         case 'POST /zip': {
@@ -1595,6 +1630,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           if (candidates.size > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
           const allowed = new Set<EntryId>();
           await Promise.all([...candidates.values()].map(async (entry) => (await may(user, entry.kind === 'file' ? 'download' : 'list', entry, drive)) && allowed.add(entry.id)));
+          toldRead({ action: 'zip', user, entries: ids.filter((one) => allowed.has(one)).map((one) => core.getEntry(drive, one)), drive, request });
           return Response.json(core.packOf(drive, ids, (entry) => allowed.has(entry.id)));
         }
 
@@ -2127,6 +2163,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
       if (file.kind !== 'file') throw new Refused(400, 'not-a-file', `${file.name} is a folder.`);
       const inline = url.searchParams.get('inline') === '1';
       if (!inline) await spend();
+      toldRead({ action: inline ? 'view' : 'download', user: null, link: link.id, entries: [file], drive, request });
       return Response.json({ url: await options.storage.downloadUrl(file.versions[0].key, file.name, file.type, base, inline) });
     }
     // An archive of some of what it reads, or of all of it, and the addresses of its files a few at a time.
@@ -2137,6 +2174,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
       for (const id of ids) inside(id);
       if (ids.reduce((sum, id) => sum + core.subtree(drive, id).length, 0) > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
       await spend();
+      toldRead({ action: 'zip', user: null, link: link.id, entries: ids.map((one) => inside(one)), drive, request });
       return Response.json(core.packOf(drive, ids, (entry) => core.isWithin(drive, entry.id, root.id)));
     }
     if (rest === 'urls') {
