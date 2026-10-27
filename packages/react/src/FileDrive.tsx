@@ -9,9 +9,14 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { DriveProvider, type DriveProviderProps, useDrive, useOuterDrive } from './headless';
 
+/** What an application does to the drive from its own bar and sections, with `chrome={false}`. */
+export type DriveControls = Pick<MountedDrive, 'go' | 'search' | 'upload' | 'newFolder' | 'openSettings'>;
+
 export interface FileDriveProps extends Omit<DriveProviderProps, 'children'>, Omit<DriveOptions, 'base' | 'client' | 'headers' | 'language' | 'texts' | 'logo' | 'onChange' | 'live'> {
   /** What goes before the title; ReboFiles' mark unless given. */
   logo?: ReactNode;
+  /** Given `useRef<DriveControls>(null)`, the drive's controls are put in it while it is there: `controls.current?.go('trash')`. */
+  controls?: { current: DriveControls | null };
 }
 
 export function FileDrive({ base, client, headers, language, texts, live, ...props }: FileDriveProps) {
@@ -24,7 +29,7 @@ export function FileDrive({ base, client, headers, language, texts, live, ...pro
   );
 }
 
-function Mounted({ logo, ...options }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
+function Mounted({ logo, controls, ...options }: Omit<FileDriveProps, keyof Omit<DriveProviderProps, 'children'>>) {
   // The application's own texts, if any, and its language under the settings, which the drive reads itself.
   const { client, revision, changed, ownTexts: texts, givenLanguage: language } = useDrive();
   const box = useRef<HTMLDivElement>(null);
@@ -53,9 +58,11 @@ function Mounted({ logo, ...options }: Omit<FileDriveProps, keyof Omit<DriveProv
       },
     });
     drive.current = mounted;
+    if (controls) controls.current = mounted;
     return () => {
       mounted.destroy();
       drive.current = null;
+      if (controls?.current === mounted) controls.current = null;
     };
   }, [client]);
 

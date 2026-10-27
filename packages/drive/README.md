@@ -41,6 +41,25 @@ drive.refresh();  // after a change made elsewhere
 drive.destroy();
 ```
 
+### Inside your application's own bar
+
+`chrome: false` leaves out the drive's bar (title, search, notifications,
+settings) and its sections (the bar at the foot of a phone): your
+application puts its own around it, drives it, and shows where it is.
+
+```ts
+const drive = mountDrive(element, { chrome: false, onState: (state) => show(state) });
+drive.go('trash');            // a section, or a folder of My files: go('files', id)
+drive.search('contract');     // by name and by what is written inside
+drive.upload();               // the picker of files; upload('folder') for a folder
+drive.newFolder();
+drive.openSettings();
+// state: { section, folder, path, query, count, loading, usage, canConfigure, received, toReview, freshShared }
+```
+
+In React, `<FileDrive chrome={false} controls={ref} onState={setState} />`,
+with `ref = useRef<DriveControls>(null)`.
+
 The element takes the drive's height: give it one. Everything `<FileDrive>`
 takes, `mountDrive` takes: `client`, `headers`, `texts`, `logo` (a Node),
 `defaultView`, `onOpen`, `linkAddress`, `className`, `settings: false`,

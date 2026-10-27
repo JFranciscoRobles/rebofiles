@@ -319,7 +319,7 @@ ${Object.keys(FOLDERS)
 .rf-toast-undo:focus-visible { box-shadow: 0 0 0 2px var(--rf-brand-light); }
 @keyframes rf-pop { from { opacity: 0; transform: translate(-50%, 8px); } }
 
-.rf-dialog { border: 0; padding: 0; border-radius: 16px; box-shadow: var(--rf-shadow-menu); width: min(420px, calc(100vw - 32px)); color: var(--rf-ink); background: var(--rf-bg); font: 14px/1.45 var(--rf-font); }
+.rf-dialog { margin: auto; border: 0; padding: 0; border-radius: 16px; box-shadow: var(--rf-shadow-menu); width: min(420px, calc(100vw - 32px)); color: var(--rf-ink); background: var(--rf-bg); font: 14px/1.45 var(--rf-font); }
 .rf-dialog::backdrop { background: rgba(var(--rf-shade),.4); }
 .rf-dialog form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .rf-dialog h2 { margin: 0; font-size: 18px; font-weight: 700; }
@@ -782,6 +782,9 @@ ${Object.keys(FOLDERS)
   .rf-link-rows .rf-row { grid-template-columns: minmax(0,1fr) 80px 40px; }
   .rf-link-rows .rf-row > :nth-child(3) { display: revert; }
 }
+/* Without its own bar and sections (chrome: false): the application puts its own around it. */
+.rf-bare .rf-top, .rf-bare .rf-side { display: none; }
+@media (min-width: 901px) { .rf-bare .rf-body, .rf-bare.rf-compact .rf-body { grid-template-columns: minmax(0,1fr) 290px; grid-template-rows: minmax(0,1fr); } }
 /* On a phone: the sections in a bar at the foot, a button that floats to add, what is chosen in a sheet from below. */
 .rf-who-found { list-style: none; margin: -6px 0 0; padding: 4px; border: 1px solid var(--rf-border); border-radius: 12px; background: var(--rf-bg); box-shadow: var(--rf-shadow-menu); max-height: 240px; overflow-y: auto; }
 .rf-who-found li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
@@ -796,6 +799,7 @@ ${Object.keys(FOLDERS)
   .rf-gear { width: 44px; height: 44px; border-radius: 22px; }
   .rf-body, .rf-compact .rf-body { display: flex; flex-direction: column; gap: 0; padding: 0; overflow-x: hidden; overflow-y: auto; background: var(--rf-bg); }
   .rf-main { order: 1; flex: 1 0 auto; min-height: auto; border: 0; border-radius: 0; padding-bottom: 88px; }
+  .rf-bare .rf-main { padding-bottom: 0; }
   .rf-details { order: 2; flex: none; border: 0; border-radius: 0; border-top: 1px solid var(--rf-divider); }
   .rf-details-many { display: none; }
   .rf-status:not(:has(.rf-bar)) { display: none; }

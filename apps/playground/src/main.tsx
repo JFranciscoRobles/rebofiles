@@ -6,11 +6,13 @@
 // `?as=bea` is the drive as Bea sees it, to share with her and look; a link
 // of the drive comes here as `?link=…`, and shows what it reads.
 // `?retries=0` gives up a cut upload at once, for its "Try again" to be seen.
+// `?chrome=0` is the drive without its own bar and sections, inside a bar of an
+// application's (`chrome={false}`), driven by it and telling it where it is.
 
 import type { FileEntry } from '@rebofiles/core';
-import { DriveProvider, FileDrive, SharedLink, createDriveClient } from '@rebofiles/react';
+import { type DriveControls, type DriveState, DriveProvider, FileDrive, type Section, SharedLink, createDriveClient } from '@rebofiles/react';
 import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
-import { StrictMode, Suspense, lazy, useState } from 'react';
+import { StrictMode, Suspense, lazy, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // The editor is large: loaded the first time a document is opened, not with the drive.
@@ -26,11 +28,46 @@ const headers = (): Record<string, string> => (as ? { 'x-user': as } : {});
 const retries = params.get('retries');
 const client = retries === null ? undefined : createDriveClient({ base: '/api/files', headers, retry: { attempts: Number(retries), delay: 200 } });
 
+const bare = params.get('chrome') === '0';
+
+/** The bar of an application around a drive without its own: its sections, its search, what to add, and where it is. */
+function HostBar({ controls, state }: { controls: { current: DriveControls | null }; state: DriveState | null }) {
+  const sections: [Section, string][] = [
+    ['files', 'Files'],
+    ['shared', 'Shared'],
+    ['recent', 'Recent'],
+    ['trash', 'Trash'],
+  ];
+  return (
+    <section className="host-bar" aria-label="The application">
+      <h1>{state?.path.at(-1)?.name ?? 'Files'}</h1>
+      <nav aria-label="Sections">
+        {sections.map(([id, label]) => (
+          <button key={id} type="button" aria-current={state?.section === id ? 'page' : undefined} onClick={() => controls.current?.go(id)}>
+            {label}
+          </button>
+        ))}
+      </nav>
+      <input type="search" aria-label="Search the files" onChange={(event) => controls.current?.search(event.target.value)} />
+      <button type="button" onClick={() => controls.current?.newFolder()}>
+        New folder
+      </button>
+      <output aria-label="Shown">{state ? `${state.count} shown` : ''}</output>
+    </section>
+  );
+}
+
 function Playground() {
   const [open, setOpen] = useState<{ file: FileEntry; url: string } | null>(null);
+  const controls = useRef<DriveControls>(null);
+  const [state, setState] = useState<DriveState | null>(null);
   return (
     <DriveProvider base="/api/files" client={client} language={language} headers={headers}>
+      {bare && <HostBar controls={controls} state={state} />}
       <FileDrive
+        chrome={!bare}
+        controls={controls}
+        onState={bare ? setState : undefined}
         theme={theme}
         title={as ? `Playground · ${as}` : 'Playground'}
         defaultView={params.get('view') === 'grid' ? 'grid' : 'list'}

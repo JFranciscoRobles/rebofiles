@@ -36,7 +36,7 @@ export { type ZipItem, type ZipSink, type ZipOptions, writeZip, blobSink, stream
 export { type Choice, type Conflict, type UploadItem, type Uploads, type UploadsOptions, type UploadsSummary, createUploads, formatDuration, lookInDrive } from './uploads';
 export { type Picked, readDropped, readChosen } from './folders';
 export { type ZipProgress, type ZipDownload, type ZipDownloadOptions, downloadZip } from './download';
-export { type DriveOptions, type MountedDrive, mountDrive } from './screen';
+export { type DriveOptions, type DriveState, type MountedDrive, type Section, mountDrive } from './screen';
 export { type SharedLinkOptions, mountSharedLink } from './link';
 export { picturesToPdf } from './pdf';
 export { qrMatrix, qrSvg, qrPng } from './qr';

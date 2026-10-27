@@ -130,6 +130,14 @@ export interface DriveOptions {
   viewOnlyLinks?: boolean;
   /** Each file looked for in the drive before it goes, and asked about when its bytes or its name are there already: true unless said. */
   checkUploads?: boolean;
+  /**
+   * The bar at the top (the title, the search, notifications and settings) and the sections down the side, a bar at
+   * the foot of a phone: shown unless false. Without them, the application puts its own around the drive, drives it
+   * with `go`, `search`, `upload`, `newFolder` and `openSettings`, and shows where it is from `onState`.
+   */
+  chrome?: boolean;
+  /** Told where the drive is each time that changes: the section, the folder, what is searched, how many, the space. */
+  onState?: (state: DriveState) => void;
   className?: string;
   /** Called after every change made from the drive, for what else in the page shows it to ask again. */
   onChange?: () => void;
@@ -143,8 +151,41 @@ export interface DriveOptions {
 /** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
 export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void; pdf?(): Promise<Uint8Array> } | undefined;
 
+/** Where the drive is, as an application that puts its own bar and sections around it shows it (`onState`). */
+export interface DriveState {
+  section: Section;
+  /** The folder shown, in My files or Shared with me; null at the top. */
+  folder: EntryId | null;
+  /** From the top down to it. */
+  path: { id: EntryId; name: string }[];
+  /** What is searched for; '' for nothing. */
+  query: string;
+  /** How many are listed, once they are. */
+  count: number;
+  loading: boolean;
+  /** The bytes the one asking keeps, and how many they may: null for no limit; null before it is known. */
+  usage: { used: number; quota: number | null } | null;
+  /** Whether they may change the settings of the whole drive. */
+  canConfigure: boolean;
+  /** Whether anything came through their requests for files, and how much of it is still to be looked at. */
+  received: boolean;
+  toReview: number;
+  /** How many were shared with them since they last looked. */
+  freshShared: number;
+}
+
 export interface MountedDrive {
   readonly client: DriveClient;
+  /** A section, and in My files or Shared with me a folder of it: as a section of the application's own would ask. */
+  go(section: Section, folder?: EntryId | null): void;
+  /** Files searched for by name and by what is written in them, as the search box of the application's own asks; '' for none. */
+  search(query: string): void;
+  /** The picker of files, or of a folder, to upload into the folder shown. */
+  upload(what?: 'files' | 'folder'): void;
+  /** The dialog of a new folder, in the folder shown. */
+  newFolder(): void;
+  /** The screen of settings. */
+  openSettings(): void;
   /** Other options, as a framework gives them again. */
   update(options: Partial<DriveOptions>): void;
   /** Asks the server again, after a change made elsewhere. */
@@ -152,7 +193,7 @@ export interface MountedDrive {
   destroy(): void;
 }
 
-type Section = 'files' | 'recent' | 'starred' | 'received' | 'shared' | 'trash';
+export type Section = 'files' | 'recent' | 'starred' | 'received' | 'shared' | 'trash';
 /** What a request for files is made of, as its dialog holds it while it is written. */
 /** A document asked for, as the dialog holds it: its id once made, the words it should say, whether its expiry is asked. */
 interface AskedItem {
@@ -4517,6 +4558,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // ---- The screen, and rendering it ----
 
   let afterRender: (() => void)[] = [];
+  /** What `onState` was told last, not to tell it again. */
+  let toldState = '';
   let scrolledTo: EntryId | null = null;
 
   function screen() {
@@ -4543,6 +4586,32 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 ? t('trash')
                 : null;
     const count = entries.length === 1 ? t('item') : t('items', { n: entries.length });
+    const spaceText = () => {
+      const space = usage('').value;
+      return space ? (space.quota ? t('usedOf', { used: formatSize(space.used, locale), quota: formatSize(space.quota, locale) }) : t('used', { used: formatSize(space.used, locale) })) : '';
+    };
+    // Where it is, told to an application that shows it itself, once it changes.
+    if (options.onState) {
+      const received = receivedNow('').value ?? [];
+      const state: DriveState = {
+        section,
+        folder,
+        path: path.map((step) => ({ id: step.id, name: step.name })),
+        query,
+        count: entries.length,
+        loading,
+        usage: usage('').value ?? null,
+        canConfigure: Boolean(settings?.canConfigure),
+        received: received.length > 0,
+        toReview: toReview(received),
+        freshShared,
+      };
+      const said = JSON.stringify(state);
+      if (said !== toldState) {
+        toldState = said;
+        afterRender.push(() => options.onState?.(state));
+      }
+    }
     const title = options.title ?? 'Files';
     // Each with a shorter name, for the bar at the foot of a phone.
     const nav = (name: IconName, text: string, current: boolean, onClick: () => void, { badge, short, ...extra }: Record<string, unknown> = {}) =>
@@ -4561,7 +4630,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
     return h(
       'div',
-      { class: `rf-drive${options.layout === 'compact' ? ' rf-compact' : ''}${options.className ? ` ${options.className}` : ''}`, 'data-theme': themeNow(), 'data-rf': prefix },
+      {
+        class: `rf-drive${options.layout === 'compact' ? ' rf-compact' : ''}${options.chrome === false ? ' rf-bare' : ''}${options.className ? ` ${options.className}` : ''}`,
+        'data-theme': themeNow(),
+        'data-rf': prefix,
+      },
       h('style', null, CSS),
       // Its own element for each colour: a stylesheet is not walked by morph, so another colour is another element.
       settings?.settings.brand ? h('style', { key: `brand${settings.settings.brand}` }, brandStyle(`.rf-drive[data-rf="${prefix}"]`, settings.settings.brand)) : null,
@@ -4864,7 +4937,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
       h(
         'div',
         { class: 'rf-status', inert: Boolean(settingsPart || viewing) },
-        h('span', { class: 'rf-grow' }, count, storage && h('span', { class: 'rf-where' }, ` · ${storage}`)),
+        h(
+          'span',
+          { class: 'rf-grow' },
+          count,
+          // Without the sections, the space used is said here, where they said it.
+          options.chrome === false && spaceText() && h('span', null, ` · ${spaceText()}`),
+          storage && h('span', { class: 'rf-where', title: t('location') }, ` · ${storage}`),
+        ),
         zipping
           ? [
               h('span', null, t('zipping', { name: zipping.name, pct: Math.round((zipping.read / Math.max(1, zipping.size)) * 100) })),
@@ -4957,6 +5037,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   return {
     client,
+    go: (next, to = null) => go(next, to),
+    search: (value) => {
+      if (section !== 'files' && section !== 'shared' && value.trim()) go('files');
+      setTyped(value);
+    },
+    upload: (what = 'files') => element.querySelector<HTMLInputElement>(what === 'folder' ? '.rf-folder-file' : '.rf-file')?.click(),
+    newFolder: () => ((dialog = { kind: 'folder', name: '' }), render()),
+    openSettings: () => openSettings(),
     update(next) {
       options = { ...options, ...next };
       retranslate();

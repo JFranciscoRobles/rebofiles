@@ -4,6 +4,28 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## 0.9.0 — 2026-10-27
+
+### Added
+
+- **Inside your application's own bar.** `chrome: false` leaves out the
+  drive's bar (title, search, notifications, settings) and its sections, the
+  bar at the foot of a phone among them, for an application that puts its own
+  around it. It drives the drive with `go(section, folder)`, `search(query)`,
+  `upload()`, `newFolder()` and `openSettings()` of what `mountDrive` returns,
+  and shows where it is from `onState`: the section, the folder and its path,
+  what is searched, how many are shown, the space used, whether anything came
+  through a request and how much is to be looked at. In React,
+  `<FileDrive chrome={false} controls={ref} onState={…} />`.
+  Without the sections, the space used is said in the bar at the foot, with
+  how many are shown and where the files are kept.
+
+### Fixed
+
+- **Dialogs centred under a reset of the page.** A page that takes every
+  margin off (Tailwind's reset does) left the drive's dialogs at its top
+  left corner: they are centred by themselves.
+
 ## 0.8.1 — 2026-10-27
 
 ### Fixed

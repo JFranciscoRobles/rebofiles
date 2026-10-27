@@ -2,7 +2,7 @@
 // from, and the client of the server's routes. Each name is here on purpose;
 // a change to this list is a change of the API.
 
-export { type FileDriveProps, FileDrive } from './FileDrive';
+export { type DriveControls, type FileDriveProps, FileDrive } from './FileDrive';
 export { type SharedLinkProps, SharedLink } from './SharedLink';
 export {
   type DriveProviderProps,
@@ -23,6 +23,8 @@ export {
 export {
   type ClientOptions,
   type DriveClient,
+  type DriveState,
+  type Section,
   type Listing,
   type UploadOptions,
   type UploadProgress,
