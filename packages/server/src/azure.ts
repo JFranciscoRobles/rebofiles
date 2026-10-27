@@ -146,6 +146,21 @@ export function azureStorage(options: AzureOptions): Storage {
       if (answer.status === 404) throw new Error(`Azure has nothing at ${from} to copy part ${part.number} of.`);
     },
 
+    async copy(from, to, size, type) {
+      // An empty one is written as it is: there is no range of it to read.
+      if (size === 0) return this.write!(to, new Uint8Array(), type);
+      // A block at a time read by Azure from the blob there (Put Block From URL), then the blob made of them.
+      const source = signed(from, 'r', 600);
+      const parts = partsOf(size);
+      for (const part of parts) {
+        await ask('PUT', signed(to, 'w', 60, { comp: 'block', blockid: blockOf(part.number) }), {
+          headers: { 'x-ms-copy-source': source, 'x-ms-source-range': `bytes=${part.from}-${part.to - 1}`, 'content-length': '0' },
+        });
+      }
+      const xml = `<?xml version="1.0" encoding="utf-8"?><BlockList>${parts.map((part) => `<Latest>${blockOf(part.number)}</Latest>`).join('')}</BlockList>`;
+      await ask('PUT', signed(to, 'w', 60, { comp: 'blocklist' }), { body: xml, headers: { 'content-type': 'application/xml', 'x-ms-blob-content-type': type } });
+    },
+
     async write(key, bytes, type) {
       await ask('PUT', signed(key, 'cw', 60), { body: bytes as Uint8Array<ArrayBuffer>, headers: { 'x-ms-blob-type': 'BlockBlob', 'content-type': type } });
     },

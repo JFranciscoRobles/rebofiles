@@ -4,7 +4,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE } from '../team';
+import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE, WEBHOOK_CODE } from '../team';
 
 const hrefOf = (slug: string) => docHref('es', slug);
 
@@ -126,6 +126,29 @@ export const observe: DocPage = {
           <P>
             Pasado uno, la respuesta es un <C>429 rate-limited</C> con <C>Retry-After</C>, y el drive lo dice en el idioma de cada persona. <C>limits: false</C> para ninguno.
           </P>
+        </>
+      ),
+    },
+    {
+      id: 'webhooks',
+      title: 'Webhooks',
+      badge: 'HTTP',
+      color: 'green',
+      lead: 'Cada cambio avisado a otro servicio por HTTP, como onChange se lo dice a tu código: sin retrasar nunca la petición que lo hizo.',
+      body: (
+        <>
+          <Code code={WEBHOOK_CODE} />
+          <List
+            items={[
+              <>
+                El cuerpo: <C>id</C> (el mismo en cada intento), <C>action</C>, <C>at</C>, <C>by</C>, la <C>entry</C> resumida y la <C>activity</C>. Cabeceras <C>X-Rebofiles-Event</C>,{' '}
+                <C>X-Rebofiles-Delivery</C>, <C>X-Rebofiles-Timestamp</C> y <C>X-Rebofiles-Signature</C>, un HMAC-SHA256 de la marca de tiempo y el cuerpo.
+              </>,
+              <>
+                Se reintenta al segundo y a los cuatro, pero no cuando se rechaza por lo que es (4xx); a <C>onFailure</C> se le avisa del que no llegó.
+              </>,
+            ]}
+          />
         </>
       ),
     },

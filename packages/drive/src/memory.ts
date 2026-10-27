@@ -143,6 +143,25 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
     entry: (entryId) => run(() => ({ entry: core.getEntry(drive, entryId), path: core.ancestors(drive, entryId), trashed: core.isTrashed(drive, entryId) })),
     recent: () => run(() => core.recent(drive)),
     trash: () => run(() => core.trash(drive, options.top === 'everyone' ? undefined : user)),
+    copy: (entryId, parent) =>
+      change((current) => {
+        const source = core.getFile(current, entryId);
+        const copyId = id();
+        const versionId = id();
+        const was = source.versions[0];
+        const key = `${copyId}/${versionId}`;
+        blobs.set(key, blobs.get(was.key) ?? new Blob([], { type: source.type }));
+        const renditions = (was.renditions ?? []).map((r) => {
+          const at = `${copyId}/${versionId}@${r.size}`;
+          blobs.set(at, blobs.get(r.key) ?? new Blob());
+          return { ...r, key: at };
+        });
+        const version = { id: versionId, key, size: was.size, ...(was.placeholder ? { placeholder: was.placeholder } : {}), ...(renditions.length ? { renditions } : {}) };
+        const next = core.copyFile(current, entryId, { id: copyId, parent: parent === undefined ? source.parent : parent, version }, context());
+        const kept = texts.get(entryId);
+        if (kept?.version === was.id) texts.set(copyId, { version: versionId, text: kept.text });
+        return { drive: next, answer: core.getFile(next, copyId) };
+      }),
     setFields: (entryId, fields) => change((current) => one(core.setFields(current, entryId, fields, context()), entryId)),
     withField: (name, value) => run(() => [...drive.entries.values()].filter((entry) => entry.fields?.[name] === value && !core.isTrashed(drive, entry.id))),
     adminUsage: async () => {
@@ -257,13 +276,24 @@ export function createMemoryClient(options: MemoryOptions = {}): MemoryClient {
           settings: mine,
         };
       }),
-    share: (entryId, who, role) => change((current) => one(core.share(current, entryId, who, role, context()), entryId)),
+    share: (entryId, who, role, days) =>
+      change((current) => {
+        const at = context();
+        const until = typeof days === 'number' ? new Date(Date.parse(at.at) + days * 86_400_000).toISOString() : days;
+        return one(core.share(current, entryId, who, role, at, until), entryId);
+      }),
     unshare: (entryId, who) => change((current) => one(core.unshare(current, entryId, who), entryId)),
     // No server to sign it: a link's token is its id, and nothing outside the page reads it.
     // A password is not kept here: with no server, there is no one to ask for it.
     createLink: (entryId, days = 7, how = {}) =>
       change((current) => {
-        const link = { id: id(), expires: new Date(Date.parse(context().at) + days * 86_400_000).toISOString(), locked: Boolean(how.password), uses: how.once ? 1 : undefined };
+        const link = {
+          id: id(),
+          expires: new Date(Date.parse(context().at) + days * 86_400_000).toISOString(),
+          locked: Boolean(how.password),
+          uses: how.once ? 1 : undefined,
+          ...(how.uploads ? { uploads: how.uploads } : {}),
+        };
         const next = core.addLink(current, entryId, link, context());
         return { drive: next, answer: { entry: core.getEntry(next, entryId), token: link.id } };
       }),

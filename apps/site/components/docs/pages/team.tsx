@@ -131,6 +131,20 @@ export const redisLimiter: Limiter = {
   },
 };`;
 
+export const WEBHOOK_CODE = `import { everyChange, verifyWebhook, webhook } from '@rebofiles/server';
+
+createDriveHandler({
+  ...options,
+  // Each change POSTed as JSON, signed, tried again three times: only these actions, or all.
+  onChange: everyChange(
+    webhook({ url: 'https://crm.example/hooks/files', secret: process.env.HOOK_SECRET!, actions: ['uploaded', 'version', 'deleted'] }),
+    ({ activity }) => audit(activity),
+  ),
+});
+
+// Where it arrives: the body as it came, checked before it is trusted.
+const ok = verifyWebhook(process.env.HOOK_SECRET!, await request.text(), request.headers);`;
+
 export const observe: DocPage = {
   title: 'Hooks, logs and limits',
   description: 'The server telling your application what is done (onChange), what went wrong (logger) and how long each route takes (OpenTelemetry), and how much each may ask.',
@@ -191,6 +205,29 @@ export const observe: DocPage = {
           <P>
             Past one, the answer is a <C>429 rate-limited</C> with <C>Retry-After</C>, and the drive says so in each person’s language. <C>limits: false</C> for none.
           </P>
+        </>
+      ),
+    },
+    {
+      id: 'webhooks',
+      title: 'Webhooks',
+      badge: 'HTTP',
+      color: 'green',
+      lead: 'Each change told to another service over HTTP, as onChange tells your code: never holding up the request that made it.',
+      body: (
+        <>
+          <Code code={WEBHOOK_CODE} />
+          <List
+            items={[
+              <>
+                The body: <C>id</C> (the same in each try), <C>action</C>, <C>at</C>, <C>by</C>, the <C>entry</C> in short, and the <C>activity</C>. Headers <C>X-Rebofiles-Event</C>,{' '}
+                <C>X-Rebofiles-Delivery</C>, <C>X-Rebofiles-Timestamp</C> and <C>X-Rebofiles-Signature</C>, an HMAC-SHA256 of the timestamp and the body.
+              </>,
+              <>
+                Tried again after a second and after four, but not when refused for what it is (4xx); <C>onFailure</C> is told of one that did not arrive.
+              </>,
+            ]}
+          />
         </>
       ),
     },

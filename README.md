@@ -23,7 +23,9 @@ assistant; changes shown as they happen and folders of thousands, the drive
 read a piece at a time; comments; groups; pictures and text of PDFs made by
 the server; files checked by their bytes and by ClamAV; limits; retention,
 legal holds and a person's data exported; only the changed parts of a file
-sent; starred files; fields of your own on each entry; notifications in the
+sent; copies; requests for files through a link; shares that end; webhooks;
+frames of videos made by the server; Word versions compared; starred
+files; fields of your own on each entry; notifications in the
 drive; the space of each person for who looks after it; Excel workbooks shown
 and searched; pictures read with OCR; Google Cloud Storage and Azure besides
 S3; Word documents created, written by several at once and downloaded as PDF;

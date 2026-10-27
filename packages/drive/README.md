@@ -19,7 +19,7 @@ npm install @rebofiles/drive
 
 ```ts
 import { mountDrive } from '@rebofiles/drive';
-import { newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
+import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs'; // needs @rebodocs/core and @rebodocs/viewer
 
 const drive = mountDrive(document.getElementById('files')!, {
   base: '/api/files',
@@ -32,6 +32,7 @@ const drive = mountDrive(document.getElementById('files')!, {
   pictureDocument: pictureOfDocx, // that picture, made at upload
   textDocument: textOfDocx, // what is written in it, to find it by
   newDocument: newDocx, // "Create document": an empty one, named, then opened
+  compareDocument: compareDocx, // "Compare" in the history: what changed, over its pages
   onOpenDocument: (file, url) => openInRebodocs(file, url),
   fields: 'edit', // your application's fields of an entry, changed in its details
 });
@@ -61,6 +62,10 @@ at a time, and Word documents in their pages with `viewDocument: viewDocx`
 (from `@rebofiles/drive/rebodocs`, with `@rebodocs/viewer` installed), printed
 or downloaded as a PDF; ← and → go to the next. `onOpen` opens files your own
 way instead.
+
+Make a copy is in the menu of a file; the dialog of sharing shares for a
+while, and makes links of a folder that take files, or only take them (a
+request for files, whose page `mountSharedLink` sends them from).
 
 Starred holds what each person stars, the bell over the drive what was shared
 with them and the comments that name them, and Settings → People, for who may

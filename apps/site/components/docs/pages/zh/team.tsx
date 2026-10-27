@@ -3,7 +3,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Callout, Code, type DocPage, List, P, Table } from '../../ui';
-import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE } from '../team';
+import { COMMENTS_HOOK, EXPORT_CODE, FIELDS_CODE, HOOKS_CODE, LIMITS_CODE, ON_COMMENT, REDIS_CODE, RETENTION_CODE, STARRED_CODE, WEBHOOK_CODE } from '../team';
 
 const hrefOf = (slug: string) => docHref('zh', slug);
 
@@ -122,6 +122,29 @@ export const observe: DocPage = {
           <P>
             超过限制时返回 <C>429 rate-limited</C> 并带有 <C>Retry-After</C>，网盘会用每个人的语言提示。设为 <C>limits: false</C> 则不限制。
           </P>
+        </>
+      ),
+    },
+    {
+      id: 'webhooks',
+      title: 'Webhook',
+      badge: 'HTTP',
+      color: 'green',
+      lead: '通过 HTTP 把每次更改告知其他服务，就像 onChange 告诉你的代码一样：从不拖慢触发更改的请求。',
+      body: (
+        <>
+          <Code code={WEBHOOK_CODE} />
+          <List
+            items={[
+              <>
+                请求体：<C>id</C>（每次重试相同）、<C>action</C>、<C>at</C>、<C>by</C>、简要的 <C>entry</C> 和 <C>activity</C>。请求头 <C>X-Rebofiles-Event</C>、<C>X-Rebofiles-Delivery</C>、
+                <C>X-Rebofiles-Timestamp</C> 和 <C>X-Rebofiles-Signature</C>（时间戳和请求体的 HMAC-SHA256）。
+              </>,
+              <>
+                一秒后和四秒后重试，但因请求本身被拒绝（4xx）时不重试；未送达时会通知 <C>onFailure</C>。
+              </>,
+            ]}
+          />
         </>
       ),
     },

@@ -5,7 +5,7 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
 import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ES } from '../team';
 
@@ -415,6 +415,38 @@ export const sharing: DocPage = {
             ]}
           />
           <Code lang="tsx" code={SHARE} />
+        </>
+      ),
+    },
+    {
+      id: 'for-a-while',
+      title: 'Por un tiempo',
+      badge: 'Hasta',
+      color: 'purple',
+      lead: 'Compartido con alguien por un día, una semana, un mes o tres: pasado ese tiempo no le da nada, como si se hubiera quitado, y ya no está en su Compartido conmigo.',
+      body: (
+        <>
+          <Code code={SHARE_UNTIL} />
+          <P>El diálogo y los detalles dicen hasta cuándo; uno terminado lo dice, para compartirlo de nuevo o quitarlo.</P>
+        </>
+      ),
+    },
+    {
+      id: 'requests-for-files',
+      title: 'Solicitudes de archivos',
+      badge: 'Subidas',
+      color: 'green',
+      lead: 'Un enlace de una carpeta puede recibir archivos: “Ver y añadir archivos”, o “Solo enviar archivos”, una solicitud que no muestra nada de lo que hay. Quien lo abre sin sesión dice quién es, si quiere, y envía.',
+      body: (
+        <>
+          <Code code={REQUEST_CODE} />
+          <List
+            items={[
+              'Lo que llega es del dueño de la carpeta, cuenta en su espacio y dice quién lo envió (un campo “from”). Al dueño se le avisa en la campana.',
+              'Sube como cualquier archivo, por partes directo al almacenamiento y revisado como cualquiera; el enlace no puede hacer nada más.',
+              'Su vencimiento, su contraseña y sus usos valen como en cualquier enlace.',
+            ]}
+          />
         </>
       ),
     },

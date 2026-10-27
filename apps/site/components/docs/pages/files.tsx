@@ -219,6 +219,9 @@ export const previews: DocPage = {
               <>
                 <C>docx()</C>, <C>xlsx()</C> and <C>text()</C>: what is written in a Word document, with Rebodocs, in the cells of a workbook, and in a file of text.
               </>,
+              <>
+                <C>video()</C>, given to <C>deriveAll(…)</C>: a frame of a video in the drive’s sizes, with ffmpeg.
+              </>,
             ]}
           />
           <P>
@@ -299,6 +302,14 @@ export const search: DocPage = {
   ],
 };
 
+export const COPY_CODE = `const copy = await client.copy(file.id);            // beside it: "budget (2).xlsx"
+const mine = await client.copy(file.id, folder.id);   // or into a folder of one's own`;
+
+export const COMPARE_CODE = `import { compareDocx } from '@rebofiles/react/rebodocs';
+
+// "Compare" on each version of a Word document but the current, in its history.
+<FileDrive base="/api/files" viewDocument={viewDocx} compareDocument={compareDocx} />`;
+
 export const SPACE = `createDriveHandler({
   ...options,
   // Or from the settings of the drive, under Storage, for whoever may configure it.
@@ -321,6 +332,22 @@ export const versions: DocPage = {
           A file uploaded where one of its name is, when “Replace” is chosen, or saved from Rebodocs, is its next version; the one before stays. Restoring one makes it the newest again, as a new
           version with the same bytes, so the storage is not written and the restore too can be undone.
         </P>
+      ),
+    },
+    {
+      id: 'a-copy',
+      title: 'A copy',
+      badge: 'Copy',
+      color: 'purple',
+      lead: 'Make a copy, in the menu or the details of a file: a file of its own, beside it with “(2)” in its name, its bytes copied in the storage itself.',
+      body: (
+        <>
+          <Code code={COPY_CODE} />
+          <P>
+            The copy is the one who made it’s, and counts against their space; of a file shared to read, it goes to their own top. Its smaller pictures and its text go with it. S3, Azure and the disk
+            copy the bytes themselves; Google Cloud Storage has them read and written by the server, up to 100 MB.
+          </P>
+        </>
       ),
     },
     {
@@ -504,6 +531,14 @@ export const word: DocPage = {
           </P>
         </>
       ),
+    },
+    {
+      id: 'compare-versions',
+      title: 'Compare two versions',
+      badge: 'History',
+      color: 'blue',
+      lead: 'What changed in a Word document between a version and the one now, over its pages: struck through in red what was taken out, underlined in green what was put in, one change after another.',
+      body: <Code lang="tsx" code={COMPARE_CODE} />,
     },
     {
       id: 'for-an-assistant',

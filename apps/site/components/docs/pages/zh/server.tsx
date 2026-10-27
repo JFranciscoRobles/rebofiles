@@ -4,7 +4,7 @@
 import { docHref } from '@/lib/site';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, Trouble, withCode } from '../../ui';
-import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, ROUTE, SHARE, optionId } from '../server';
+import { AUTHORIZE, AZURE_CODE, CORS, ENV, GCS_CODE, NODE, ON_SHARE, ORIGINS, POSTGRES, REQUEST_CODE, ROUTE, SHARE, SHARE_UNTIL, optionId } from '../server';
 import { ADMIN_CODE, GROUPS_CODE, NOTICES_CODE } from '../team';
 import { SCALE_NUMBERS_ZH } from '../team';
 
@@ -402,6 +402,38 @@ export const sharing: DocPage = {
             ]}
           />
           <Code lang="tsx" code={SHARE} />
+        </>
+      ),
+    },
+    {
+      id: 'for-a-while',
+      title: '限时共享',
+      badge: '期限',
+      color: 'purple',
+      lead: '与某人共享一天、一周、一个月或三个月：到期后不再授予任何权限，如同已撤销，也不再出现在其“与我共享”中。',
+      body: (
+        <>
+          <Code code={SHARE_UNTIL} />
+          <P>对话框和详情会显示到期时间；已结束的会标明，可重新共享或删除。</P>
+        </>
+      ),
+    },
+    {
+      id: 'requests-for-files',
+      title: '文件收集',
+      badge: '上传',
+      color: 'green',
+      lead: '文件夹的链接可以接收文件：“查看并添加文件”，或“仅发送文件”（不显示文件夹中任何内容的文件收集）。打开链接的人无需登录，可选填姓名后发送。',
+      body: (
+        <>
+          <Code code={REQUEST_CODE} />
+          <List
+            items={[
+              '收到的文件属于文件夹的所有者，计入其空间，并注明发送者（字段 “from”）。所有者会在铃铛中收到通知。',
+              '与其他文件一样分片直接上传到存储并接受检查；该链接不能做其他任何事。',
+              '有效期、密码和使用次数与其他链接相同。',
+            ]}
+          />
         </>
       ),
     },

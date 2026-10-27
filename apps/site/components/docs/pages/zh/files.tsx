@@ -2,7 +2,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Code, type DocPage, List, P, Table } from '../../ui';
-import { DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
+import { COMPARE_CODE, COPY_CODE, DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
 import { DERIVE_CODE, OCR_CODE } from '../team';
 
 const to = (slug: string) => docHref('zh', slug);
@@ -202,6 +202,9 @@ export const previews: DocPage = {
               <>
                 <C>docx()</C>、<C>xlsx()</C> 和 <C>text()</C>：用 Rebodocs 读取 Word 文档的文字，读取 Excel 工作簿的单元格，以及文本文件的文字。
               </>,
+              <>
+                <C>video()</C>（传给 <C>deriveAll(…)</C>）：用 ffmpeg 截取视频的一帧，生成网盘的各个尺寸。
+              </>,
             ]}
           />
           <P>页面会说明自己生成了什么，服务器只生成其余部分；每个库在首次需要时才加载，因此只需安装用到的库。页面会根据事件显示新生成的内容。</P>
@@ -293,6 +296,19 @@ export const versions: DocPage = {
           当上传位置已有同名文件并选择“替换”，或从 Rebodocs
           保存时，新文件会成为它的下一个版本，之前的版本保留。恢复某个版本会让它重新成为最新版本——以相同内容创建一个新版本，因此不会写入存储，恢复操作本身也可以撤销。
         </P>
+      ),
+    },
+    {
+      id: 'a-copy',
+      title: '副本',
+      badge: '副本',
+      color: 'purple',
+      lead: '在文件的菜单或详情中“创建副本”：一个独立的文件，放在原文件旁边，名称带“(2)”，内容在存储中直接复制。',
+      body: (
+        <>
+          <Code code={COPY_CODE} />
+          <P>副本属于创建者，计入其空间；只读共享的文件的副本放在其自己的顶层。缩略图和文字也会一并复制。S3、Azure 和磁盘由存储自己复制；Google Cloud Storage 则由服务器读取再写入，最多 100 MB。</P>
+        </>
       ),
     },
     {
@@ -429,6 +445,14 @@ export const word: DocPage = {
           </P>
         </>
       ),
+    },
+    {
+      id: 'compare-versions',
+      title: '比较两个版本',
+      badge: '历史',
+      color: 'blue',
+      lead: 'Word 文档在某个版本与当前版本之间的变化，显示在页面上：红色删除线表示删除的内容，绿色下划线表示添加的内容，可逐个查看。',
+      body: <Code lang="tsx" code={COMPARE_CODE} />,
     },
     {
       id: 'for-an-assistant',

@@ -6,9 +6,9 @@
 // upload, a restore from the trash) is made free with "(2)".
 
 import { DriveError } from './errors';
-import { type Context, type Drive, type Entry, type EntryId, FOLDER_COLORS, type FileEntry, type FolderColor, type FolderEntry, type PartHashes, type Version } from './model';
+import { type Context, type Drive, type Entry, type EntryId, FOLDER_COLORS, type FileEntry, type FolderColor, type FolderEntry, type Version } from './model';
 import { checkName, takenBy, uniqueName } from './names';
-import { getEntry, getFolder, isTrashed, isWithin, subtree, trash } from './tree';
+import { getEntry, getFile, getFolder, isTrashed, isWithin, subtree, trash } from './tree';
 
 export interface NameOptions {
   /** What to do when the name is taken in the folder: refuse with 'name-taken' (the default), or add "(2)". */
@@ -64,8 +64,10 @@ export function createFolder(drive: Drive, folder: NewFolder, context: Context):
 
 export interface NewFile extends NewFolder {
   type: string;
+  /** Whose it is: the one who uploaded it unless said, as the owner of a folder a link put it in. */
+  owner?: string;
   /** Its first version: where the bytes were put, and how many. */
-  version: { id: string; key: string; size: number; sha256?: string; parts?: PartHashes };
+  version: Omit<Version, 'at' | 'by'>;
 }
 
 /** A file uploaded. Its name is made free with "(2)", as a second upload of the same file should not replace the first. */
@@ -75,9 +77,9 @@ export function addFile(drive: Drive, file: NewFile, context: Context): Drive {
   const entry: FileEntry = {
     kind: 'file',
     id: file.id,
-    name: free(drive, file.parent, file.name, undefined, context.by, { ifTaken: 'keep-both' }),
+    name: free(drive, file.parent, file.name, undefined, file.owner ?? context.by, { ifTaken: 'keep-both' }),
     parent: file.parent,
-    owner: context.by,
+    owner: file.owner ?? context.by,
     created: context.at,
     modified: context.at,
     modifiedBy: context.by,
@@ -85,6 +87,17 @@ export function addFile(drive: Drive, file: NewFile, context: Context): Drive {
     versions: [{ ...file.version, at: context.at, by: context.by }],
   };
   return put(drive, entry);
+}
+
+/**
+ * A copy of a file, as a new file of its own: its current version alone, under `version.key` (bytes the storage has
+ * copied there), with its smaller pictures as given; in `parent`, its name with "(2)" when taken there. The copy is the
+ * one who made it's, as a file they uploaded would be.
+ */
+export function copyFile(drive: Drive, id: EntryId, copy: { id: EntryId; parent: EntryId | null; version: Omit<Version, 'at' | 'by'> }, context: Context): Drive {
+  const file = getFile(drive, id);
+  if (isTrashed(drive, id)) throw new DriveError('in-trash', `${file.name} is in the trash`);
+  return addFile(drive, { id: copy.id, name: file.name, parent: copy.parent, type: file.type, version: copy.version }, context);
 }
 
 /** A folder given a colour, or its own again with null. Not a change of what is in it: it is not modified by it. */

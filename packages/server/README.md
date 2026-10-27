@@ -153,6 +153,14 @@ pdf.js, the text of Word documents, Excel workbooks and text files. `ocr()`
 reads pictures and scanned PDFs with Tesseract, given to `deriveAll(…)`. Each
 library is optional, imported when first needed.
 
+## Copies, requests for files, shares for a while, webhooks
+
+`POST /entries/:id/copy` copies a file's bytes in the storage; a link of a
+folder with `uploads: 'also' | 'only'` takes files (`/links/:token/uploads`),
+the owner's; a share may last `days`; `webhook({ url, secret })` as
+`onChange` POSTs each change, signed (`verifyWebhook`). `video()` makes a
+frame of a video with ffmpeg.
+
 ## Starred, fields, notifications, the whole drive
 
 `/starred` and `/entries/:id/star`, each person's own; fields of your

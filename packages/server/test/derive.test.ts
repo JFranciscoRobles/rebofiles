@@ -2,7 +2,7 @@
 // picture and of a PDF's first page, their placeholder, and what is written in
 // a PDF and a text, found by a search; nothing of what the page says it made.
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -11,7 +11,8 @@ import type { FileEntry } from '@rebofiles/core';
 import { createDriveClient } from '@rebofiles/drive';
 import { type DriveServerOptions, createDriveHandler, diskStorage, memoryMetadata } from '../src';
 import { sampleXlsx } from '../../../tools/sample-xlsx';
-import { deriveAll, ocr, pdf, pictures, text } from '../src/derive';
+import { execFileSync } from 'node:child_process';
+import { deriveAll, ocr, pdf, pictures, text, video } from '../src/derive';
 
 let folder = '';
 beforeAll(async () => {
@@ -124,6 +125,28 @@ describe('what the server makes of a file', () => {
     await client.upload(new File([png], 'receipt.png', { type: 'image/png' }));
     await handle.idle();
     expect((await client.searchText('invoice 4471')).map((f) => f.entry.name)).toEqual(['receipt.png']);
+  });
+
+  // ffmpeg is the system's, so it is tried where there is one.
+  const ffmpeg = (() => {
+    try {
+      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  it.skipIf(!ffmpeg)('of a video, a frame of it in the drive’s sizes, and its placeholder', { timeout: 60_000 }, async () => {
+    const { handle, client } = drive({ derive: deriveAll(pictures(), video()) });
+    const made = join(folder, 'clip.mp4');
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=duration=2:size=640x360:rate=10', '-pix_fmt', 'yuv420p', made]);
+    const bytes = await readFile(made);
+    const file = await client.upload(new File([bytes], 'clip.mp4', { type: 'video/mp4' }));
+    await handle.idle();
+    const version = ((await client.entry(file.id)).entry as FileEntry).versions[0];
+    expect(version.renditions?.map((r) => r.size)).toEqual([160, 480]);
+    expect(version.renditions?.[1]).toMatchObject({ width: 480, height: 270, type: 'image/jpeg' });
+    expect(version.placeholder).toMatch(/^data:image\/webp;base64,/);
   });
 
   it('is not made, and the upload is as it was, when what makes it fails', async () => {

@@ -206,3 +206,23 @@ describe('groups', () => {
     expect(accessOf(drive, 'q4', carl)).toBe('viewer');
   });
 });
+
+describe('a share with an end', () => {
+  it('gives nothing past it, and is not in Shared with me', () => {
+    // Made on October 1st of 2026 for a day: over by now.
+    const ended = share(demoDrive(), 'clients', 'luis', 'editor', ana, '2026-10-02T09:00:00.000Z');
+    expect(accessOf(ended, 'contract', 'luis')).toBeNull();
+    expect(sharedWith(ended, 'luis')).toEqual([]);
+    const lasting = share(demoDrive(), 'clients', 'luis', 'editor', ana, '2999-01-01T00:00:00.000Z');
+    expect(accessOf(lasting, 'contract', 'luis')).toBe('editor');
+  });
+
+  it('keeps its end when its role changes, and loses it for good with null', () => {
+    let drive = share(demoDrive(), 'clients', 'luis', 'editor', ana, '2999-01-01T00:00:00.000Z');
+    drive = share(drive, 'clients', 'luis', 'viewer', ana);
+    expect(drive.entries.get('clients')?.shares?.[0]).toMatchObject({ role: 'viewer', until: '2999-01-01T00:00:00.000Z' });
+    drive = share(drive, 'clients', 'luis', 'viewer', ana, null);
+    expect(drive.entries.get('clients')?.shares?.[0].until).toBeUndefined();
+    expect(() => share(drive, 'clients', 'luis', 'viewer', ana, '2020-01-01T00:00:00.000Z')).toThrow('ends after');
+  });
+});

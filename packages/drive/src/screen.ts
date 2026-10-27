@@ -26,6 +26,7 @@ import {
   type Sheet,
   readXlsx,
   splitName,
+  shareHolds,
   versionNumber,
 } from '@rebofiles/core';
 import { refusalText } from './refusals';
@@ -97,6 +98,11 @@ export interface DriveOptions {
    * `onOpenDocument`, or else in the viewer.
    */
   newDocument?: () => Uint8Array | Promise<Uint8Array>;
+  /**
+   * What changed in a Word document from one version to another, shown in `element`: `compareDocx` of
+   * `@rebofiles/drive/rebodocs`. Given, each version but the current has "Compare" in the history.
+   */
+  compareDocument?: (element: HTMLElement, before: Uint8Array, after: Uint8Array, context: { language: string; before: string; after: string }) => ShownDocument | Promise<ShownDocument>;
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -143,7 +149,7 @@ type Dialog =
   | { kind: 'fields'; entry: Entry; text: string }
   | { kind: 'rename'; entry: Entry; name: string }
   | { kind: 'move'; entries: Entry[]; at: EntryId | null }
-  | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean }
+  | { kind: 'share'; entry: Entry; who: string; role: Role; days?: number; password?: string; once?: boolean; lasts?: number; uploads?: 'also' | 'only' }
   | { kind: 'delete'; entries: Entry[] }
   | { kind: 'empty' }
   | null;
@@ -352,6 +358,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   // What the one asking starred, to mark it wherever it is shown.
   const stars = resource(() => client.starred().then((entries) => new Set(entries.map((entry) => entry.id))));
   const isStarred = (id: EntryId) => stars('').value?.has(id) ?? false;
+  /** A copy of a file beside it, selected once it is there. */
+  const makeCopy = (file: FileEntry) =>
+    attempt(
+      async () => {
+        const made = await client.copy(file.id);
+        select(made.id);
+      },
+      t('copied', { name: file.name }),
+    );
   const toggleStar = (entry: Entry) => {
     const on = !isStarred(entry.id);
     return attempt(() => client.star(entry.id, on), on ? t('nowStarred', { name: entry.name }) : t('nowUnstarred', { name: entry.name }));
@@ -1005,7 +1020,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   };
   /** Who a share names, as a person reads it: everyone, a group by its name, or someone by their id. */
-  const whoName = (who: string) => (who === EVERYONE ? t('everyone') : isGroup(who) ? t('groupNamed', { name: who.slice(6) }) : who);
+  const whoName = (who: string) => (who === EVERYONE ? t('everyone') : isGroup(who) ? t('groupNamed', { name: who.slice(6) }) : who.startsWith('link:') ? t('throughLink') : who);
   const roleName = (role: Role) => t(role === 'viewer' ? 'roleViewer' : role === 'commenter' ? 'roleCommenter' : 'roleEditor');
   /** A kind as a person reads it, for putting entries of one kind together. */
   const typeLabel = (entry: Entry) => (entry.kind === 'folder' ? t('folder') : typeName(entry));
@@ -1416,6 +1431,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
           act(t('move'), 'move', () => ((dialog = { kind: 'move', entries: many, at: null }), (movedInto = false), render())),
           one && act(t('share'), 'users', () => ((dialog = { kind: 'share', entry: one, who: '', role: 'viewer' }), render())),
           one && act(isStarred(one.id) ? t('unstar') : t('star'), 'star', () => void toggleStar(one)),
+          file && !inTrash && act(t('makeCopy'), 'copy', () => void makeCopy(file)),
           act(t('moveToTrash'), 'trash', () => void each(many, (entry) => client.moveToTrash(entry.id), 'trashedMany'), true),
           many.every((entry) => entry.kind === 'folder') && swatches(many as FolderEntry[], 'menuitemradio', () => closeContext(false)),
         ];
@@ -1606,6 +1622,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 button(withIcon('move', t('move')), () => ((dialog = { kind: 'move', entries: [entry], at: null }), (movedInto = false), render()), { class: 'rf-btn' }),
                 button(withIcon('users', t('share')), () => ((dialog = { kind: 'share', entry, who: '', role: 'viewer' }), render()), { class: 'rf-btn' }),
                 button(withIcon('star', isStarred(entry.id) ? t('unstar') : t('star')), () => void toggleStar(entry), { class: 'rf-btn', 'aria-pressed': isStarred(entry.id) }),
+                file && button(withIcon('copy', t('makeCopy')), () => void makeCopy(file), { class: 'rf-btn' }),
                 button(withIcon('trash', t('moveToTrash')), () => void each([entry], (one) => client.moveToTrash(one.id), 'trashedMany'), {
                   class: 'rf-btn rf-text rf-danger',
                 }),
@@ -1653,10 +1670,19 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                       ),
                       i === 0
                         ? h('span', { class: 'rf-chip' }, t('current'))
-                        : !inTrash &&
-                            button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), {
-                              class: 'rf-link',
-                            }),
+                        : [
+                            // What changed from it to the version now, in the viewer.
+                            options.compareDocument &&
+                              kindOf(file) === 'docx' &&
+                              button(t('compare'), () => ((comparing = version.id), view(file.id)), {
+                                class: 'rf-link',
+                                'aria-label': `${t('compare')} · ${t('version', { n: versionNumber(file, version.id) })}`,
+                              }),
+                            !inTrash &&
+                              button(t('restore'), () => void attempt(() => client.restoreVersion(file.id, version.id), t('versionRestored', { n: versionNumber(file, version.id) })), {
+                                class: 'rf-link',
+                              }),
+                          ],
                     ),
                   ),
                 )
@@ -1668,8 +1694,15 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                   !file && !inTrash && row(t('folderColor'), swatches([entry as FolderEntry], 'radio')),
                   row(t('owner'), entry.owner),
                   entry.hold ? row(t('onHold'), t('onHoldHint', { by: entry.hold.by }), entry.hold.reason) : null,
-                  entry.shares?.length ? row(t('sharedWith'), entry.shares.map((s) => `${whoName(s.with)} · ${roleName(s.role)}`).join(', ')) : null,
-                  row(t('modified'), `${formatDate(entry.modified, locale)} · ${entry.modifiedBy}`),
+                  entry.shares?.length
+                    ? row(
+                        t('sharedWith'),
+                        entry.shares
+                          .map((s) => `${whoName(s.with)} · ${roleName(s.role)}${s.until ? ` · ${shareHolds(s) ? t('linkUntil', { date: formatDate(s.until, locale) }) : t('shareEnded')}` : ''}`)
+                          .join(', '),
+                      )
+                    : null,
+                  row(t('modified'), `${formatDate(entry.modified, locale)} · ${whoName(entry.modifiedBy)}`),
                   where && row(t('location'), where),
                   options.fields !== false && Object.entries(entry.fields ?? {}).map(([name, value]) => row(name, value)),
                   file && row(t('key'), h('code', null, file.versions[0].key)),
@@ -1809,7 +1842,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   }
   const activityText = (a: Activity) => {
-    const by = a.by === 'trash' ? t('theTrash') : a.by;
+    const by = a.by === 'trash' ? t('theTrash') : a.by.startsWith('link:') ? t('throughLink') : a.by;
     const values = { by, name: a.name, was: a.was ?? '', with: a.with ? whoName(a.with) : '', role: a.role ? roleName(a.role) : '' };
     const key = (
       {
@@ -2017,19 +2050,22 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   }
 
   /** Who an entry is shared with and as what, and its links: each change made at once, the dialog staying open. */
-  function shareDialog(of: Entry, who: string, role: Role, made: { days?: number; password?: string; once?: boolean } = {}) {
+  function shareDialog(of: Entry, who: string, role: Role, made: { days?: number; password?: string; once?: boolean; lasts?: number; uploads?: 'also' | 'only' } = {}) {
     const found = detail(of.id);
     const entry = found.current && found.value ? found.value.entry : of;
     const label = t('shareTitle', { name: of.name });
     const address = options.linkAddress ?? defaultAddress;
     const copy = async (token: string) => navigator.clipboard.writeText(address(token));
-    const setShare = (change: Partial<{ who: string; role: Role; days: number; password: string; once: boolean }>) => {
+    const setShare = (change: Partial<{ who: string; role: Role; days: number; password: string; once: boolean; lasts: number; uploads: 'also' | 'only' | undefined }>) => {
       if (dialog?.kind === 'share') Object.assign(dialog, change);
       render();
     };
     // Emptied once shared, unless the next one was typed meanwhile.
     const add = (user: string) =>
-      attempt(() => client.share(of.id, user, role).then(() => dialog?.kind === 'share' && dialog.who.trim() === user && setShare({ who: '' })), t('shared', { who: whoName(user) }));
+      attempt(
+        () => client.share(of.id, user, role, made.lasts || null).then(() => dialog?.kind === 'share' && dialog.who.trim() === user && setShare({ who: '' })),
+        t('shared', { who: whoName(user) }),
+      );
     const roles = (value: Role, onChange: (role: Role) => void, labelled: string) =>
       h(
         'select',
@@ -2054,10 +2090,16 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
               { class: 'rf-shares' },
               entry.shares.map((s) => {
                 const person = whoName(s.with);
+                const ended = !shareHolds(s);
                 return h(
                   'li',
                   { key: s.with },
-                  h('span', { class: 'rf-grow' }, person),
+                  h(
+                    'span',
+                    { class: 'rf-grow' },
+                    person,
+                    s.until && h('small', { class: `rf-share-until${ended ? ' rf-ended' : ''}` }, ended ? t('shareEnded') : t('linkUntil', { date: formatDate(s.until, locale) })),
+                  ),
                   roles(s.role, (next) => void attempt(() => client.share(of.id, s.with, next)), `${t('role')} · ${person}`),
                   button(t('remove'), () => void attempt(() => client.unshare(of.id, s.with)), { class: 'rf-link', 'aria-label': `${t('remove')} · ${person}` }),
                 );
@@ -2076,6 +2118,11 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             onInput: (event: Event) => setShare({ who: (event.target as HTMLInputElement).value }),
           }),
           roles(role, (next) => setShare({ role: next }), t('role')),
+          h(
+            'select',
+            { class: 'rf-select', 'aria-label': t('shareLasts'), value: String(made.lasts ?? 0), onChange: (event: Event) => setShare({ lasts: Number((event.target as HTMLSelectElement).value) }) },
+            [0, 1, 7, 30, 90].map((n) => h('option', { key: String(n), value: String(n) }, n === 0 ? t('forGood') : n === 1 ? t('linkDay') : t('linkDays', { n }))),
+          ),
           h('button', { type: 'submit', class: 'rf-btn rf-primary', disabled: !who.trim() }, t('share')),
         ),
         h('p', { class: 'rf-hint', id: `${prefix}-who-hint` }, t('addPersonHint')),
@@ -2098,6 +2145,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                     until,
                     link.locked && h('span', { class: 'rf-tag' }, t('linkLocked')),
                     link.uses !== undefined && h('span', { class: 'rf-tag' }, spent ? t('linkSpent') : t('linkOnce')),
+                    link.uploads && h('span', { class: 'rf-tag' }, link.uploads === 'only' ? t('linkRequest') : t('linkTakesFiles')),
                   ),
                   button(t('copyLink'), () => void attempt(async () => copy(await client.linkToken(of.id, link.id)), t('linkCopied')), {
                     class: 'rf-link',
@@ -2130,13 +2178,27 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
             h('input', { type: 'checkbox', checked: Boolean(made.once), onChange: (event: Event) => setShare({ once: (event.target as HTMLInputElement).checked }) }),
             t('linkOnceLabel'),
           ),
+          // A folder's link may let files in, or only take them: a request for files.
+          of.kind === 'folder' &&
+            h(
+              'select',
+              {
+                class: 'rf-select',
+                'aria-label': t('linkLets'),
+                value: made.uploads ?? '',
+                onChange: (event: Event) => setShare({ uploads: ((event.target as HTMLSelectElement).value || undefined) as 'also' | 'only' | undefined }),
+              },
+              h('option', { value: '' }, t('linkSees')),
+              h('option', { value: 'also' }, t('linkSeesAndAdds')),
+              h('option', { value: 'only' }, t('linkOnlyAdds')),
+            ),
         ),
         made.password && made.password.length < 4 && h('p', { class: 'rf-hint' }, t('linkPasswordShort')),
         button(
           withIcon('link', t('createLink')),
           () =>
             void attempt(async () => {
-              const link = await client.createLink(of.id, made.days ?? 7, { password: made.password || undefined, once: made.once });
+              const link = await client.createLink(of.id, made.days ?? 7, { password: made.password || undefined, once: made.once, uploads: of.kind === 'folder' ? made.uploads : undefined });
               await copy(link.token);
               setShare({ password: '', once: false });
             }, t('linkCopied')),
@@ -2151,6 +2213,8 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
 
   let viewing: EntryId | null = null;
   let zoomed = false;
+  /** Of a document shown, the version it is compared with, from the history; none for the document as it is. */
+  let comparing: string | null = null;
   /** The whole text of a file, up to VIEW_LIMIT: null while it comes, an Error when it could not. */
   const fullTexts = new Map<string, string | null | Error>();
   // Workbooks read, by version and how much of them; and the sheet shown of the one in the viewer.
@@ -2223,6 +2287,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   };
   const closeView = () => {
     undoDocument();
+    comparing = null;
     const back = viewing;
     viewing = null;
     if (back && picked.size <= 1) select(back);
@@ -2317,6 +2382,37 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         } catch {}
       }
       return h('div', { class: 'rf-view-code' }, h('pre', null, shown), cut);
+    }
+    // Two versions of a document, what changed from the one asked for to the one now.
+    const against = comparing && file.versions.find((version) => version.id === comparing);
+    if (kind === 'docx' && against && options.compareDocument) {
+      const compare = options.compareDocument;
+      return h('div', {
+        key: `compare:${file.id}:${against.id}:${file.versions[0].id}`,
+        class: 'rf-view-pages',
+        'data-own': true,
+        mount: (node: HTMLElement) => {
+          undoDocument();
+          const bytesOf = async (version?: string) => new Uint8Array(await (await fetch(await client.url(file.id, { version, inline: true }))).arrayBuffer());
+          Promise.all([bytesOf(against.id), bytesOf()])
+            .then(([before, after]) =>
+              compare(node, before, after, {
+                language: locale,
+                before: t('version', { n: versionNumber(file, against.id) }),
+                after: t('version', { n: versionNumber(file, file.versions[0].id) }),
+              }),
+            )
+            .then(
+              (shown) => {
+                const handle = typeof shown === 'function' ? { destroy: shown } : shown;
+                if (viewing !== file.id) return handle?.destroy();
+                shownDocument = handle;
+                render();
+              },
+              () => node.replaceChildren(h('p', { class: 'rf-view-cut' }, t('couldNotRead'))),
+            );
+        },
+      });
     }
     if (kind === 'docx' && (options.viewDocument || options.previewDocument)) {
       const url = urlOf(file);
@@ -2422,13 +2518,13 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         kind === 'docx' &&
           shownDocument?.pdf &&
           button(
-            withIcon('download', 'PDF'),
+            [icon('download', 18), h('span', null, 'PDF')],
             () =>
               void attempt(async () => {
                 const pdf = await shownDocument?.pdf?.();
                 if (pdf) saveBlob(new Blob([pdf as BlobPart], { type: 'application/pdf' }), `${file.name.replace(/\.docx$/i, '')}.pdf`);
               }),
-            { class: 'rf-btn rf-small', 'aria-label': t('downloadPdf'), title: t('downloadPdf') },
+            { class: 'rf-btn rf-icon rf-pdf', 'aria-label': t('downloadPdf'), title: t('downloadPdf') },
           ),
         // A document shown in its pages prints as it is shown; anything else opens in a tab of its own.
         kind === 'docx' && shownDocument?.print
@@ -3091,7 +3187,14 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                           { key: notice.id },
                           button(
                             [
-                              h('span', null, notice.kind === 'shared' ? t('noticeShared', { by: notice.by, name: notice.name }) : t('noticeMentioned', { by: notice.by, name: notice.name })),
+                              h(
+                                'span',
+                                null,
+                                t(notice.kind === 'shared' ? 'noticeShared' : notice.kind === 'received' ? 'noticeReceived' : 'noticeMentioned', {
+                                  by: notice.by.startsWith('link:') ? t('throughLink') : notice.by,
+                                  name: notice.name,
+                                }),
+                              ),
                               notice.text && h('small', { class: 'rf-notice-text' }, notice.text),
                               h('small', null, formatDate(notice.at, locale)),
                             ],

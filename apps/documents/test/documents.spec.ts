@@ -123,3 +123,31 @@ test('a document downloaded as a PDF, from the editor and from the viewer', asyn
   const bytes = await (await import('node:fs/promises')).readFile((await pdf.path())!);
   expect(new TextDecoder().decode(bytes.subarray(0, 5))).toBe('%PDF-');
 });
+
+test('two versions of a document compared, from its history, what changed between them shown', async ({ page }) => {
+  await page.goto(`${DOCUMENTS}/?as=compare`);
+  await page.getByRole('button', { name: 'Create document' }).click();
+  await page.getByRole('dialog', { name: 'New document' }).getByRole('textbox').fill('Terms');
+  await page.getByRole('dialog', { name: 'New document' }).getByRole('button', { name: 'Create', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'Terms.docx' });
+  await editor.locator('.dx-page').first().click();
+  await page.keyboard.type('Payment within thirty days.');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect(editor.getByText('Saved as a new version')).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' Late payment adds a fee.');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect.poll(async () => (await (await page.request.get(`${DOCUMENTS}/api/files/entries`, { headers: { 'x-user': 'compare' } })).json()).entries[0].versions.length).toBe(3);
+  await editor.getByRole('button', { name: 'Back to the drive' }).click();
+
+  await item(page, 'Terms.docx').click();
+  const details = page.getByRole('complementary', { name: 'Details' });
+  await details.getByRole('tab', { name: /Versions/ }).click();
+  await details.getByRole('button', { name: 'Compare · Version 2' }).click();
+  const viewer = page.getByRole('dialog', { name: /Terms/ });
+  await expect(viewer.locator('.dx-vv')).toBeVisible();
+  await expect(viewer.locator('.dx-vv-count')).toBeVisible();
+  await expect(viewer.locator('.dx-page').first()).toContainText('Late payment adds a fee.');
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+});

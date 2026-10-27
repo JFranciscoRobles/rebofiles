@@ -53,9 +53,13 @@ const NEEDS: Record<Action, Access> = {
 
 export const allows = (access: Access | null, action: Action): boolean => access !== null && RANK[access] >= RANK[NEEDS[action]];
 
+/** Whether a share still gives what it says: one with an end has not reached it. */
+export const shareHolds = (share: Share, now = new Date().toISOString()): boolean => share.until === undefined || share.until > now;
+
 const shareFor = (entry: Entry, names: Set<string>): Share | undefined => {
   let best: Share | undefined;
-  for (const share of entry.shares ?? []) if (names.has(share.with) && (!best || RANK[share.role] > RANK[best.role])) best = share;
+  const now = new Date().toISOString();
+  for (const share of entry.shares ?? []) if (names.has(share.with) && shareHolds(share, now) && (!best || RANK[share.role] > RANK[best.role])) best = share;
   return best;
 };
 
@@ -74,15 +78,22 @@ export function accessOf(drive: Drive, id: EntryId, who: Who): Access | null {
   return found;
 }
 
-/** Shared with `user` (or with everyone) or given a new role, outside the trash. Not with its owner, who has it all. */
-export function share(drive: Drive, id: EntryId, user: string, role: Role, context: Context): Drive {
+/**
+ * Shared with `user` (or with everyone) or given a new role, outside the trash: `until` a time after now, for good
+ * with null, or as it was shared before when left out. Not with its owner, who has it all.
+ */
+export function share(drive: Drive, id: EntryId, user: string, role: Role, context: Context, until?: string | null): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
   if (!user.trim()) throw new DriveError('invalid-share', 'Say who to share it with');
   if (!(role in RANK) || role === ('owner' as Role)) throw new DriveError('invalid-share', `"${role}" is not a role`);
   if (user === entry.owner) throw new DriveError('invalid-share', `${user} owns ${entry.name}`);
+  if (typeof until === 'string' ? Number.isNaN(Date.parse(until)) || until <= context.at : until !== undefined && until !== null)
+    throw new DriveError('invalid-share', 'A share ends after it is made');
+  const before = entry.shares?.find((s) => s.with === user);
+  const ends = until === undefined ? before?.until : (until ?? undefined);
   const shares = (entry.shares ?? []).filter((s) => s.with !== user);
-  return put(drive, { ...entry, shares: [...shares, { with: user, role, by: context.by, at: context.at }] });
+  return put(drive, { ...entry, shares: [...shares, { with: user, role, by: context.by, at: context.at, ...(ends ? { until: ends } : {}) }] });
 }
 
 /** No longer shared with `user`. What they have through a folder above it stays. */
@@ -117,13 +128,24 @@ export function sharedSince(drive: Drive, who: Who, since: string | undefined): 
 }
 
 /** A link to read an entry, and what is inside it, until `expires`. */
-export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string; locked?: boolean; uses?: number }, context: Context): Drive {
+export function addLink(drive: Drive, id: EntryId, link: { id: string; expires: string; locked?: boolean; uses?: number; uploads?: 'also' | 'only' }, context: Context): Drive {
   const entry = getEntry(drive, id);
   if (isTrashed(drive, id)) throw new DriveError('in-trash', `${entry.name} is in the trash`);
   if (!(link.expires > context.at)) throw new DriveError('invalid-share', 'A link has to expire after it is made');
   if (entry.links?.some((l) => l.id === link.id)) throw new DriveError('duplicate-id', `There is already a link ${link.id}`);
   if (link.uses !== undefined && !(Number.isInteger(link.uses) && link.uses >= 1)) throw new DriveError('invalid-share', 'A link is used once or more');
-  const made: Link = { id: link.id, role: 'viewer', expires: link.expires, by: context.by, at: context.at, ...(link.locked ? { locked: true } : {}), ...(link.uses ? { uses: link.uses } : {}) };
+  if (link.uploads !== undefined && (!['also', 'only'].includes(link.uploads) || entry.kind !== 'folder'))
+    throw new DriveError('invalid-share', 'Files are put through a link of a folder, also or only');
+  const made: Link = {
+    id: link.id,
+    role: 'viewer',
+    expires: link.expires,
+    by: context.by,
+    at: context.at,
+    ...(link.locked ? { locked: true } : {}),
+    ...(link.uses ? { uses: link.uses } : {}),
+    ...(link.uploads ? { uploads: link.uploads } : {}),
+  };
   return put(drive, { ...entry, links: [...(entry.links ?? []), made] });
 }
 

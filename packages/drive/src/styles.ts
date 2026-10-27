@@ -455,6 +455,18 @@ ${Object.keys(FOLDERS)
 .rf-view-book { display: flex; flex-direction: column; gap: 10px; width: 100%; height: 100%; min-height: 0; }
 .rf-sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .rf-sheet-tabs [aria-pressed="true"] { background: var(--rf-brand); border-color: var(--rf-brand); color: var(--rf-on-brand); }
+.rf-share-until { display: block; color: var(--rf-muted); font-size: 12px; }
+.rf-share-until.rf-ended { color: var(--rf-danger); }
+.rf-send { margin: 12px 0; padding: 16px; border: 1px dashed var(--rf-border); border-radius: 14px; display: grid; gap: 10px; justify-items: start; }
+.rf-send-only { max-width: 520px; margin: 40px auto; padding: 28px; }
+.rf-send h2 { margin: 0; font-size: 18px; }
+.rf-send-name { display: grid; gap: 4px; font-size: 13px; color: var(--rf-muted); }
+.rf-send-name input { font: inherit; color: var(--rf-ink); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--rf-border); background: var(--rf-bg); min-width: 240px; }
+.rf-send-list { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 4px; }
+.rf-send-list li { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+/* A version is restored from the history of the drive, not from the comparison shown in its viewer. */
+.rf-view-pages .dx-vv [data-name="compare-restore"] { display: none; }
+.rf-icon.rf-pdf { width: auto; padding: 0 8px; gap: 4px; font-size: 12px; font-weight: 600; }
 .rf-people { width: 100%; border-collapse: collapse; font-size: 14px; }
 .rf-people th, .rf-people td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rf-border); font-weight: 400; }
 .rf-people thead th { color: var(--rf-muted); font-size: 12px; font-weight: 600; }

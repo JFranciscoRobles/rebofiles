@@ -446,6 +446,17 @@ export const metadata: DocPage = {
   ],
 };
 
+export const SHARE_UNTIL = `await client.share(folder.id, 'auditor', 'viewer', 30);   // for thirty days, then nothing
+await client.share(folder.id, 'auditor', 'editor');       // another role: the same end
+await client.share(folder.id, 'auditor', 'editor', null); // for good`;
+
+export const REQUEST_CODE = `// A request for files: whoever opens it sends them, and sees nothing of what is there.
+const { token } = await client.createLink(folder.id, 30, { uploads: 'only' });
+// { uploads: 'also' }: they see the folder, and may add files to it.
+
+// In code, as the page of the link does:
+await createLinkClient({ base: '/api/files', token, from: () => 'Carla Ruiz' }).upload(file);`;
+
 export const SHARE = `// The page a link goes to: app/shared/page.tsx
 'use client';
 import { SharedLink } from '@rebofiles/react';
@@ -495,6 +506,38 @@ export const sharing: DocPage = {
             ]}
           />
           <Code lang="tsx" code={SHARE} />
+        </>
+      ),
+    },
+    {
+      id: 'for-a-while',
+      title: 'For a while',
+      badge: 'Until',
+      color: 'purple',
+      lead: 'Shared with someone for a day, a week, a month or three: past it, it gives them nothing, as if it had been taken back, and is no longer in their Shared with me.',
+      body: (
+        <>
+          <Code code={SHARE_UNTIL} />
+          <P>The dialog and the details say until when; one ended says so, to share it again or take it away.</P>
+        </>
+      ),
+    },
+    {
+      id: 'requests-for-files',
+      title: 'Requests for files',
+      badge: 'Uploads',
+      color: 'green',
+      lead: 'A link of a folder may take files: “See and add files”, or “Only send files”, a request for files that shows nothing of what is there. Whoever opens it signed out says who they are, if they want, and sends.',
+      body: (
+        <>
+          <Code code={REQUEST_CODE} />
+          <List
+            items={[
+              'What arrives is the owner’s of the folder, counts against their space, and says who sent it (a field “from”). The owner is told in the bell.',
+              'It goes up as any file does, in parts straight to the storage, checked as any is; the link may do nothing else.',
+              'Its expiry, its password and its uses hold as for any link.',
+            ]}
+          />
         </>
       ),
     },

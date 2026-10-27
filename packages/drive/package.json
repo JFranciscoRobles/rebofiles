@@ -15,13 +15,17 @@
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.12.0",
-    "@rebodocs/viewer": ">=0.12.0"
+    "@rebodocs/viewer": ">=0.12.0",
+    "@rebodocs/editor": ">=0.12.0"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {
       "optional": true
     },
     "@rebodocs/viewer": {
+      "optional": true
+    },
+    "@rebodocs/editor": {
       "optional": true
     }
   },

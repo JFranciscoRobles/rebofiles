@@ -8,7 +8,7 @@
 
 import type { FileEntry } from '@rebofiles/core';
 import { DriveProvider, FileDrive } from '@rebofiles/react';
-import { newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode, Suspense, lazy, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -28,6 +28,7 @@ function Documents() {
         title={{ en: 'Documents', es: 'Documentos', zh: '文档' }[language ?? 'en']}
         defaultView={params.get('view') === 'list' ? 'list' : 'grid'}
         newDocument={newDocx}
+        compareDocument={compareDocx}
         fields="edit"
         viewDocument={viewDocx}
         previewDocument={previewDocx}

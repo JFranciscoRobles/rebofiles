@@ -24,6 +24,7 @@ const PAGE_SIZES = [320, 640];
 const extensionOf = (name: string) => splitName(name).ext.slice(1).toLowerCase();
 const isPicture = (file: ToDerive['file']) =>
   /^image\/(png|jpeg|gif|webp|avif|tiff|heic|heif)$/.test(file.type) || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'tif', 'tiff', 'heic'].includes(extensionOf(file.name));
+const isVideo = (file: ToDerive['file']) => file.type.startsWith('video/') || ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'].includes(extensionOf(file.name));
 const isPdf = (file: ToDerive['file']) => file.type === 'application/pdf' || extensionOf(file.name) === 'pdf';
 const isDocx = (file: ToDerive['file']) => file.type.includes('wordprocessingml') || extensionOf(file.name) === 'docx';
 const TEXT_TYPES = /^(text\/|application\/(json|xml|yaml|x-yaml|javascript|csv|x-sh|sql))/;
@@ -76,22 +77,66 @@ const loadSharp = () => (sharpModule ??= import('sharp').then((m) => (m as unkno
 export function pictures(): Derive {
   return async ({ file, read, images, want }) => {
     if (!want.pictures || !isPicture(file) || !small(file)) return;
-    const sharp = await loadSharp();
-    const bytes = await read();
-    const meta = await sharp(bytes).metadata();
-    // Turned as the camera said it was held: its width and height as it is shown.
-    const turned = (meta.orientation ?? 1) >= 5;
-    const longest = Math.max((turned ? meta.height : meta.width) ?? 0, (turned ? meta.width : meta.height) ?? 0);
-    const quality = Math.round(images.quality * 100);
-    const renditions: NonNullable<Derived['renditions']> = [];
-    for (const size of smallerThan(images.sizes, longest)) {
-      const shaped = sharp(bytes).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true });
-      const kept = images.format === 'original' && meta.format && ['png', 'webp', 'gif', 'avif'].includes(meta.format);
-      const { data, info } = await (kept ? shaped.toFormat(meta.format as 'png') : shaped.jpeg({ quality, mozjpeg: true })).toBuffer({ resolveWithObject: true });
-      renditions.push({ size, width: info.width, height: info.height, type: kept ? `image/${info.format}` : 'image/jpeg', bytes: new Uint8Array(data) });
+    return picturesOf(await read(), images);
+  };
+}
+
+/** The smaller pictures of a picture's bytes, in the drive's sizes, and its placeholder, with sharp. */
+async function picturesOf(bytes: Uint8Array, images: ToDerive['images']): Promise<Derived> {
+  const sharp = await loadSharp();
+  const meta = await sharp(bytes).metadata();
+  // Turned as the camera said it was held: its width and height as it is shown.
+  const turned = (meta.orientation ?? 1) >= 5;
+  const longest = Math.max((turned ? meta.height : meta.width) ?? 0, (turned ? meta.width : meta.height) ?? 0);
+  const quality = Math.round(images.quality * 100);
+  const renditions: NonNullable<Derived['renditions']> = [];
+  for (const size of smallerThan(images.sizes, longest)) {
+    const shaped = sharp(bytes).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true });
+    const kept = images.format === 'original' && meta.format && ['png', 'webp', 'gif', 'avif'].includes(meta.format);
+    const { data, info } = await (kept ? shaped.toFormat(meta.format as 'png') : shaped.jpeg({ quality, mozjpeg: true })).toBuffer({ resolveWithObject: true });
+    renditions.push({ size, width: info.width, height: info.height, type: kept ? `image/${info.format}` : 'image/jpeg', bytes: new Uint8Array(data) });
+  }
+  const tiny = await sharp(bytes).rotate().resize(16, 16, { fit: 'inside' }).webp({ quality: 40 }).toBuffer();
+  return { renditions, placeholder: `data:image/webp;base64,${tiny.toString('base64')}` };
+}
+
+export interface VideoOptions {
+  /** The ffmpeg to run: `ffmpeg` on the path unless said, or the one of `ffmpeg-static`. */
+  ffmpeg?: string;
+  /** The second its frame is taken at: 1 unless said, the first for a video shorter. */
+  at?: number;
+}
+
+/**
+ * A frame of a video, as its pictures in the drive's sizes and its placeholder: what the grid and the details show of
+ * it, for a video that came from no page (an assistant, a sync). With ffmpeg, which has to be installed, and sharp.
+ */
+export function video(options: VideoOptions = {}): Derive {
+  return async ({ file, read, images, want }) => {
+    if (!want.pictures || !isVideo(file) || !small(file)) return;
+    const { mkdtemp, readFile, rm, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { execFile } = await import('node:child_process');
+    // On the disk, as ffmpeg reads where a video keeps what it is made of, often at its end.
+    const folder = await mkdtemp(join(tmpdir(), 'rebofiles-video-'));
+    try {
+      const input = join(folder, `in.${extensionOf(file.name) || 'mp4'}`);
+      const output = join(folder, 'frame.png');
+      await writeFile(input, await read());
+      const frame = (at: number) =>
+        new Promise<void>((done, fail) =>
+          execFile(options.ffmpeg ?? 'ffmpeg', ['-v', 'error', '-y', '-ss', String(at), '-i', input, '-frames:v', '1', output], { timeout: 60_000 }, (error) => (error ? fail(error) : done())),
+        );
+      await frame(options.at ?? 1);
+      let bytes = await readFile(output).catch(() => undefined);
+      if (!bytes?.length) {
+        await frame(0);
+        bytes = await readFile(output);
+      }
+      return picturesOf(new Uint8Array(bytes), images);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
     }
-    const tiny = await sharp(bytes).rotate().resize(16, 16, { fit: 'inside' }).webp({ quality: 40 }).toBuffer();
-    return { renditions, placeholder: `data:image/webp;base64,${tiny.toString('base64')}` };
   };
 }
 

@@ -33,7 +33,8 @@ export function gcsOptionsFrom(env: Record<string, string | undefined> = process
 export function gcsStorage(options: GcsOptions): Storage {
   const endpoint = (options.endpoint ?? 'https://storage.googleapis.com').replace(/\/$/, '');
   const s3: S3Options = { ...options, endpoint, region: 'auto' };
-  const { copyPart: _, remove: __, ...rest } = s3Storage(s3);
+  // Copies made by the server, read and written: its XML API copies as it likes its own headers.
+  const { copyPart: _, remove: __, copy: ___, ...rest } = s3Storage(s3);
   const credentials = { accessKeyId: options.accessKeyId, secretAccessKey: options.secretAccessKey, region: 'auto' };
   const send = options.fetch ?? fetch;
   return {

@@ -2,6 +2,7 @@
 // stores of the metadata, and how to put them on `node:http`.
 
 export { type Action, type User, type DriveServerOptions, type DriveEvent, type DriveHandler, createDriveHandler, everyone, byRoles, routeOf } from './api';
+export { type WebhookBody, type WebhookOptions, everyChange, verifyWebhook, webhook } from './webhooks';
 export { type Logger, type RequestDone, type MeterLike, type Limit, type Limits, type Limiter, DEFAULT_LIMITS, consoleLogger, memoryLimiter, openTelemetry } from './observe';
 export { nodeHandler } from './node';
 export { type Storage, type UploadPart, type UploadPlan, type FinishedPart, type ResumePlan, UploadGone, PART_SIZE, MAX_PARTS, partSizeOf } from './storage';

@@ -3,7 +3,7 @@
 
 import { docHref } from '@/lib/site';
 import { C, Code, type DocPage, List, P, Table } from '../../ui';
-import { DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
+import { COMPARE_CODE, COPY_CODE, DOCX, NEW_DOC, QUEUE, RESUME, SAVE, SIZES, SPACE, TOGETHER } from '../files';
 import { DERIVE_CODE, OCR_CODE } from '../team';
 
 const to = (slug: string) => docHref('es', slug);
@@ -213,6 +213,9 @@ export const previews: DocPage = {
               <>
                 <C>docx()</C>, <C>xlsx()</C> y <C>text()</C>: lo que tiene escrito un documento de Word, con Rebodocs, las celdas de un libro de Excel y un archivo de texto.
               </>,
+              <>
+                <C>video()</C>, dado a <C>deriveAll(…)</C>: un fotograma de un video en los tamaños del drive, con ffmpeg.
+              </>,
             ]}
           />
           <P>
@@ -309,6 +312,22 @@ export const versions: DocPage = {
           Un archivo subido donde ya hay uno con su nombre, cuando se elige “Reemplazar”, o guardado desde Rebodocs, es su siguiente versión; la anterior se queda. Restaurar una la vuelve la más
           reciente, como una nueva versión con los mismos bytes, así que no se escribe en el almacenamiento y también la restauración se puede deshacer.
         </P>
+      ),
+    },
+    {
+      id: 'a-copy',
+      title: 'Una copia',
+      badge: 'Copia',
+      color: 'purple',
+      lead: 'Hacer una copia, en el menú o los detalles de un archivo: un archivo propio, junto a él con “(2)” en su nombre, sus bytes copiados en el mismo almacenamiento.',
+      body: (
+        <>
+          <Code code={COPY_CODE} />
+          <P>
+            La copia es de quien la hizo y cuenta en su espacio; la de un archivo compartido para leer va a su propio inicio. Sus imágenes y su texto van con ella. S3, Azure y el disco copian los
+            bytes ellos mismos; en Google Cloud Storage el servidor los lee y los escribe, hasta 100 MB.
+          </P>
+        </>
       ),
     },
     {
@@ -454,6 +473,14 @@ export const word: DocPage = {
           </P>
         </>
       ),
+    },
+    {
+      id: 'compare-versions',
+      title: 'Comparar dos versiones',
+      badge: 'Historial',
+      color: 'blue',
+      lead: 'Lo que cambió en un documento de Word entre una versión y la actual, sobre sus páginas: tachado en rojo lo que se quitó, subrayado en verde lo que se puso, un cambio tras otro.',
+      body: <Code lang="tsx" code={COMPARE_CODE} />,
     },
     {
       id: 'for-an-assistant',

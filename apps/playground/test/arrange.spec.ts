@@ -55,7 +55,7 @@ test('the menu of an entry, by the mouse and by the keyboard, and a trash undone
   await item(page, 'b-medium.txt').click({ button: 'right' });
   const menu = page.getByRole('menu', { name: 'b-medium.txt' });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText(['Open', 'Download', 'Rename', 'Move', 'Share', 'Add to starred', 'Move to trash']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Open', 'Download', 'Rename', 'Move', 'Share', 'Add to starred', 'Make a copy', 'Move to trash']);
   await expect(menu.getByRole('menuitem', { name: 'Open' })).toBeFocused();
   expect.soft((await new AxeBuilder({ page }).include('.rf-ctx').analyze()).violations.map((v) => v.id)).toEqual([]);
   // Up from the first is the last, as round a menu.

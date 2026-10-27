@@ -72,6 +72,37 @@ export async function viewDocx(element: HTMLElement, bytes: Uint8Array, context:
 }
 
 /**
+ * What changed in a Word document from `before` to `after`, shown over the pages of `after` by Rebodocs, read only:
+ * what was added and taken away marked, as its history shows two versions. `mountDrive(element, { compareDocument:
+ * compareDocx })`, for "Compare" in the history of a document.
+ */
+export async function compareDocx(element: HTMLElement, before: Uint8Array, after: Uint8Array, context: { language?: string; before?: string; after?: string } = {}): Promise<DocumentView> {
+  const [{ createViewer, setLocale }, { createVersionView }] = await Promise.all([import('@rebodocs/viewer'), import('@rebodocs/editor')]);
+  if (context.language) setLocale(context.language);
+  // In a box of its own: the comparison goes beside the editor's element, which is to be inside what the drive leaves alone.
+  const box = document.createElement('div');
+  box.style.cssText = 'position: relative; width: 100%; height: 100%';
+  element.appendChild(box);
+  const viewer = createViewer(box, after);
+  const versions = { list: async () => [], load: async (id: string) => (id === 'before' ? before : after) };
+  const comparison = createVersionView(viewer.editor, versions);
+  await comparison.show({ id: 'before', label: context.before }, { id: 'after', label: context.after });
+  return {
+    get pages() {
+      return viewer.pages;
+    },
+    layout: (mode) => viewer.setLayout(mode),
+    print: () => viewer.print(),
+    pdf: () => viewer.editor.exportPdf(),
+    destroy: () => {
+      comparison.destroy();
+      viewer.destroy();
+      box.remove();
+    },
+  };
+}
+
+/**
  * The first page of a Word document as Rebodocs draws it, for a thumbnail: drawn once out of sight, and given as
  * the element of that page, at its real size (`data-width`, `data-height` in pixels), to be shown made smaller.
  * `mountDrive(element, { thumbDocument: thumbDocx })`.

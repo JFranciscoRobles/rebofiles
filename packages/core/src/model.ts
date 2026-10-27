@@ -57,6 +57,8 @@ export interface Share {
   role: Role;
   by: string;
   at: string;
+  /** Until when it is shared, in ISO 8601: past it, it gives nothing, as if it had been taken back. For good unless said. */
+  until?: string;
 }
 
 /** An address to read an entry and what is inside it without signing in, until `expires`. Taken back by removing it. */
@@ -73,6 +75,11 @@ export interface Link {
   used?: number;
   /** ISO 8601: when its last use was taken. It works a while longer, for the rest of that download, then no more. */
   spent?: string;
+  /**
+   * Of a folder: whoever holds it may also put files in it (`'also'`), or may only put files in it and sees nothing of
+   * what is there (`'only'`, a request for files). Only to read unless said.
+   */
+  uploads?: 'also' | 'only';
   by: string;
   at: string;
 }

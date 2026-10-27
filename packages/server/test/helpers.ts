@@ -109,6 +109,13 @@ export function memoryS3({ listPage = 1000 } = {}) {
       uploads.delete(q.get('uploadId')!);
       return new Response('<CompleteMultipartUploadResult/>');
     }
+    // CopyObject: the bytes of another key, copied in the bucket.
+    if (method === 'PUT' && sent.has('x-amz-copy-source')) {
+      const from = decodeURIComponent(sent.get('x-amz-copy-source')!.replace(/^\/bucket\//, ''));
+      if (!objects.has(from)) return new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 });
+      objects.set(key, objects.get(from)!.slice());
+      return new Response('<CopyObjectResult/>');
+    }
     if (method === 'PUT') {
       if (signed && !signed.includes('content-length')) return new Response('unsigned length', { status: 400 });
       if (unsent) return new Response(`<Error><Code>SignatureDoesNotMatch</Code><Message>${unsent} was signed but not sent</Message></Error>`, { status: 403 });

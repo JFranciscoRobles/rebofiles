@@ -63,6 +63,8 @@ export interface MetadataStore {
   keepText?(id: EntryId, version: string, text: string): Promise<void>;
   /** The texts that may have every word of the query, at most `limit` of them: more are looked at again by the server, which keeps those that do. */
   findText?(query: string, limit: number): Promise<KeptText[]>;
+  /** The text kept of a file, and of which version: for a copy of it to be found by it too. */
+  textOf?(id: EntryId): Promise<KeptText | undefined>;
   /**
    * What was done after `cursor` (the one the last call gave; none for where it is now), in order, by any process:
    * how the server tells the pages watching what another process changed, without holding the drive.
@@ -232,6 +234,9 @@ export function memoryMetadata(entries: Iterable<Entry> = []): MetadataStore {
       // All of them: the server looks for the words itself.
       return [...texts.values()];
     },
+    async textOf(id) {
+      return texts.get(id);
+    },
     async record(more) {
       lines.push(...more);
     },
@@ -374,6 +379,7 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
   db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS rebofiles_text USING fts5(id UNINDEXED, version UNINDEXED, body, tokenize = 'unicode61 remove_diacritics 2')");
   const unkeep = db.prepare('DELETE FROM rebofiles_text WHERE id = ?');
   const keepIt = db.prepare('INSERT INTO rebofiles_text (id, version, body) VALUES (?, ?, ?)');
+  const textById = db.prepare('SELECT id, version, body FROM rebofiles_text WHERE id = ?');
   const match = db.prepare('SELECT id, version, body FROM rebofiles_text WHERE rebofiles_text MATCH ? ORDER BY rank LIMIT ?');
   const byWhom = db.prepare("SELECT line FROM rebofiles_activity WHERE json_extract(line, '$.by') = ? ORDER BY seq DESC LIMIT ?");
   const lastSeq = db.prepare('SELECT coalesce(max(seq), 0) AS n FROM rebofiles_activity');
@@ -433,6 +439,10 @@ export async function sqliteMetadata(path: string): Promise<MetadataStore> {
       if (!words.length) return [];
       const rows = match.all(words.map((word) => `"${word}"*`).join(' '), limit) as { id: string; version: string; body: string }[];
       return rows.map((row) => ({ id: row.id, version: row.version, text: row.body }));
+    },
+    async textOf(id) {
+      const row = textById.get(id) as { id: string; version: string; body: string } | undefined;
+      return row && { id: row.id, version: row.version, text: row.body };
     },
     async record(more) {
       db.exec('BEGIN');
@@ -675,6 +685,11 @@ export async function postgresMetadata(db: PostgresClient | PostgresPool, option
       if (!words.length) return [];
       const { rows } = await db.query(`SELECT id, version, body FROM ${table}_text WHERE words @@ to_tsquery('simple', $1) LIMIT $2`, [words.map((word) => `${word}:*`).join(' & '), limit]);
       return (rows as { id: string; version: string; body: string }[]).map((row) => ({ id: row.id, version: row.version, text: row.body }));
+    },
+    async textOf(id) {
+      const { rows } = await db.query(`SELECT id, version, body FROM ${table}_text WHERE id = $1`, [id]);
+      const row = (rows as { id: string; version: string; body: string }[])[0];
+      return row && { id: row.id, version: row.version, text: row.body };
     },
     async activity(id, limit) {
       const { rows } = await db.query(`SELECT line FROM ${table}_activity WHERE entry = $1 OR parent = $1 OR origin = $1 ORDER BY seq DESC LIMIT $2`, [id, limit]);

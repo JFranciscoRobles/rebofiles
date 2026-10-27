@@ -4,7 +4,7 @@
 // For one machine, a playground or a desktop; a site puts them in a bucket.
 
 import { createReadStream } from 'node:fs';
-import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { READ_LIFE, type Storage, attachment, partsOf, shownWindow } from './storage';
@@ -110,6 +110,13 @@ export function diskStorage(options: DiskOptions): Storage {
       } finally {
         await source.close();
       }
+    },
+
+    async copy(from, to) {
+      const target = pathOf(to);
+      await mkdir(dirname(target), { recursive: true });
+      await copyFile(pathOf(from), `${target}.uploading`);
+      await rename(`${target}.uploading`, target);
     },
 
     async write(key, bytes) {

@@ -109,6 +109,16 @@ describe('Azure Blob Storage, against Azurite', () => {
     expect(finished.entry.versions[0].size).toBe(whole.length);
   }, 60_000);
 
+  it('copies a file in Azure itself, a block at a time, its type kept', async () => {
+    const { client, read } = drive();
+    const whole = bytes(PART_SIZE + 777, 5);
+    const file = await client.upload(new File([whole], 'report.bin', { type: 'application/x-report' }));
+    const copy = await client.copy(file.id);
+    expect(copy.name).toBe('report (2).bin');
+    expect(sum(await read(copy))).toBe(sum(whole));
+    expect((await fetch(await client.url(copy.id))).headers.get('content-type')).toBe('application/x-report');
+  }, 60_000);
+
   it('reads and writes as the server asks, and deletes what it is told to', async () => {
     const { storage } = drive();
     await storage.write!('made/page.txt', new TextEncoder().encode('hello azure'), 'text/plain');

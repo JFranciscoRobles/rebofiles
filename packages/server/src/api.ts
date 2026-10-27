@@ -20,6 +20,7 @@
 //   POST   /uploads/abort                 { token }: an upload given up, and what of it arrived taken away
 //   PATCH  /entries/:id                   { name }, { parent }, { color } or { fields }, with { ifTaken: 'keep-both' } to add "(2)"
 //   GET    /fields?name=…&value=…         what has that field set to that value, of what one may read
+//   POST   /entries/:id/copy              { parent }: a copy of a file, its bytes copied in the storage; beside it unless said, or at one's own top
 //   POST   /entries/:id/trash             into the trash
 //   POST   /entries/:id/restore           out of it
 //   DELETE /entries/:id                   gone for good, from the trash
@@ -41,7 +42,7 @@
 //   GET    /shared                        what others shared with the one asking
 //   GET    /shared/new                    how many of those are new since they last looked
 //   POST   /shared/seen                   they looked: none is new any more
-//   POST   /entries/:id/shares            { with, role }: shared, or given another role
+//   POST   /entries/:id/shares            { with, role, days }: shared, or given another role; for that many days, for good with null, as before unless said
 //   DELETE /entries/:id/shares/:with      no longer shared with them
 //   POST   /entries/:id/links             { days, password, once }: a link to read it without signing in, and its address
 //   GET    /entries/:id/links/:link       the address of a link again
@@ -66,6 +67,7 @@
 //   GET    /links/:token/download?id=…&inline=1
 //   GET    /links/:token/zip?ids=…        what an archive of some of it (all, unless said) holds
 //   GET    /links/:token/urls?ids=…       the addresses of some of its files
+//   POST   /links/:token/uploads          { name, folder, type, size }, and /finish, /abort: a file put in it, of a link that lets files in ({ uploads })
 
 import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -228,6 +230,9 @@ interface Pending {
   madeHere?: MadeHere[];
   /** The SHA-256 of the bytes, as the page said: kept with the version, to tell the same file again. */
   sha256?: string;
+  /** Of a file put through a link: whose it is, the owner of the folder, and what whoever sent it said they are called. */
+  owner?: string;
+  from?: string;
 }
 
 /** Where to read a file from, and until when. */
@@ -270,6 +275,8 @@ const TEXT_KEPT = 100_000;
 /** An upload left halfway is good for this long. */
 const UPLOAD_LIFE = 24 * 60 * 60;
 const MAX_BODY = 1_000_000;
+/** The largest file the server copies by reading and writing it, for a storage that cannot copy by itself. */
+const COPY_THROUGH = 100 * 1024 * 1024;
 /** How many entries a person may star; the oldest go past it. */
 const MAX_STARRED = 1000;
 /** A person's starred entries, as kept. */
@@ -406,7 +413,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         for (const id of folders) {
           const folder = id === null ? null : after.entries.get(id);
           if (id === null && options.top !== 'everyone' && !atTheTop.has(watcher.user.id)) continue;
-          if (folder !== undefined && (await options.authorize(watcher.user, 'list', folder, after))) seen.push(id);
+          if (folder !== undefined && (await may(watcher.user, 'list', folder, after))) seen.push(id);
         }
         if (entries.length || seen.length) watcher.send(`event: change\ndata: ${JSON.stringify({ by, at, folders: seen, entries } satisfies DriveEvent)}\n\n`);
       } catch (error) {
@@ -436,11 +443,11 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         const folders = new Set<EntryId | null>();
         for (const line of theirs) {
           const entry = drive.entries.get(line.entry);
-          if (entry && (await options.authorize(watcher.user, 'read', entry, drive))) entries.push(entry.id);
+          if (entry && (await may(watcher.user, 'read', entry, drive))) entries.push(entry.id);
           for (const id of [line.parent, ...(line.from !== undefined ? [line.from] : [])]) {
             const folder = id === null ? null : drive.entries.get(id);
             if (id === null && options.top !== 'everyone' && !(line.parent === null && (entry?.owner ?? line.by) === watcher.user.id)) continue;
-            if (folder !== undefined && (await options.authorize(watcher.user, 'list', folder, drive))) folders.add(id);
+            if (folder !== undefined && (await may(watcher.user, 'list', folder, drive))) folders.add(id);
           }
         }
         if (entries.length || folders.size) watcher.send(`event: change\ndata: ${JSON.stringify({ by: null, at, folders: [...folders], entries: [...new Set(entries)] } satisfies DriveEvent)}\n\n`);
@@ -528,11 +535,22 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
   const driveSettings = async () => core.readDriveSettings(await getSetting('drive'), defaults);
   const defaults = core.readDriveSettings(options.settings ?? {});
 
+  /**
+   * Who puts files through a link: a user made for the request, who may make a file in the link's folder and under it,
+   * and nothing else; and the folder, whose owner the files are, and what they said they are called.
+   */
+  const throughLinks = new WeakMap<User, { root: Entry; owner: string; link: core.Link; from?: string }>();
+  const linkUsers = new WeakMap<Request, User>();
+  const may = (user: User, action: Action, entry: Entry | null, drive: Drive): boolean | Promise<boolean> => {
+    const via = throughLinks.get(user);
+    if (via) return action === 'upload' && entry !== null && entry.kind === 'folder' && core.isWithin(drive, entry.id, via.root.id) && !core.isTrashed(drive, entry.id);
+    return options.authorize(user, action, entry, drive);
+  };
   const allow = async (user: User, action: Action, entry: Entry | null, drive: Drive) => {
-    if (!(await options.authorize(user, action, entry, drive))) throw new Refused(403, 'forbidden', 'You may not do that here.');
+    if (!(await may(user, action, entry, drive))) throw new Refused(403, 'forbidden', 'You may not do that here.');
   };
   const readable = async (user: User, entries: Entry[], drive: Drive) => {
-    const seen = await Promise.all(entries.map((entry) => options.authorize(user, 'read', entry, drive)));
+    const seen = await Promise.all(entries.map((entry) => may(user, 'read', entry, drive)));
     return entries.filter((_, i) => seen[i]);
   };
   const folderOf = (drive: Drive, id: string | null | undefined): Entry | null => (id ? core.getFolder(drive, id) : null);
@@ -705,7 +723,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
     if (options.onChange) void Promise.resolve(options.onChange({ activity: line, entry })).catch((error) => log.error('onChange failed:', error));
     const drive = await load({ ids: [entry.id] });
     for (const watcher of watchers)
-      if (await Promise.resolve(options.authorize(watcher.user, 'read', entry, drive)).catch(() => false))
+      if (await Promise.resolve(may(watcher.user, 'read', entry, drive)).catch(() => false))
         watcher.send(`event: change\ndata: ${JSON.stringify({ by, at: line.at, folders: [], entries: [entry.id] } satisfies DriveEvent)}\n\n`);
   };
 
@@ -720,8 +738,9 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
 
       if (path.startsWith('/links/')) return await viaLink(path, url, request);
 
-      const user = await options.identify(request);
+      const user = linkUsers.get(request) ?? (await options.identify(request));
       if (!user) throw new Refused(401, 'signed-out', 'Sign in first.');
+      const via = throughLinks.get(user);
       askedBy.set(request, user.id);
       await throttle('requests', user.id);
       const context = (): Context => ({ by: user.id, at: now() });
@@ -734,6 +753,8 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         }
       };
       const route = routeOf(request.method, path);
+      // Through a link that lets files in: a file put in its folder, and nothing else.
+      if (via && !['POST /uploads', 'POST /uploads/finish', 'POST /uploads/abort'].includes(route)) throw new Refused(403, 'forbidden', 'A link puts files in, and does nothing else.');
       const id = decodeURIComponent(/^\/entries\/([^/]+)/.exec(path)?.[1] ?? '');
       const versionId = decodeURIComponent(/\/versions\/([^/]+)/.exec(path)?.[1] ?? '');
       const shareWith = decodeURIComponent(/\/shares\/([^/]+)/.exec(path)?.[1] ?? '');
@@ -866,7 +887,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             const entry = drive.entries.get(kept.id);
             if (entry?.kind !== 'file' || entry.versions[0].id !== kept.version || core.isTrashed(drive, entry.id)) continue;
             const match = core.textMatch(kept.text, q);
-            if (match && (await options.authorize(user, 'read', entry, drive))) found.push({ entry, snippet: match.snippet });
+            if (match && (await may(user, 'read', entry, drive))) found.push({ entry, snippet: match.snippet });
           }
           return Response.json({ results: found });
         }
@@ -908,7 +929,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             drive: settings,
             mine,
             settings: core.settingsFor(settings, mine),
-            canConfigure: await options.authorize(user, 'configure', null, drive),
+            canConfigure: await may(user, 'configure', null, drive),
             saved: kept !== undefined || options.settings !== undefined,
             you: user.id,
           });
@@ -964,7 +985,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           if (!Number.isSafeInteger(size) || size < 0) throw new Refused(400, 'bad-size', 'Say the size of the file, in bytes.');
           if (size > maxSize) throw new Refused(413, 'too-large', `Files up to ${maxSize} bytes.`);
           const type = /^[\w.+-]+\/[\w.+-]+$/.test(asked.type ?? '') ? asked.type! : 'application/octet-stream';
-          const drive = await load({ ids: [asked.rendition?.file, asked.file, asked.parent] });
+          const drive = await load({ ids: [asked.rendition?.file, asked.file, asked.parent, via?.root.id] });
           let pending: Omit<Pending, 'key' | 'state'>;
           const versionId = newId();
           if (asked.rendition) {
@@ -993,10 +1014,18 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
             const name = String(asked.name ?? '');
             const problem = core.nameProblem(name);
             if (problem) throw new Refused(400, 'invalid-name', `"${name}" cannot be a name (${problem}).`);
-            const parent = folderOf(drive, asked.parent);
+            // Through a link, into its folder unless a folder inside it is said.
+            const parent = via && !asked.parent ? via.root : folderOf(drive, asked.parent);
             await allow(user, 'upload', parent, drive);
             if (parent && core.isTrashed(drive, parent.id)) throw new Refused(409, 'in-trash', 'That folder is in the trash.');
-            pending = { versionId, size, type, user: user.id, file: { id: newId(), name, parent: parent?.id ?? null } };
+            pending = {
+              versionId,
+              size,
+              type,
+              user: user.id,
+              file: { id: newId(), name, parent: parent?.id ?? null },
+              ...(via ? { owner: via.owner, ...(via.from ? { from: via.from } : {}) } : {}),
+            };
           }
           if (options.beforeUpload) {
             const of = pending.of ? core.getFile(drive, pending.of) : undefined;
@@ -1014,7 +1043,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           // Room in the space of whoever owns it: one's own for a new file, the owner's for a version of theirs.
           const quota = (await driveSettings()).quota;
           if (quota !== null) {
-            const owner = pending.of ? core.getEntry(drive, pending.of).owner : user.id;
+            const owner = pending.of ? core.getEntry(drive, pending.of).owner : (pending.owner ?? user.id);
             const used = core.usageOf(await load(await find.owned(owner)), owner);
             if (used + size > quota) throw new Refused(413, 'over-quota', `There is no room for it: ${bytes(used)} of ${bytes(quota)} are used, and it is ${bytes(size)}.`);
           }
@@ -1088,7 +1117,9 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
               }
               const file = pending.file!;
               await allow(user, 'upload', folderOf(drive, file.parent), drive);
-              const next = core.addFile(drive, { ...file, type: pending.type, version }, context());
+              let next = core.addFile(drive, { ...file, type: pending.type, version, ...(pending.owner ? { owner: pending.owner } : {}) }, context());
+              // Who sent it through a link, as they said.
+              if (pending.from) next = core.setFields(next, file.id, { from: pending.from }, context());
               return { drive: next, answer: { entry: core.getEntry(next, file.id) } };
             },
             user.id,
@@ -1096,6 +1127,8 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           );
           // What the page does not make of it, made after the answer: its pictures, what is written in it.
           if (!pending.rendition) toDerive(kept.entry.id, pending.versionId, pending.madeHere ?? []);
+          // The owner told of a file that came through a link of theirs.
+          if (pending.owner && pending.file) await notify(pending.owner, { kind: 'received', entry: kept.entry.id, name: kept.entry.name, by: pending.from ?? user.id });
           return Response.json(kept);
         }
 
@@ -1125,6 +1158,65 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           return Response.json({ aborted: !kept });
         }
 
+        case 'POST /entries/:id/copy': {
+          const asked = await body<{ parent?: EntryId | null }>();
+          const before = await load(both(await around(id), asked.parent ? { ids: [asked.parent] } : {}));
+          const source = core.getFile(before, id);
+          await allow(user, 'download', source, before);
+          // Beside it, where one may put a file; else at one's own top, as a file shared to read is copied.
+          let parent = asked.parent !== undefined ? asked.parent : source.parent;
+          if (asked.parent === undefined && !(await may(user, 'upload', folderOf(before, parent), before))) parent = null;
+          const current = source.versions[0];
+          const quota = (await driveSettings()).quota;
+          if (quota !== null) {
+            const used = core.usageOf(await load(await find.owned(user.id)), user.id);
+            if (used + current.size > quota) throw new Refused(413, 'over-quota', `There is no room for it: ${bytes(used)} of ${bytes(quota)} are used, and it is ${bytes(current.size)}.`);
+          }
+          const copyId = newId();
+          const versionId = newId();
+          const made: string[] = [];
+          const copyBytes = async (from: string, to: string, size: number, type: string) => {
+            if (options.storage.copy) await options.storage.copy(from, to, size, type);
+            else if (options.storage.read && options.storage.write && size <= COPY_THROUGH) await options.storage.write(to, await options.storage.read(from), type);
+            else throw new Refused(501, 'cannot-copy', 'This storage does not copy a file this large.');
+            made.push(to);
+          };
+          try {
+            const key = `${copyId}/${versionId}`;
+            await copyBytes(current.key, key, current.size, source.type);
+            const renditions = [];
+            for (const rendition of current.renditions ?? []) {
+              const at = `${copyId}/${versionId}@${rendition.size}`;
+              await copyBytes(rendition.key, at, rendition.bytes, rendition.type);
+              renditions.push({ ...rendition, key: at });
+            }
+            const version = {
+              id: versionId,
+              key,
+              size: current.size,
+              ...(current.sha256 ? { sha256: current.sha256 } : {}),
+              ...(current.parts ? { parts: current.parts } : {}),
+              ...(current.placeholder ? { placeholder: current.placeholder } : {}),
+              ...(renditions.length ? { renditions } : {}),
+            };
+            const kept = await change(
+              async (drive) => {
+                await allow(user, 'upload', folderOf(drive, parent), drive);
+                const next = core.copyFile(drive, id, { id: copyId, parent, version }, context());
+                return { drive: next, answer: { entry: core.getEntry(next, copyId) } };
+              },
+              user.id,
+              { ids: [id, parent], children: [parent], owners: topOf(user.id) },
+            );
+            // Found by what is written in it, as the file it was copied from.
+            const text = (await options.metadata.textOf?.(id)) ?? ownTexts.get(id);
+            if (text?.version === current.id) await keepText(copyId, versionId, text.text);
+            return Response.json(kept);
+          } catch (error) {
+            await options.storage.remove(made).catch(() => undefined);
+            throw error;
+          }
+        }
         case 'PATCH /entries/:id': {
           const asked = await body<{ name?: string; parent?: EntryId | null; color?: core.FolderColor | null; fields?: Record<string, string | null>; ifTaken?: 'refuse' | 'keep-both' }>();
           const ifTaken = asked.ifTaken === 'keep-both' ? 'keep-both' : 'refuse';
@@ -1224,7 +1316,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           for (const id of ids) if (drive.entries.has(id)) for (const entry of core.subtree(drive, id)) candidates.set(entry.id, entry);
           if (candidates.size > ZIP_AT_ONCE) throw new Refused(413, 'too-many', `Up to ${ZIP_AT_ONCE} files and folders in one archive.`);
           const allowed = new Set<EntryId>();
-          await Promise.all([...candidates.values()].map(async (entry) => (await options.authorize(user, entry.kind === 'file' ? 'download' : 'list', entry, drive)) && allowed.add(entry.id)));
+          await Promise.all([...candidates.values()].map(async (entry) => (await may(user, entry.kind === 'file' ? 'download' : 'list', entry, drive)) && allowed.add(entry.id)));
           return Response.json(core.packOf(drive, ids, (entry) => allowed.has(entry.id)));
         }
 
@@ -1251,7 +1343,7 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           await Promise.all(
             [...new Set(ids)].map(async (id) => {
               const entry = drive.entries.get(id);
-              if (entry?.kind !== 'file' || !(await options.authorize(user, 'download', entry, drive))) return;
+              if (entry?.kind !== 'file' || !(await may(user, 'download', entry, drive))) return;
               urls[id] = await addressOf(entry, asked.inline === true, size);
             }),
           );
@@ -1259,14 +1351,18 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
         }
 
         case 'POST /entries/:id/shares': {
-          const asked = await body<{ with: string; role: Role }>();
+          const asked = await body<{ with: string; role: Role; days?: number | null }>();
           const who = String(asked.with ?? '');
+          // Days it lasts; null for good; left out, as it was shared before.
+          const days = asked.days === undefined || asked.days === null ? asked.days : Number(asked.days);
+          if (typeof days === 'number' && !(days > 0 && days <= 3650)) throw new Refused(400, 'invalid-share', 'A share lasts from a day to ten years, or for good.');
+          const until = typeof days === 'number' ? new Date(Date.parse(now()) + days * 86_400_000).toISOString() : days;
           let first = false;
           const answer = await change(
             async (drive) => {
               await allow(user, 'share', core.getEntry(drive, id), drive);
               first = !core.getEntry(drive, id).shares?.some((s) => s.with === who);
-              const next = core.share(drive, id, who, asked.role, context());
+              const next = core.share(drive, id, who, asked.role, context(), until);
               return { drive: next, answer: { entry: core.getEntry(next, id) } };
             },
             user.id,
@@ -1295,12 +1391,18 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
           );
 
         case 'POST /entries/:id/links': {
-          const asked = await body<{ days?: number; password?: string; once?: boolean }>();
+          const asked = await body<{ days?: number; password?: string; once?: boolean; uploads?: 'also' | 'only' }>();
           const days = asked.days === undefined ? 7 : Number(asked.days);
           if (!(days > 0 && days <= LINK_DAYS)) throw new Refused(400, 'bad-days', `A link lasts from a day to ${LINK_DAYS} days.`);
           const password = typeof asked.password === 'string' && asked.password ? asked.password : undefined;
           if (password && password.length < 4) throw new Refused(400, 'bad-password', 'A password of four characters or more.');
-          const made = { id: newId(), expires: new Date(Date.parse(now()) + days * 86_400_000).toISOString(), locked: !!password, uses: asked.once ? 1 : undefined };
+          const made = {
+            id: newId(),
+            expires: new Date(Date.parse(now()) + days * 86_400_000).toISOString(),
+            locked: !!password,
+            uses: asked.once ? 1 : undefined,
+            ...(asked.uploads ? { uploads: asked.uploads } : {}),
+          };
           // Kept before the link is there, so it is never there without it.
           if (password) await setSetting(`link:${made.id}`, await sealPassword(password));
           return Response.json(
@@ -1526,6 +1628,20 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
     const spend = async () => {
       if (link.uses !== undefined && (link.used ?? 0) < link.uses) await change(async (current) => ({ drive: core.useLink(current, link.id, now()), answer: null }), 'drive', { ids: [root.id] });
     };
+    // A request for files: what is in it is not for whoever sends them.
+    if (link.uploads === 'only' && rest !== undefined && rest !== 'uploads') throw new Refused(403, 'forbidden', 'This link only takes files.');
+    if (rest === 'uploads') {
+      if (!link.uploads || root.kind !== 'folder') throw new Refused(403, 'forbidden', 'This link does not take files.');
+      await throttle('uploads', `link:${link.id}`);
+      // The routes of an upload, as one who may only put files in this folder; whose they are is its owner's.
+      const who: User = { id: `link:${link.id}` };
+      const from = (request.headers.get('x-link-name') ?? '').trim().slice(0, 100);
+      throughLinks.set(who, { root, owner: root.owner, link, ...(from ? { from } : {}) });
+      const sub = path.split('/')[4];
+      const inner = new Request(`${url.origin}${base}/uploads${sub ? `/${sub}` : ''}`, { method: request.method, headers: request.headers, body: await request.arrayBuffer() });
+      linkUsers.set(inner, who);
+      return answer(inner);
+    }
     const inside = (id: string | null) => {
       const entry = id ? core.getEntry(drive, id) : root;
       if (!core.isWithin(drive, entry.id, root.id) || core.isTrashed(drive, entry.id)) throw new Refused(404, 'no-link', 'That is not in what this link reads.');
@@ -1534,7 +1650,10 @@ export function createDriveHandler(options: DriveServerOptions): DriveHandler {
     if (rest === undefined) {
       const folder = inside(url.searchParams.get('folder'));
       const path = [...core.ancestors(drive, folder.id), folder].filter((entry) => core.isWithin(drive, entry.id, root.id));
-      return Response.json({ root, folder, path, entries: folder.kind === 'folder' ? core.children(drive, folder.id) : [] });
+      const what = { uploads: link.uploads ?? null };
+      // A request for files sees its folder, and nothing in it.
+      if (link.uploads === 'only') return Response.json({ root, folder: root, path: [root], entries: [], link: what });
+      return Response.json({ root, folder, path, entries: folder.kind === 'folder' ? core.children(drive, folder.id) : [], link: what });
     }
     if (rest === 'download') {
       const file = inside(url.searchParams.get('id'));

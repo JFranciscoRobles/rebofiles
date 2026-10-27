@@ -338,6 +338,8 @@ export function createDriveClient(options: ClientOptions) {
     entry: (id: EntryId) => ask<{ entry: Entry; path: FolderEntry[]; trashed: boolean }>('GET', `/entries/${encodeURIComponent(id)}`),
     recent: async () => (await ask<{ entries: Entry[] }>('GET', '/recent')).entries,
     trash: async () => (await ask<{ entries: Entry[] }>('GET', '/trash')).entries,
+    /** A copy of a file, as a file of its own: beside it unless `parent` says, or at one's own top where one may not put it. */
+    copy: (id: EntryId, parent?: EntryId | null) => one('POST', `/entries/${encodeURIComponent(id)}/copy`, parent === undefined ? {} : { parent }) as Promise<FileEntry>,
     /** Fields of the application's own set, each to its text, or taken away with null; those not named stay. */
     setFields: (id: EntryId, fields: Record<string, string | null>) => one('PATCH', `/entries/${encodeURIComponent(id)}`, { fields }),
     /** What has the field `name` set to `value`, of what one may read: the files of a client, of a case. */
@@ -400,13 +402,15 @@ export function createDriveClient(options: ClientOptions) {
     deleteForever: async (id: EntryId) => (await ask<{ removed: EntryId[] }>('DELETE', `/entries/${encodeURIComponent(id)}`)).removed,
     emptyTrash: async () => (await ask<{ removed: EntryId[] }>('POST', '/trash/empty')).removed,
     /** Shared with someone, or with everyone signed in as `'*'`, or given another role. */
-    share: (id: EntryId, user: string, role: Role) => one('POST', `/entries/${encodeURIComponent(id)}/shares`, { with: user, role }),
+    /** Shared with someone for `days`, past which it gives nothing; for good with null; as it was shared before unless said. */
+    share: (id: EntryId, user: string, role: Role, days?: number | null) => one('POST', `/entries/${encodeURIComponent(id)}/shares`, { with: user, role, ...(days !== undefined ? { days } : {}) }),
     /** No longer shared with them; anyone may leave what was shared with themselves. */
     unshare: (id: EntryId, user: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/shares/${encodeURIComponent(user)}`),
     /** A link to read it without signing in, for `days`; the token is what goes in its address. */
     /** A link for `days`, opened only with `password` when one is given, and good for one download when `once`. */
-    createLink: (id: EntryId, days?: number, how: { password?: string; once?: boolean } = {}) =>
-      ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days, password: how.password, once: how.once }),
+    /** A link to read it; of a folder, with `uploads`, one that lets files in too (`'also'`) or only (`'only'`, a request for files). */
+    createLink: (id: EntryId, days?: number, how: { password?: string; once?: boolean; uploads?: 'also' | 'only' } = {}) =>
+      ask<{ entry: Entry; token: string }>('POST', `/entries/${encodeURIComponent(id)}/links`, { days, password: how.password, once: how.once, ...(how.uploads ? { uploads: how.uploads } : {}) }),
     /** The token of a link made before: the same every time. */
     linkToken: async (id: EntryId, link: string) => (await ask<{ token: string }>('GET', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`)).token,
     removeLink: (id: EntryId, link: string) => one('DELETE', `/entries/${encodeURIComponent(id)}/links/${encodeURIComponent(link)}`),
@@ -562,10 +566,12 @@ export interface LinkListing {
   /** From the root down to the folder. */
   path: Entry[];
   entries: Entry[];
+  /** What the link lets in besides: files too, or only files (and then nothing of what is there is listed). */
+  link?: { uploads: 'also' | 'only' | null };
 }
 
 /** What a link reads, for someone not signed in: its folders and an address to read each file from. */
-export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch; password?: () => string | undefined }) {
+export function createLinkClient(options: { base: string; token: string; fetch?: typeof fetch; password?: () => string | undefined; from?: () => string | undefined }) {
   const base = `${options.base.replace(/\/$/, '')}/links/${encodeURIComponent(options.token)}`;
   const send = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const ask = async <T>(path: string): Promise<T> => {
@@ -577,7 +583,21 @@ export function createLinkClient(options: { base: string; token: string; fetch?:
     return said as T;
   };
   const absolute = (url: string) => (/^https?:/.test(url) ? url : new URL(url, /^https?:/.test(base) ? base : typeof location === 'undefined' ? 'http://localhost' : location.href).toString());
+  // Files put through the link go up as any do, in parts straight to the storage, at the link's own routes.
+  const sender = createDriveClient({
+    base,
+    fetch: options.fetch,
+    remember: null,
+    headers: () => {
+      const password = options.password?.();
+      const from = options.from?.();
+      return { ...(password ? { 'x-link-password': password } : {}), ...(from ? { 'x-link-name': from } : {}) };
+    },
+  });
   return {
+    /** A file put in the folder of a link that lets files in, or in a folder inside it: the owner's, told of it. */
+    upload: (file: Blob & { name?: string }, how: { folder?: EntryId; onProgress?: UploadOptions['onProgress']; signal?: AbortSignal } = {}) =>
+      sender.upload(file, { parent: how.folder, onProgress: how.onProgress, signal: how.signal }),
     list: (folder?: EntryId) => ask<LinkListing>(folder ? `?folder=${encodeURIComponent(folder)}` : ''),
     url: async (id: EntryId, how: { inline?: boolean } = {}) => absolute((await ask<{ url: string }>(`/download?id=${encodeURIComponent(id)}${how.inline ? '&inline=1' : ''}`)).url),
     /** What an archive of these holds, or of all the link reads. */

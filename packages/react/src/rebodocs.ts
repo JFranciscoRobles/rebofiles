@@ -5,4 +5,4 @@
 //   import { previewDocx } from '@rebofiles/react/rebodocs';
 //   <FileDrive previewDocument={previewDocx} viewDocument={viewDocx} />
 
-export { type DocumentLayout, type DocumentView, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
+export { type DocumentLayout, type DocumentView, compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';

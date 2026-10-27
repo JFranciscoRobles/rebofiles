@@ -1,7 +1,9 @@
 // What someone who was sent a link sees, without signing in: the folder or the
 // file it was made for, its folders to go into, and each file to open or save.
-// Nothing can be changed from here. Mounted on an element of its own, as the
-// page that shows it is most often apart from the drive.
+// Nothing can be changed from here, but for files put in a folder whose link
+// lets them in; and a request for files shows only where to send them.
+// Mounted on an element of its own, as the page that shows it is most often
+// apart from the drive.
 //
 //   mountSharedLink(document.getElementById('shared')!, { token: new URLSearchParams(location.search).get('link')! });
 
@@ -34,7 +36,83 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
   let password: string | undefined;
   let asking: 'ask' | 'wrong' | null = null;
   let typed = '';
-  const link = createLinkClient({ base: options.base ?? '/api/files', token: options.token, password: () => password });
+  // Who sends files through it, as they say they are called, told to the owner with each.
+  let from = '';
+  const link = createLinkClient({ base: options.base ?? '/api/files', token: options.token, password: () => password, from: () => from.trim() || undefined });
+  /** The files sent from this page, each as it goes. */
+  let sending: { id: number; name: string; pct: number; state: 'sending' | 'sent' | 'failed'; error?: string }[] = [];
+  let sent = 0;
+  const send = async (files: Iterable<File>) => {
+    const into = listing?.folder.kind === 'folder' && listing.link?.uploads === 'also' ? listing.folder.id : undefined;
+    await Promise.all(
+      [...files].map(async (file) => {
+        const item = { id: ++sent, name: file.name, pct: 0, state: 'sending' as const };
+        sending = [...sending, item];
+        render();
+        const set = (change: Partial<(typeof sending)[number]>) => ((sending = sending.map((one) => (one.id === item.id ? { ...one, ...change } : one))), render());
+        try {
+          await link.upload(file, { folder: into, onProgress: ({ sent: done, size }) => set({ pct: Math.round((done / Math.max(1, size)) * 100) }) });
+          set({ state: 'sent', pct: 100 });
+        } catch (failed) {
+          set({ state: 'failed', error: (failed as Error).message });
+        }
+      }),
+    );
+    // What it reads besides, shown again with what came.
+    if (listing?.link?.uploads === 'also') show(into === listing.root.id ? undefined : into);
+  };
+  /** Where files are put, of a link that takes them: who sends them, the button, and each as it goes. */
+  const sendBox = (only: boolean) =>
+    h(
+      'section',
+      {
+        class: `rf-send${only ? ' rf-send-only' : ''}`,
+        'aria-label': t('sendFiles'),
+        onDragover: (event: DragEvent) => event.dataTransfer?.types.includes('Files') && event.preventDefault(),
+        onDrop: (event: DragEvent) => {
+          event.preventDefault();
+          if (event.dataTransfer?.files.length) void send(event.dataTransfer.files);
+        },
+      },
+      h('h2', null, only ? t('sendFilesTo', { name: listing?.root.name ?? '' }) : t('addFilesHere')),
+      only && h('p', { class: 'rf-hint' }, t('sendFilesHint')),
+      h(
+        'label',
+        { class: 'rf-send-name' },
+        h('span', null, t('yourName')),
+        h('input', { type: 'text', autocomplete: 'name', value: from, onInput: (event: Event) => (from = (event.target as HTMLInputElement).value) }),
+      ),
+      h('input', {
+        type: 'file',
+        multiple: true,
+        hidden: true,
+        class: 'rf-send-file',
+        onChange: (event: Event) => {
+          const input = event.target as HTMLInputElement;
+          if (input.files?.length) void send(input.files);
+          input.value = '';
+        },
+      }),
+      h(
+        'button',
+        { type: 'button', class: 'rf-btn rf-primary', onClick: () => element.querySelector<HTMLInputElement>('.rf-send-file')?.click() },
+        icon('upload', 16),
+        h('span', null, t('uploadFiles')),
+      ),
+      sending.length > 0 &&
+        h(
+          'ul',
+          { class: 'rf-send-list', 'aria-live': 'polite' },
+          sending.map((one) =>
+            h(
+              'li',
+              { key: String(one.id) },
+              h('span', { class: 'rf-grow' }, one.name),
+              h('small', { class: one.state === 'failed' ? 'rf-error' : undefined }, one.state === 'sent' ? t('sentFile') : one.state === 'failed' ? (one.error ?? t('couldNotSend')) : `${one.pct}%`),
+            ),
+          ),
+        ),
+    );
   let listing: LinkListing | null = null;
   let error: string | null = null;
   let alive = true;
@@ -148,53 +226,56 @@ export function mountSharedLink(element: HTMLElement, options: SharedLinkOptions
             ? passwordForm()
             : error
               ? h('div', { class: 'rf-empty rf-error', role: 'alert' }, error)
-              : [
-                  h(
-                    'div',
-                    { class: 'rf-head' },
+              : listing?.link?.uploads === 'only'
+                ? sendBox(true)
+                : [
                     h(
                       'div',
-                      { class: 'rf-crumbs' },
-                      // A link to a file has no folders to go back up: the file is its only row.
-                      listing?.root.kind === 'folder' &&
-                        listing.path.map((step, i) =>
-                          h(
-                            'span',
-                            { key: step.id, style: 'display: contents' },
-                            i > 0 && icon('chevron', 16),
+                      { class: 'rf-head' },
+                      h(
+                        'div',
+                        { class: 'rf-crumbs' },
+                        // A link to a file has no folders to go back up: the file is its only row.
+                        listing?.root.kind === 'folder' &&
+                          listing.path.map((step, i) =>
                             h(
-                              'button',
-                              { type: 'button', class: 'rf-crumb', 'aria-current': step.id === listing?.folder.id ? 'page' : undefined, onClick: () => show(i === 0 ? undefined : step.id) },
-                              step.name,
+                              'span',
+                              { key: step.id, style: 'display: contents' },
+                              i > 0 && icon('chevron', 16),
+                              h(
+                                'button',
+                                { type: 'button', class: 'rf-crumb', 'aria-current': step.id === listing?.folder.id ? 'page' : undefined, onClick: () => show(i === 0 ? undefined : step.id) },
+                                step.name,
+                              ),
                             ),
                           ),
-                        ),
+                      ),
+                      listing?.folder.kind === 'folder' && zipButton(listing.folder, true),
                     ),
-                    listing?.folder.kind === 'folder' && zipButton(listing.folder, true),
-                  ),
-                  h(
-                    'ul',
-                    { class: 'rf-items rf-link-rows', 'aria-label': t('name') },
-                    listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('linkEmpty')),
-                    rows.map((entry) =>
-                      h(
-                        'li',
-                        { key: entry.id, class: 'rf-row' },
+                    listing?.link?.uploads === 'also' && listing.folder.kind === 'folder' && sendBox(false),
+                    h(
+                      'ul',
+                      { class: 'rf-items rf-link-rows', 'aria-label': t('name') },
+                      listing && rows.length === 0 && h('li', { class: 'rf-empty' }, t('linkEmpty')),
+                      rows.map((entry) =>
                         h(
-                          'button',
-                          { type: 'button', class: 'rf-name', onClick: () => (entry.kind === 'folder' ? show(entry.id) : void open(entry)) },
-                          h('span', { class: `rf-tile rf-k-${kindOf(entry)}`, 'aria-hidden': 'true' }, entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry)),
-                          h('span', null, entry.name),
+                          'li',
+                          { key: entry.id, class: 'rf-row' },
+                          h(
+                            'button',
+                            { type: 'button', class: 'rf-name', onClick: () => (entry.kind === 'folder' ? show(entry.id) : void open(entry)) },
+                            h('span', { class: `rf-tile rf-k-${kindOf(entry)}`, 'aria-hidden': 'true' }, entry.kind === 'folder' ? icon('folder', 16) : badgeOf(entry)),
+                            h('span', null, entry.name),
+                          ),
+                          h('span', null, formatDate(entry.modified, locale)),
+                          h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
+                          entry.kind === 'file'
+                            ? h('button', { type: 'button', class: 'rf-btn rf-text', 'aria-label': `${t('download')} · ${entry.name}`, onClick: () => void open(entry, true) }, icon('download', 16))
+                            : zipButton(entry, false),
                         ),
-                        h('span', null, formatDate(entry.modified, locale)),
-                        h('span', null, entry.kind === 'file' ? formatSize(entry.versions[0].size, locale) : '—'),
-                        entry.kind === 'file'
-                          ? h('button', { type: 'button', class: 'rf-btn rf-text', 'aria-label': `${t('download')} · ${entry.name}`, onClick: () => void open(entry, true) }, icon('download', 16))
-                          : zipButton(entry, false),
                       ),
                     ),
-                  ),
-                ],
+                  ],
         ),
       ),
     );

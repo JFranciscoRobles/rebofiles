@@ -8,6 +8,29 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Added
 
+- **A copy of a file.** Make a copy, in its menu and its details: a file of
+  its own beside it ("(2)"), its bytes copied in the storage under a key of
+  its own (`copy` of a storage: S3's CopyObject, the disk, Azure block by
+  block; read and written by the server otherwise, up to 100 MB), its
+  pictures and text with it, counted against the space of who made it
+  (`POST /entries/:id/copy`, `client.copy`).
+- **Requests for files.** A link of a folder may take files (`uploads:
+  'also'`) or only take them (`'only'`, showing nothing of what is there):
+  the page of the link sends them as any upload goes, saying who sent them;
+  they are the folder owner's, count against their space, carry a field
+  `from`, and the owner is told in the bell (`POST /links/:token/uploads`).
+- **Shares for a while.** `days` of a share, from a day to ten years: past
+  it, it gives nothing (`Share.until`, `shareHolds`); a new role keeps its
+  end, null makes it for good. In the dialog, and said in the details.
+- **Two versions of a Word document compared.** `compareDocument`
+  (`compareDocx`): "Compare" in the history shows what changed from a version
+  to the one now, over its pages, with Rebodocs.
+- **Webhooks.** `webhook({ url, secret, actions })` as `onChange`: each change
+  POSTed as JSON, signed with HMAC-SHA256, tried again when it does not
+  arrive; `verifyWebhook` for the service told, `everyChange` for several.
+- **Frames of videos made by the server.** `video()` of
+  `@rebofiles/server/derive`, with ffmpeg: a frame in the drive's sizes and
+  its placeholder, for videos that came from no page.
 - **Create document, and a document as a PDF.** `newDocument` (`newDocx` of
   `@rebofiles/drive/rebodocs`) gives the files a "Create document" button and
   New a "New document": an empty .docx, named by the person, in the folder
@@ -516,6 +539,8 @@ minor version (0.x.0) may change the API; such changes are listed under
 
 ### Fixed
 
+- **The comparison and anything else beside a Rebodocs editor in the
+  viewer** stay: the viewer of a document draws in a box of its own.
 - **Open in Rebodocs, from the viewer.** The viewer is closed first: open, it
   left inert what the application opened over the drive, which took no keys.
 - **A view said loading while it is.** In the render after the view changes,

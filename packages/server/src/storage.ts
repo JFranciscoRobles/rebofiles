@@ -93,6 +93,11 @@ export interface Storage {
    * those of the one before but some. Without it, every part is sent.
    */
   copyPart?(from: string, to: string, state: string, part: { number: number; from: number; to: number }): Promise<void>;
+  /**
+   * The bytes under `from` kept again under `to`, in the storage itself: a copy of a file. Without it, the server reads
+   * them and writes them (`read`, `write`), for a file small enough.
+   */
+  copy?(from: string, to: string, size: number, type: string): Promise<void>;
   /** The requests to addresses of its own, for a storage the browser cannot reach; undefined for any other. */
   serve?(request: Request, path: string): Promise<Response | undefined>;
 }

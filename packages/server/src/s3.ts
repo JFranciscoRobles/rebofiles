@@ -170,6 +170,15 @@ export function s3Storage(options: S3Options): Storage {
       if (answer.status === 404 || /<Error>/.test(text)) throw new Error(`The bucket did not copy part ${part.number}: ${text.slice(0, 300)}`);
     },
 
+    async copy(from, to, size) {
+      // CopyObject: the bucket copies the bytes itself, up to 5 GiB in one request.
+      if (size > 5 * 1024 ** 3) throw new Error('A file larger than 5 GiB is not copied in one request.');
+      const answer = await ask('PUT', at(to), undefined, { 'x-amz-copy-source': `/${options.bucket}/${encodeURI((options.prefix ?? '') + from)}` });
+      // As finishing, it can answer 200 and say in the body that it failed.
+      const text = await answer.text();
+      if (answer.status === 404 || /<Error>/.test(text)) throw new Error(`The bucket did not copy ${from}: ${text.slice(0, 300)}`);
+    },
+
     async write(key, bytes, type) {
       const url = presign(credentials, { method: 'PUT', url: at(key), expires: 60, headers: { 'content-type': type, 'content-length': String(bytes.length) } });
       const answer = await send(url, { method: 'PUT', body: bytes as Uint8Array<ArrayBuffer>, headers: { 'content-type': type } });
