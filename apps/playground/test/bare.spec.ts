@@ -5,7 +5,8 @@ import { expect, test } from '@playwright/test';
 
 test('without its own bar and sections, driven by the application’s and telling it where it is', async ({ page }) => {
   const name = `Bare ${Date.now()}`;
-  await page.goto('/?chrome=0');
+  // As someone of their own: the folder it makes is not in the drive the other tests go through.
+  await page.goto('/?chrome=0&as=bare');
   const host = page.getByRole('region', { name: 'The application' });
   await expect(host.locator('output')).toContainText(/\d+ shown/);
 
