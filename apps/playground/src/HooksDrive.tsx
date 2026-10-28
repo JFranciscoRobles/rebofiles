@@ -4,7 +4,7 @@
 
 import type { EntryId, FileEntry } from '@rebofiles/core';
 import { DriveProvider, type View, formatDate, formatSize, useActions, useActivity, useDrive, useEntries, useEntry, useUploads } from '@rebofiles/react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 type Section = 'files' | 'starred' | 'shared' | 'recent' | 'trash';
 
@@ -148,6 +148,16 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
   const starred = useEntries({ section: 'starred' }).entries.some((entry) => entry.id === id);
   const { activity } = useActivity(id, 10);
   const [name, setName] = useState<string | null>(null);
+  // Closed when what it shows is gone, if it is still open: on a slow connection, the server may answer after another
+  // section, or this same entry again, was chosen.
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
+  const gone = () => open.current && onGone();
   if (!found) return null;
   const { entry, path } = found;
   const file: FileEntry | null = entry.kind === 'file' ? entry : null;
@@ -162,7 +172,7 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
         {entry.owner} · {path.map((step) => step.name).join(' / ') || t('top')}
       </p>
       {inTrash ? (
-        <button type="button" onClick={() => attempt(() => actions.restore(entry.id).then(onGone))}>
+        <button type="button" onClick={() => attempt(() => actions.restore(entry.id).then(gone))}>
           {t('restore')}
         </button>
       ) : (
@@ -184,7 +194,7 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
               </button>
             </>
           )}
-          <button type="button" onClick={() => attempt(() => actions.moveToTrash(entry.id).then(onGone))}>
+          <button type="button" onClick={() => attempt(() => actions.moveToTrash(entry.id).then(gone))}>
             {t('moveToTrash')}
           </button>
         </>
@@ -211,8 +221,9 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
       <h3>{t('activity')}</h3>
       {activity.length ? (
         <ul aria-label={t('activity')}>
-          {activity.map((done) => (
-            <li key={`${done.at}-${done.action}`}>
+          {activity.map((done, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: what was done has no id, and two things may be done in the same millisecond: counted from the oldest, as the newest come first
+            <li key={`${done.at}-${activity.length - i}`}>
               {done.by} · {done.action} · {formatDate(done.at, locale)}
             </li>
           ))}

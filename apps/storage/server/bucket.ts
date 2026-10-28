@@ -11,13 +11,16 @@
 //
 // Everything the server does is on: what is made of a file (a PDF's first page,
 // its text), files checked once they arrive, the events, comments, holds and
-// the days things are kept, the limits; and an assistant at /api/mcp.
+// the days things are kept; who is who from a directory, who read what, the
+// reminders of requests for files and what is about to expire, each written in
+// its console where an application would send a mail or keep an audit; and an
+// assistant at /api/mcp.
 
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMcpHandler } from '@rebofiles/mcp';
-import { byRoles, checkType, createDriveHandler, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
+import { byRoles, checkType, createDriveHandler, mailReminders, s3OptionsFrom, s3Storage, sqliteMetadata } from '@rebofiles/server';
 import { deriveAll, docx, ocr, pdf, pictures, text, xlsx } from '@rebofiles/server/derive';
 
 const ENV = resolve(import.meta.dirname, '../.env');
@@ -36,6 +39,14 @@ export const storage = s3Storage(s3OptionsFrom(process.env));
 
 /** Who is in which group, as an application would say it. */
 const GROUPS: Record<string, string[]> = { bea: ['team'], carl: ['team'] };
+/** Who works here, as the application's directory would say: to share with by name, and their names shown for their ids. */
+const PEOPLE = [
+  { id: 'bea', name: 'Bea Ruiz', detail: 'bea@acme.test' },
+  { id: 'carl', name: 'Carl Soto', detail: 'carl@acme.test' },
+  { id: 'group:team', name: 'Team', detail: 'Bea and Carl' },
+];
+/** The page's port, as `vite.config.ts` has it: where a reminder's link opens. */
+const PORT = 5183;
 
 export const handle = createDriveHandler({
   storage,
@@ -60,6 +71,20 @@ export const handle = createDriveHandler({
   onComment: ({ entry, mentions, by }) => {
     if (mentions.length) console.log(`${by.id} named ${mentions.join(', ')} on “${entry.name}”`);
   },
+  // Who read what, where an application would keep an audit: a folder listed is left out, to keep the console readable.
+  onRead: ({ action, user, link, entries }) => {
+    if (action !== 'list') console.log(`[read] ${user?.id ?? `link ${link}`} ${action} ${entries.map((entry) => `“${entry.name}”`).join(', ')}`);
+  },
+  people: {
+    search: (query) => PEOPLE.filter((one) => `${one.name} ${one.detail} ${one.id}`.toLowerCase().includes(query.toLowerCase())),
+    names: (ids) => Object.fromEntries(PEOPLE.filter((one) => ids.includes(one.id)).map((one) => [one.id, one.name])),
+  },
+  // Requests for files remind whom they were sent to every so many days, by a mail written here instead of sent.
+  reminders: mailReminders({
+    mail: (mail) => console.log(`[mail] to ${mail.to}: ${mail.subject}`),
+    url: (token) => `http://localhost:${PORT}/?link=${encodeURIComponent(token)}`,
+  }),
+  expiring: { days: 15, onExpiring: ({ entry, expires }) => console.log(`[expiring] “${entry.name}” on ${expires}`) },
 });
 
 // The tools for an assistant, at /api/mcp, as the person `x-user` says:

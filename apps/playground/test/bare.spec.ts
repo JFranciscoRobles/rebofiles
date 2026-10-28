@@ -62,6 +62,10 @@ test('kept in a folder: it starts there, its path starts there, and nothing abov
   await host.getByRole('button', { name: 'Request files here' }).click();
   await expect(page.getByRole('dialog', { name: 'Request files for “Deeds”' })).toBeVisible();
   await page.keyboard.press('Escape');
+  // And sharing it, from the application's other button.
+  await host.getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Share “Deeds”' })).toBeVisible();
+  await page.keyboard.press('Escape');
   // Its own section of files goes back to it, not to the top of the drive.
   await host.getByRole('button', { name: 'Files', exact: true }).click();
   await expect(host.getByRole('heading', { level: 1 })).toHaveText(top.name);

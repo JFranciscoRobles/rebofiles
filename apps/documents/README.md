@@ -48,6 +48,12 @@ npm run documents   # from the root: http://localhost:5184
   field. A photo that looks blurry is asked again before it goes.
 - **What stops being good**: a document may ask until when it is good; its
   owner is told in the bell 15 days before, and asks for it again in one click.
+- **Who is who**: Carla, Beto and the teams Jurídico and Ventas are found by
+  name where something is shared, from a directory of the demo's (`people`),
+  and their names shown for their ids.
+- **Who read what**: each file seen or downloaded and each archive, by whom or
+  through which link, written in the console (`onRead`), as an audit would
+  keep it.
 
 `?lang=es` (or `zh`) shows it in Spanish; `?view=list` starts with the list.
 No one signs in: it is for one's own machine. Delete `storage/documents` to

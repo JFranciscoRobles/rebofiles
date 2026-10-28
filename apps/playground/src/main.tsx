@@ -35,6 +35,8 @@ const bare = params.get('chrome') === '0';
 function HostBar({ controls, state }: { controls: { current: DriveControls | null }; state: DriveState | null }) {
   const sections: [Section, string][] = [
     ['files', 'Files'],
+    ['starred', 'Starred'],
+    ['received', 'Received'],
     ['shared', 'Shared'],
     ['recent', 'Recent'],
     ['trash', 'Trash'],
@@ -55,6 +57,9 @@ function HostBar({ controls, state }: { controls: { current: DriveControls | nul
       </button>
       <button type="button" onClick={() => controls.current?.requestFiles()}>
         Request files here
+      </button>
+      <button type="button" onClick={() => controls.current?.share()}>
+        Share
       </button>
       <output aria-label="Shown">{state ? `${state.count} shown` : ''}</output>
     </section>

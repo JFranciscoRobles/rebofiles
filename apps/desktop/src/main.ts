@@ -7,7 +7,7 @@
 // Windows, and the bucket with the same in its rule of origins.
 
 import { type MountedDrive, mountDrive } from '@rebofiles/drive';
-import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
+import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/drive/rebodocs';
 import { type Server, type ServerProblem, forget, recall, remember, tryServer } from './server';
 import { type SyncStatus, canSync, defaultFolder, keptSync, startSync } from './sync';
 
@@ -94,6 +94,9 @@ function open(server: Server) {
     linkAddress: (token) => `${new URL(server.address).origin}/?link=${encodeURIComponent(token)}`,
     previewDocument: previewDocx,
     viewDocument: viewDocx,
+    newDocument: newDocx,
+    compareDocument: compareDocx,
+    fields: 'edit',
     thumbDocument: thumbDocx,
     textDocument: textOfDocx,
     pictureDocument: pictureOfDocx,

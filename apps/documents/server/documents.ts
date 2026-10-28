@@ -13,8 +13,9 @@
 // bytes, and each change told to a webhook, which this same demo takes at
 // /api/hooks, checks and writes in its console. Requests for files remind
 // whom they were sent to by a mail kept at /api/outbox instead of sent; what
-// is written in what comes is checked against what was asked; and what stops
-// being good is told before. Two templates of requests come with it.
+// is written in what comes is checked against what was asked; what stops
+// being good is told before; and who read what is written in its console, as
+// an audit would keep it. Two templates of requests come with it.
 
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -122,6 +123,10 @@ export const handle = createDriveHandler({
     url: (token) => `http://localhost:${PORT}/?link=${encodeURIComponent(token)}`,
   }),
   expiring: { days: 15, onExpiring: ({ entry, expires }) => console.log(`[expiring] “${entry.name}” on ${expires}`) },
+  // Who read what, where an application would keep an audit: a folder listed is left out, to keep the console readable.
+  onRead: ({ action, user, link, entries }) => {
+    if (action !== 'list') console.log(`[read] ${user?.id ?? `link ${link}`} ${action} ${entries.map((entry) => `“${entry.name}”`).join(', ')}`);
+  },
 });
 
 /** The mails kept, for the page: GET /api/outbox. */

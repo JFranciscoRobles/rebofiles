@@ -5,7 +5,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 test('a whole drive from the hooks: folders, uploads, details, renaming, versions, the trash, starred, a copy, the activity, search', async ({ page }) => {
-  await page.goto('/headless.html?as=hooks');
+  // Someone of their own each time: a drive that starts empty, again when the test is run again.
+  const who = `hooks-${test.info().retry}-${test.info().repeatEachIndex}`;
+  await page.goto(`/headless.html?as=${who}`);
   await expect(page.getByText('This folder is empty.')).toBeVisible();
 
   await page.getByRole('textbox', { name: 'Folder name' }).fill('Hooks');
@@ -17,7 +19,7 @@ test('a whole drive from the hooks: folders, uploads, details, renaming, version
   await page.getByRole('button', { name: 'note.txt' }).click();
   const details = page.getByRole('complementary', { name: 'Details' });
   await expect(details.getByRole('heading', { name: 'note.txt' })).toBeVisible();
-  await expect(details).toContainText('hooks · Hooks');
+  await expect(details).toContainText(`${who} · Hooks`);
 
   await details.getByRole('textbox', { name: 'New name' }).fill('notes.txt');
   await details.getByRole('button', { name: 'Rename' }).click();
@@ -39,7 +41,7 @@ test('a whole drive from the hooks: folders, uploads, details, renaming, version
   await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'My files' }).click();
   await page.getByRole('button', { name: '📁 Hooks' }).click();
   await page.getByRole('button', { name: 'notes.txt' }).click();
-  await expect(details.getByRole('list', { name: 'Activity' })).toContainText('hooks · renamed');
+  await expect(details.getByRole('list', { name: 'Activity' })).toContainText(`${who} · renamed`);
   await details.getByRole('button', { name: 'Add to starred' }).click();
   await expect(details.getByRole('button', { name: 'Remove from starred' })).toHaveAttribute('aria-pressed', 'true');
   await details.getByRole('button', { name: 'Make a copy' }).click();

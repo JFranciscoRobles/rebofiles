@@ -7,8 +7,9 @@ it keeps them, tries them again at every start, and asks again when they no
 longer work. **Server → Change Server…** (⇧⌘K) asks for another.
 
 Everything the drive does in a browser it does here: uploads in parts,
-resumed after a cut; the viewer and Word documents through Rebodocs; the
-.zip; sharing. What it downloads goes to Downloads, a name taken made free as
+resumed after a cut; the viewer and Word documents through Rebodocs, made new
+and compared between versions; fields of one's own on each file; the .zip;
+sharing. What it downloads goes to Downloads, a name taken made free as
 the drive does it, "report (2).pdf".
 
 ## Running it

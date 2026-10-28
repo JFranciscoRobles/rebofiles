@@ -49,8 +49,15 @@ Everything the drive does is on here, as in the playground:
   things are kept, legal holds).
 - A link of the drive (`?link=…`) shows only what it reads, its password
   asked first when it has one.
-- Comments, the events (open two windows), Word documents opened in Rebodocs
-  and saved as a new version, `?lang=`, `?theme=`, `?view=grid`.
+- Comments, the events (open two windows), Word documents made, compared
+  between versions and opened in Rebodocs, each save a new version; fields of
+  one's own on each file; `?lang=`, `?theme=`, `?view=grid`.
+- Who is who: Bea, Carl and the team are found by name where something is
+  shared (`people`), and their names shown for their ids.
+- Requests for files remind whom they were sent to, and what is about to
+  expire is told: each mail written in the console instead of sent
+  (`reminders`, `expiring`). Who read what, too (`onRead`), as an audit would
+  keep it.
 - The server makes what the page does not (`derive: deriveAll()`: a PDF's
   first page and its text, with pdf.js), refuses what is not what its name
   says (`inspect: checkType()`), says who was shared with or named in a
@@ -67,6 +74,7 @@ Deleting `storage/bucket.sqlite` starts the drive over, but what it named
 stays in the bucket until deleted there. Seeding twice gives "(2)" of each
 file.
 
-No one signs in, and everyone may do everything: it is for one's own
-machine. `server/bucket.ts` is where a site would say who is asking and what
-they may do.
+No one signs in: whoever the page says it is (`?as=`) is who asks, and what
+each may do is `byRoles`, from the drive itself. It is for one's own machine:
+`server/bucket.ts` is where a site would say who is asking and what they may
+do.

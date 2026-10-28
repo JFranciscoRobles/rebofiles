@@ -1,6 +1,7 @@
 // The drive against the bucket of `.env`, with everything it does: the same
-// <FileDrive> as the playground, Word documents previewed, shown in their
-// pages and opened in Rebodocs, each save a new version. What is uploaded goes
+// <FileDrive> as the playground, Word documents made, previewed, shown in their
+// pages, compared between versions and opened in Rebodocs, each save a new
+// version; and fields of one's own on each file. What is uploaded goes
 // straight from the page to the bucket.
 // `?lang=es` (or `zh`) shows it in Spanish, `?view=grid` starts with the grid,
 // `?theme=dark` (or `auto`) shows it dark; without them, the drive's settings
@@ -10,7 +11,7 @@
 
 import type { FileEntry } from '@rebofiles/core';
 import { DriveProvider, FileDrive, SharedLink } from '@rebofiles/react';
-import { pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
 import { StrictMode, Suspense, lazy, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -34,6 +35,9 @@ function Bucket() {
         defaultView={params.get('view') === 'grid' ? 'grid' : 'list'}
         previewDocument={previewDocx}
         viewDocument={viewDocx}
+        newDocument={newDocx}
+        compareDocument={compareDocx}
+        fields="edit"
         thumbDocument={thumbDocx}
         textDocument={textOfDocx}
         pictureDocument={pictureOfDocx}
