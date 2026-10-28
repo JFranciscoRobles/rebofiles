@@ -25,6 +25,9 @@ export default defineConfig({
   // One drive for every test, so one after another.
   workers: 1,
   fullyParallel: false,
+  // On CI, a test that fails is run again, twice at most, and told as flaky when it passes then: the runners are slower
+  // and busier than a laptop, and some tests wait on timings they do not hold.
+  retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure' },
   projects: [

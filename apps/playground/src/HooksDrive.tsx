@@ -3,10 +3,10 @@
 // hooks shows this file as it is, and a test in Chrome goes through it.
 
 import type { EntryId, FileEntry } from '@rebofiles/core';
-import { DriveProvider, type View, formatDate, formatSize, useActions, useDrive, useEntries, useEntry, useUploads } from '@rebofiles/react';
+import { DriveProvider, type View, formatDate, formatSize, useActions, useActivity, useDrive, useEntries, useEntry, useUploads } from '@rebofiles/react';
 import { type FormEvent, useState } from 'react';
 
-type Section = 'files' | 'shared' | 'recent' | 'trash';
+type Section = 'files' | 'starred' | 'shared' | 'recent' | 'trash';
 
 export function HooksDrive({ user }: { user?: string }) {
   return (
@@ -49,7 +49,7 @@ function Screen() {
     field.value = '';
   };
   const sending = uploads.find((u) => u.state === 'sending');
-  const sections: Record<Section, string> = { files: t('myFiles'), shared: t('sharedWithMe'), recent: t('recent'), trash: t('trash') };
+  const sections: Record<Section, string> = { files: t('myFiles'), starred: t('starred'), shared: t('sharedWithMe'), recent: t('recent'), trash: t('trash') };
 
   return (
     <div className="hd">
@@ -144,6 +144,9 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
   const { t, locale } = useDrive();
   const actions = useActions();
   const found = useEntry(id);
+  // Whether it is starred: the list of the starred, which asks again after a star like every other hook.
+  const starred = useEntries({ section: 'starred' }).entries.some((entry) => entry.id === id);
+  const { activity } = useActivity(id, 10);
   const [name, setName] = useState<string | null>(null);
   if (!found) return null;
   const { entry, path } = found;
@@ -168,10 +171,18 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
             <input aria-label={t('newName')} value={name ?? entry.name} onChange={(e) => setName(e.target.value)} />
             <button type="submit">{t('rename')}</button>
           </form>
+          <button type="button" aria-pressed={starred} onClick={() => attempt(() => actions.star(entry.id, !starred))}>
+            {starred ? t('unstar') : t('star')}
+          </button>
           {file && (
-            <button type="button" onClick={() => actions.url(file.id).then((url) => window.open(url, '_blank'))}>
-              {t('download')}
-            </button>
+            <>
+              <button type="button" onClick={() => actions.url(file.id).then((url) => window.open(url, '_blank'))}>
+                {t('download')}
+              </button>
+              <button type="button" onClick={() => attempt(() => actions.copy(file.id))}>
+                {t('makeCopy')}
+              </button>
+            </>
           )}
           <button type="button" onClick={() => attempt(() => actions.moveToTrash(entry.id).then(onGone))}>
             {t('moveToTrash')}
@@ -197,6 +208,18 @@ function Details({ id, inTrash, attempt, onGone }: { id: EntryId; inTrash: boole
           </ul>
         </>
       )}
+      <h3>{t('activity')}</h3>
+      {activity.length ? (
+        <ul aria-label={t('activity')}>
+          {activity.map((done) => (
+            <li key={`${done.at}-${done.action}`}>
+              {done.by} · {done.action} · {formatDate(done.at, locale)}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>{t('noActivity')}</p>
+      )}
     </aside>
   );
 }
@@ -220,6 +243,7 @@ const STYLE = `
 .hd tr.hd-on { background: #f1ead8; }
 .hd aside { width: 260px; border-left: 2px solid #1d2433; padding-left: 16px; }
 .hd aside form { display: flex; gap: 6px; margin: 8px 0; }
+.hd aside > button { display: block; margin: 4px 0; }
 .hd aside input { min-width: 0; flex: 1; }
 .hd [role='alert'] { color: #9b1c1c; }
 `;

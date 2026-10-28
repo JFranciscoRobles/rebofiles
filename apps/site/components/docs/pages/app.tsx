@@ -125,7 +125,8 @@ export const PROVIDER = `import { DriveProvider } from '@rebofiles/react';
 </DriveProvider>`;
 
 export const ENTRIES = `const { entries, path, loading, error, refresh } = useEntries({ section: 'files', folder: id });
-// or { section: 'recent' }, { section: 'shared' }, { section: 'trash' },
+// or { section: 'recent' }, { section: 'starred' }, { section: 'received' },
+//    { section: 'shared' }, { section: 'trash' },
 //    { section: 'search', query: 'contract', trashed: false }`;
 
 export const ACTIONS = `const actions = useActions();
@@ -134,6 +135,11 @@ await actions.rename(id, 'final.docx');            // refused as 409 "name-taken
 await actions.move(id, folder);
 await actions.moveToTrash(id); await actions.restore(id);
 await actions.restoreVersion(id, versionId);
+await actions.copy(id);                            // a copy beside it, or in a folder given
+await actions.star(id);                            // star(id, false) to take it back
+await actions.setColor(folder, 'green');           // null for the drive's own
+await actions.setFields(id, { case: '2026-114' }); // null takes one away
+await actions.review(id, 'rejected', 'Blurred');   // what came through a request; or 'accepted'
 await actions.upload(file, { parent, onProgress });  // or { file: id } for a new version
 await actions.share(id, 'bea', 'editor', 7);       // for a week; unshare(id, 'bea')
 const { token } = await actions.createLink(id, 7, { password: 'tea' });  // removeLink(id, link)
@@ -155,29 +161,31 @@ export const SETTINGS = `const { settings, mine, canConfigure, save, saveMine } 
 if (canConfigure) await save({ trashDays: 30 });   // the drive's
 await saveMine({ language: 'es', theme: 'dark' });  // one's own`;
 
+export const NEWER = `const { activity } = useActivity(id);                 // who did what to it, the newest first
+const { results } = useTextSearch('indemnity');        // [{ entry, snippet }]: by what is written inside
+const { notifications, unseen, saw } = useNotifications();
+const { requests, remind } = useRequests();            // [{ folder, link, token }]; remind(folder.id, link.id)
+const { people } = usePeople(typed);                   // [{ id, name, detail? }], from your directory
+const { files } = useExpiring(30);                     // [{ entry, expires, days }], the soonest first
+const { entries } = useWithField('client', 'carla');   // the files of one record of yours
+// Each asks again after every change, says \`loading\` and \`error\`, and gives nothing for an empty query.`;
+
 export const BEYOND = `import { useEffect, useState } from 'react';
 import { useDrive } from '@rebofiles/react';
 
 // What has no hook of its own is the client's: useDrive() gives it, \`revision\`
 // goes up after every change, and \`changed()\` tells every hook to ask again.
-function Starred() {
-  const { client, revision, changed } = useDrive();
-  const [starred, setStarred] = useState<Awaited<ReturnType<typeof client.starred>>>([]);
-  useEffect(() => void client.starred().then(setStarred), [client, revision]);
-  const unstar = async (id: string) => (await client.star(id, false), changed());
-  return starred.map((entry) => <button key={entry.id} onClick={() => unstar(entry.id)}>{entry.name} ★</button>);
+function Space() {
+  const { client, revision } = useDrive();
+  const [usage, setUsage] = useState<Awaited<ReturnType<typeof client.usage>> | null>(null);
+  useEffect(() => void client.usage().then(setUsage), [client, revision]);
+  return usage && <meter value={usage.used} max={usage.quota ?? usage.used} />;
 }
 
-// The same for the rest, each a route of the server:
-await client.copy(id);                     // a copy beside it
-await client.setColor(folder, 'green');    // a folder's colour
-await client.setFields(id, { case: '2026-114' });
-await client.activity(id);                 // who did what to it
-await client.searchText('indemnity');      // by what is written inside
-await client.received();                   // what came through one's requests for files
-await client.review(id, 'accepted');       // or 'rejected', with a reason
-await client.notifications();              // what one was told, and how many are new
-await client.people('be');                 // who is who, from your directory`;
+// A change of your own through the client, told to every hook after:
+const { client, changed } = useDrive();
+await client.updateLink(folder, link, { days: 14 });
+changed();`;
 
 export const TOGETHER = `<DriveProvider base="/api/files">
   <FileDrive />          {/* the whole drive */}
@@ -240,22 +248,29 @@ export const hooks: DocPage = {
       body: <Code lang="tsx" code={SETTINGS} />,
     },
     {
+      id: 'newer-hooks',
+      title: 'Activity, text, notifications, requests, people',
+      badge: 'Newer',
+      color: 'blue',
+      lead: 'What the drive shows besides its lists, each a hook: an entry’s activity, a search by what is written, what one was told, the requests for files one made, who to share with, what is about to expire and the files of one record.',
+      body: <Code lang="tsx" code={NEWER} />,
+    },
+    {
       id: 'beyond-the-hooks',
       title: 'What has no hook of its own',
       badge: 'The client',
       color: 'yellow',
       lead: (
         <>
-          Starred files, copies, folder colours, fields, activity, a search by what is written, requests for files and what came through them, notifications, people: the client has each, and{' '}
-          <C>useDrive()</C> gives it with what makes every hook ask again.
+          The space used, names of people by their ids, a link changed, an archive, a legal hold: the client has each, and <C>useDrive()</C> gives it with what makes every hook ask again.
         </>
       ),
       body: (
         <>
           <Code lang="tsx" code={BEYOND} />
           <P>
-            A change made through <C>client</C> is not seen by the hooks until <C>changed()</C> is called; what <C>useActions</C> and <C>useComments</C> do calls it already. Every function of the
-            client is in <a href={hrefOf('reference')}>the reference</a>.
+            A change made through <C>client</C> is not seen by the hooks until <C>changed()</C> is called; what the hooks give does it already. Every function of the client is in{' '}
+            <a href={hrefOf('reference')}>the reference</a>.
           </P>
         </>
       ),

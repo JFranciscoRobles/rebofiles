@@ -1,6 +1,6 @@
 {
   "name": "@rebofiles/mcp",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "The drive for an AI assistant: tools to list, search, read, write, rename, move and trash files, and with Rebodocs to edit its Word documents, through the routes of @rebofiles/server, with the rights of the one using it. No dependencies but core.",
   "license": "MIT",
   "private": true,
@@ -12,7 +12,7 @@
     "rebofiles-mcp": "./src/bin.ts"
   },
   "dependencies": {
-    "@rebofiles/core": "0.11.0"
+    "@rebofiles/core": "0.12.0"
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.12.0",

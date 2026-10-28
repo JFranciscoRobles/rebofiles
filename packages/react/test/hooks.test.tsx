@@ -8,7 +8,24 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as core from '@rebofiles/core';
 import { createMemoryClient } from '@rebofiles/drive';
-import { DriveProvider, FileDrive, useActions, useComments, useDrive, useEntries, useEntry, useSettings, useUploads } from '../src';
+import {
+  DriveProvider,
+  FileDrive,
+  useActions,
+  useActivity,
+  useComments,
+  useDrive,
+  useEntries,
+  useEntry,
+  useExpiring,
+  useNotifications,
+  usePeople,
+  useRequests,
+  useSettings,
+  useTextSearch,
+  useUploads,
+  useWithField,
+} from '../src';
 
 afterEach(cleanup);
 
@@ -169,5 +186,124 @@ describe('useComments', () => {
     await waitFor(() => expect(result.current.comments[0].resolved?.by).toBe('ana'));
     await act(() => result.current.remove(first.id));
     await waitFor(() => expect(result.current.comments).toEqual([]));
+  });
+});
+
+describe('useEntries, starred and received; useActions, what is newer', () => {
+  it('stars a file and lists it, copies it beside, gives a folder a colour and a file its fields', async () => {
+    const client = made();
+    const cases = await client.createFolder('Cases', null);
+    const report = await client.upload(new File(['a'], 'report.pdf'), { parent: cases.id });
+    const { result } = renderHook(
+      () => ({ starred: useEntries({ section: 'starred' }), inside: useEntries({ section: 'files', folder: cases.id }), entry: useEntry(report.id), actions: useActions() }),
+      { wrapper: within(client) },
+    );
+    await waitFor(() => expect(result.current.starred.loading).toBe(false));
+    expect(result.current.starred.entries).toEqual([]);
+    await act(() => result.current.actions.star(report.id));
+    await waitFor(() => expect(names(result.current.starred.entries)).toEqual(['report.pdf']));
+    await act(() => result.current.actions.copy(report.id));
+    await waitFor(() => expect(result.current.inside.entries).toHaveLength(2));
+    await act(() => result.current.actions.setFields(report.id, { case: '2026-114' }));
+    await waitFor(() => expect(result.current.entry?.entry.fields?.case).toBe('2026-114'));
+    await act(() => result.current.actions.setColor(cases.id, 'green'));
+    expect((await client.entry(cases.id)).entry).toMatchObject({ color: 'green' });
+    await act(() => result.current.actions.star(report.id, false));
+    await waitFor(() => expect(result.current.starred.entries).toEqual([]));
+  });
+
+  it('lists what came through requests, and a review of it is seen', async () => {
+    const client = made();
+    const came = await client.upload(new File(['id'], 'passport.pdf'), {});
+    const { result } = renderHook(() => ({ received: useEntries({ section: 'received' }), actions: useActions() }), {
+      wrapper: within({ ...client, received: async () => [(await client.entry(came.id)).entry] }),
+    });
+    await waitFor(() => expect(names(result.current.received.entries)).toEqual(['passport.pdf']));
+    await act(() => result.current.actions.review(came.id, 'rejected', 'Blurred'));
+    await waitFor(() => expect(result.current.received.entries[0].fields).toMatchObject({ review: 'rejected', reviewReason: 'Blurred' }));
+  });
+});
+
+describe('useActivity', () => {
+  it('says who did what to an entry, the newest first, and asks again after a change', async () => {
+    const client = made();
+    const folder = await client.createFolder('Old name', null);
+    const { result } = renderHook(() => ({ activity: useActivity(folder.id), actions: useActions() }), { wrapper: within(client) });
+    await waitFor(() => expect(result.current.activity.activity.map((a) => a.action)).toEqual(['created']));
+    await act(() => result.current.actions.rename(folder.id, 'New name'));
+    await waitFor(() => expect(result.current.activity.activity).toHaveLength(2));
+    expect(result.current.activity.activity[0]).toMatchObject({ by: 'ana', name: 'New name' });
+  });
+});
+
+describe('useTextSearch', () => {
+  it('finds a file by what is written inside, and nothing for an empty query', async () => {
+    const client = made();
+    await client.upload(new File(['x'], 'contract.txt'), { text: async () => 'The indemnity is capped at one year of fees.' });
+    const { result, rerender } = renderHook(({ query }: { query: string }) => useTextSearch(query), { wrapper: within(client), initialProps: { query: 'indemnity' } });
+    await waitFor(() => expect(result.current.results.map((r) => r.entry.name)).toEqual(['contract.txt']));
+    expect(result.current.results[0].snippet).toMatch(/indemnity/);
+    rerender({ query: '  ' });
+    expect(result.current).toMatchObject({ results: [], loading: false });
+  });
+});
+
+describe('useNotifications', () => {
+  it('reads what one was told and how many are new, and saying they were seen asks again', async () => {
+    let unseen = 1;
+    const notice = { id: 'n1', kind: 'shared' as const, entry: 'e1', name: 'Plan', by: 'bea', at: '2026-10-28T10:00:00.000Z', role: 'viewer' as const };
+    const client = { ...made(), notifications: async () => ({ notifications: [notice], unseen }), sawNotifications: async () => void (unseen = 0) };
+    const { result } = renderHook(() => useNotifications(), { wrapper: within(client) });
+    await waitFor(() => expect(result.current.unseen).toBe(1));
+    expect(result.current.notifications.map((n) => n.name)).toEqual(['Plan']);
+    await act(() => result.current.saw());
+    await waitFor(() => expect(result.current.unseen).toBe(0));
+  });
+});
+
+describe('useRequests', () => {
+  it('lists the requests for files made, and one more after a link that takes files', async () => {
+    const client = made();
+    const inbox = await client.createFolder('Inbox', null);
+    const { result } = renderHook(() => ({ requests: useRequests(), actions: useActions() }), { wrapper: within(client) });
+    await waitFor(() => expect(result.current.requests.loading).toBe(false));
+    expect(result.current.requests.requests).toEqual([]);
+    await act(() => result.current.actions.createLink(inbox.id, 7, { uploads: 'only' }));
+    await waitFor(() => expect(result.current.requests.requests.map((r) => r.folder.name)).toEqual(['Inbox']));
+  });
+});
+
+describe('usePeople', () => {
+  it('looks up who matches what is typed, and no one for nothing typed', async () => {
+    const asked: string[] = [];
+    const client = { ...made(), people: async (query: string) => (asked.push(query), [{ id: 'bea', name: 'Bea Ruiz' }]) };
+    const { result, rerender } = renderHook(({ query }: { query: string }) => usePeople(query), { wrapper: within(client), initialProps: { query: '' } });
+    expect(result.current).toMatchObject({ people: [], loading: false });
+    rerender({ query: 'be' });
+    await waitFor(() => expect(result.current.people.map((p) => p.name)).toEqual(['Bea Ruiz']));
+    expect(asked).toEqual(['be']);
+  });
+});
+
+describe('useExpiring and useWithField', () => {
+  it('lists what is about to expire, the soonest first, and the files of one record by a field', async () => {
+    const client = made();
+    const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    const passport = await client.upload(new File(['p'], 'passport.pdf'), {});
+    const licence = await client.upload(new File(['l'], 'licence.pdf'), {});
+    const deed = await client.upload(new File(['d'], 'deed.pdf'), {});
+    await client.setFields(passport.id, { expires: inDays(10), client: 'carla' });
+    await client.setFields(licence.id, { expires: inDays(3), client: 'carla' });
+    await client.setFields(deed.id, { expires: inDays(90), client: 'diego' });
+    const { result, rerender } = renderHook(({ who }: { who: string }) => ({ expiring: useExpiring(30), of: useWithField('client', who), actions: useActions() }), {
+      wrapper: within(client),
+      initialProps: { who: 'carla' },
+    });
+    await waitFor(() => expect(result.current.expiring.files.map((f) => f.entry.name)).toEqual(['licence.pdf', 'passport.pdf']));
+    await waitFor(() => expect(names(result.current.of.entries).sort()).toEqual(['licence.pdf', 'passport.pdf']));
+    await act(() => result.current.actions.setFields(deed.id, { client: 'carla' }));
+    await waitFor(() => expect(result.current.of.entries).toHaveLength(3));
+    rerender({ who: '' });
+    expect(result.current.of).toMatchObject({ entries: [], loading: false });
   });
 });

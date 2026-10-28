@@ -4,6 +4,24 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## 0.12.0 — 2026-10-28
+
+### Added
+
+- **Hooks for what is newer.** In `@rebofiles/react`, beside the ones the
+  drive was first built from: `useActivity(id)`, who did what to an entry;
+  `useTextSearch(query)`, the files with these words written inside, each
+  with a piece of its text; `useNotifications()`, what one was told, how many
+  are new, and `saw()`; `useRequests()`, the requests for files one has made,
+  and `remind`; `usePeople(query)`, who matches what is typed, from the
+  application's directory; `useExpiring(days)`, the files whose `expires`
+  comes soon, the soonest first; `useWithField(name, value)`, the files of one
+  record of yours. Each asks again after every change, and those of
+  a query give nothing for an empty one. `useEntries` takes
+  `{ section: 'starred' }` and `{ section: 'received' }`, and `useActions`
+  gives `copy`, `star`, `setColor`, `setFields` and `review`, each telling
+  every hook after.
+
 ## 0.11.0 — 2026-10-27
 
 ### Added

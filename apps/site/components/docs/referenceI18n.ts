@@ -54,11 +54,14 @@ const es: Words = {
       'El cliente y las palabras, para cada hook que tenga debajo.',
       '`base`, `client`, `headers`, `language`, `texts`, `live`; un <FileDrive> dentro usa los mismos. Cada hook vuelve a pedir cuando otro cambia el drive.',
     ],
-    useEntries: ['Una carpeta, Recientes, la papelera, Compartido conmigo o una búsqueda.', '`entries`, `path`, `loading`, `error`, `refresh`: se vuelve a pedir tras cada cambio.'],
+    useEntries: [
+      'Una carpeta, Recientes, Destacados, lo recibido por solicitudes, Compartido conmigo, la papelera o una búsqueda.',
+      '`entries`, `path`, `loading`, `error`, `refresh`: se vuelve a pedir tras cada cambio.',
+    ],
     useEntry: ['Una entrada tal como está ahora, y dónde está.', '`entry`, `path`, `trashed`; null mientras carga, o si no existe.'],
     useActions: [
       'Lo que cambia el drive, avisando después a cada hook.',
-      '`createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`.',
+      '`createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `copy`, `star`, `setColor`, `setFields`, `review`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`.',
     ],
     useUploads: [
       'Archivos subiendo, tres a la vez, con el tiempo que le queda a cada uno.',
@@ -66,6 +69,16 @@ const es: Words = {
     ],
     useSettings: ['Los ajustes del drive y los de la persona.', '`settings`, `drive`, `mine`, `canConfigure`, `save`, `saveMine`.'],
     useComments: ['Lo que se dice de una entrada, y decir más.', '`comments`, `loading`, `error`, `add`, `edit`, `resolve`, `remove`.'],
+    useActivity: ['Quién hizo qué a una entrada, lo más nuevo primero.', '`activity`, `loading`, `error`; `useActivity(id, limit?)`.'],
+    useTextSearch: ['Los archivos con estas palabras escritas dentro, cada uno con un trozo de su texto.', '`results` (`entry`, `snippet`), `loading`, `error`; nada para una búsqueda vacía.'],
+    useNotifications: ['Lo que se le dijo a quien pregunta, y cuántas son nuevas.', '`notifications`, `unseen`, `loading`, `error`, `saw()`.'],
+    useRequests: ['Las solicitudes de archivos que uno ha hecho.', '`requests` (`folder`, `link`, `token`), `loading`, `error`, `remind(folder, link)`.'],
+    useExpiring: [
+      'Los archivos cuyo campo `expires` llega en tantos días, o ya pasó: los más próximos primero.',
+      '`files` (`entry`, `expires`, `days`), `loading`, `error`; `useExpiring(days?)`, 15 si no se dice.',
+    ],
+    useWithField: ['Las entradas con un campo de este valor: los archivos de un registro tuyo.', '`entries`, `loading`, `error`; nada sin valor.'],
+    usePeople: ['Quién coincide con lo escrito, de tu directorio, para compartir.', '`people`, `loading`, `error`; nadie para una búsqueda vacía.'],
     useDrive: [
       'El propio provider.',
       '`client`, `revision`, `changed()`, `t`, `locale`, `settings`: cada ruta como función, un número que sube tras cada cambio, y las palabras del drive. Para lo que no tiene hook propio.',
@@ -223,11 +236,11 @@ const zh: Words = {
       '客户端与文字，供其下的每个 hook 使用。',
       '`base`、`client`、`headers`、`language`、`texts`、`live`；放在其中的 <FileDrive> 也使用相同的设置。他人更改网盘时，每个 hook 都会重新获取。',
     ],
-    useEntries: ['一个文件夹、最近、回收站、与我共享，或一次搜索。', '`entries`、`path`、`loading`、`error`、`refresh`：每次改动后重新获取。'],
+    useEntries: ['一个文件夹、最近、星标、通过请求收到的文件、与我共享、回收站，或一次搜索。', '`entries`、`path`、`loading`、`error`、`refresh`：每次改动后重新获取。'],
     useEntry: ['某个条目的当前状态及其位置。', '`entry`、`path`、`trashed`；加载中或不存在时为 null。'],
     useActions: [
       '修改网盘的操作，完成后通知每个 hook。',
-      '`createFolder`、`rename`、`move`、`moveToTrash`、`restore`、`deleteForever`、`emptyTrash`、`restoreVersion`、`share`、`unshare`、`createLink`、`removeLink`、`linkToken`、`upload`、`url`。',
+      '`createFolder`、`rename`、`move`、`moveToTrash`、`restore`、`deleteForever`、`emptyTrash`、`restoreVersion`、`copy`、`star`、`setColor`、`setFields`、`review`、`share`、`unshare`、`createLink`、`removeLink`、`linkToken`、`upload`、`url`。',
     ],
     useUploads: [
       '正在上传的文件，同时三个，每个都有剩余时间。',
@@ -235,6 +248,13 @@ const zh: Words = {
     ],
     useSettings: ['网盘的设置和个人设置。', '`settings`、`drive`、`mine`、`canConfigure`、`save`、`saveMine`。'],
     useComments: ['某个条目的评论，以及发表新评论。', '`comments`、`loading`、`error`、`add`、`edit`、`resolve`、`remove`。'],
+    useActivity: ['谁对某个条目做了什么，最新的在前。', '`activity`、`loading`、`error`；`useActivity(id, limit?)`。'],
+    useTextSearch: ['内容中包含这些文字的文件，每个附带一段文本。', '`results`（`entry`、`snippet`）、`loading`、`error`；查询为空时无结果。'],
+    useNotifications: ['发给当前用户的通知，以及新通知的数量。', '`notifications`、`unseen`、`loading`、`error`、`saw()`。'],
+    useRequests: ['自己发出的文件请求。', '`requests`（`folder`、`link`、`token`）、`loading`、`error`、`remind(folder, link)`。'],
+    useExpiring: ['字段 `expires` 在若干天内到期或已过期的文件，最近的在前。', '`files`（`entry`、`expires`、`days`）、`loading`、`error`；`useExpiring(days?)`，默认 15 天。'],
+    useWithField: ['某字段等于此值的条目：你某条记录的文件。', '`entries`、`loading`、`error`；没有值时为空。'],
+    usePeople: ['来自你的目录、与输入内容匹配的人，用于共享。', '`people`、`loading`、`error`；输入为空时无人。'],
     useDrive: ['provider 本身。', '`client`、`revision`、`changed()`、`t`、`locale`、`settings`：以函数形式提供的每条路由、每次变更后递增的数字，以及网盘的文字。用于没有专门 hook 的功能。'],
   },
   client: {

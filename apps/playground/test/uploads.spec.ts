@@ -10,10 +10,16 @@ import { expect, test } from '@playwright/test';
 const MiB = 1024 * 1024;
 
 test('files go up together, each saying how long it has left, and one is stopped and sent again', async ({ page }) => {
+  // Two files of 60 MiB, read and sent on a runner slower than a laptop.
+  test.setTimeout(90_000);
   await page.goto('/?as=panel');
-  // Each part held a while, as a slow connection holds it: long enough to be seen going.
+  // the first parts (six of the sixteen, too few to finish either) held a while, as a slow connection holds them, long enough to be seen going; the rest held until
+  // one is stopped, so that neither is done before: on a slow runner, they were.
+  let release = () => {};
+  const stopped = new Promise<void>((done) => (release = done));
+  let sent = 0;
   await page.route('**/api/files/bytes?**', async (route) => {
-    if (route.request().method() === 'PUT') await new Promise((done) => setTimeout(done, 1200));
+    if (route.request().method() === 'PUT') await (sent++ < 6 ? new Promise((done) => setTimeout(done, 1200)) : stopped);
     // A part of the one stopped is gone by then, its request taken back by the page.
     return route.continue().catch(() => undefined);
   });
@@ -38,6 +44,7 @@ test('files go up together, each saying how long it has left, and one is stopped
 
   await panel.getByRole('button', { name: 'Stop rebofiles-video-b.bin' }).click();
   await expect(panel.locator('.rf-up-stopped')).toContainText('Stopped');
+  release();
   await page.unroute('**/api/files/bytes?**');
   await expect(page.getByRole('option', { name: /^rebofiles-video-a\.bin/ })).toBeVisible({ timeout: 30_000 });
   await panel.getByRole('button', { name: 'Try again' }).click();

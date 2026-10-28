@@ -6,7 +6,7 @@ import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
 import { COMMENTS_HOOK } from '../team';
-import { ACTIONS, BEYOND, ENTRIES, ENTRY, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { ACTIONS, BEYOND, ENTRIES, ENTRY, NEWER, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/app.tsx';
@@ -147,21 +147,29 @@ export const hooks: DocPage = {
       body: <Code lang="tsx" code={SETTINGS} />,
     },
     {
+      id: 'newer-hooks',
+      title: 'Actividad, texto, notificaciones, solicitudes, personas',
+      badge: 'Más',
+      color: 'blue',
+      lead: 'Lo que el drive muestra además de sus listas, cada uno un hook: la actividad de una entrada, la búsqueda por lo que está escrito, lo que se le dijo a uno, las solicitudes de archivos que hizo, con quién compartir, lo que está por vencer y los archivos de un registro.',
+      body: <Code lang="tsx" code={NEWER} />,
+    },
+    {
       id: 'beyond-the-hooks',
       title: 'Lo que no tiene hook propio',
       badge: 'El cliente',
       color: 'yellow',
       lead: (
         <>
-          Los destacados, las copias, los colores de carpeta, los campos, la actividad, la búsqueda por lo que está escrito, las solicitudes de archivos y lo que llegó por ellas, las notificaciones,
-          las personas: el cliente tiene cada una, y <C>useDrive()</C> lo da con lo que hace que todos los hooks pidan de nuevo.
+          El espacio usado, los nombres de las personas por su id, un enlace cambiado, un archivo comprimido, una retención legal: el cliente tiene cada uno, y <C>useDrive()</C> lo da con lo que hace
+          que todos los hooks pidan de nuevo.
         </>
       ),
       body: (
         <>
           <Code lang="tsx" code={BEYOND} />
           <P>
-            Un cambio hecho con <C>client</C> no lo ven los hooks hasta llamar a <C>changed()</C>; lo que hacen <C>useActions</C> y <C>useComments</C> ya lo llama. Cada función del cliente está en{' '}
+            Un cambio hecho con <C>client</C> no lo ven los hooks hasta llamar a <C>changed()</C>; lo que dan los hooks ya lo hace. Cada función del cliente está en{' '}
             <a href={to('reference')}>la referencia</a>.
           </P>
         </>

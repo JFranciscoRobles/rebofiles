@@ -23,8 +23,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'packages/react',
-    count: 10,
-    what: 'The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change through useActions; a view loading as itself, not as the last; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and <FileDrive> beside the hooks; and useComments.',
+    count: 18,
+    what: 'The hooks in components, against the drive kept in the page: a folder, a search, Recent and the trash asked again after a change through useActions; a view loading as itself, not as the last; useEntry after a rename; settings and the language following them; uploads and their end; what someone else changed shown without asking; and <FileDrive> beside the hooks; and useComments. Starred and received, a copy, a colour, fields and a review through useActions; an entry’s activity, a search by what is written, notifications seen, requests for files and people looked up, what is about to expire and the files of one record, each in a hook of its own.',
   },
   {
     where: 'packages/sync',

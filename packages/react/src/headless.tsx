@@ -2,9 +2,23 @@
 // hooks for what a screen of your own needs. The whole <FileDrive> is built
 // from these and nothing else.
 
-import type { Comment, DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, PersonalSettings } from '@rebofiles/core';
+import type { Activity, Comment, DriveSettings, Entry, EntryId, FileEntry, FolderEntry, ImageSettings, Notice, PersonalSettings } from '@rebofiles/core';
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type DriveClient, type SettingsAnswer, TEXTS, type Texts, type Translate, type UploadItem, createDriveClient, createUploads, lookInDrive, textOf, translator } from '@rebofiles/drive';
+import {
+  type DriveClient,
+  type SettingsAnswer,
+  type Someone,
+  TEXTS,
+  type TextFound,
+  type Texts,
+  type Translate,
+  type UploadItem,
+  createDriveClient,
+  createUploads,
+  lookInDrive,
+  textOf,
+  translator,
+} from '@rebofiles/drive';
 
 interface DriveContext {
   client: DriveClient;
@@ -88,8 +102,15 @@ export function useDrive(): DriveContext {
   return context;
 }
 
-/** What a list shows: a folder, the recent files, the trash, or what a search found. */
-export type View = { section: 'files'; folder: EntryId | null } | { section: 'recent' } | { section: 'shared' } | { section: 'trash' } | { section: 'search'; query: string; trashed?: boolean };
+/** What a list shows: a folder, the recent files, the starred, what came through requests, what others shared, the trash, or what a search found. */
+export type View =
+  | { section: 'files'; folder: EntryId | null }
+  | { section: 'recent' }
+  | { section: 'starred' }
+  | { section: 'received' }
+  | { section: 'shared' }
+  | { section: 'trash' }
+  | { section: 'search'; query: string; trashed?: boolean };
 
 export interface Entries {
   entries: Entry[];
@@ -115,11 +136,15 @@ export function useEntries(view: View): Entries {
         ? client.list(view.folder)
         : view.section === 'recent'
           ? client.recent().then((entries) => ({ entries, path: [] }))
-          : view.section === 'shared'
-            ? client.shared().then((entries) => ({ entries, path: [] }))
-            : view.section === 'trash'
-              ? client.trash().then((entries) => ({ entries, path: [] }))
-              : client.search(view.query, { trashed: view.trashed }).then((entries) => ({ entries, path: [] }));
+          : view.section === 'starred'
+            ? client.starred().then((entries) => ({ entries, path: [] }))
+            : view.section === 'received'
+              ? client.received().then((entries) => ({ entries, path: [] }))
+              : view.section === 'shared'
+                ? client.shared().then((entries) => ({ entries, path: [] }))
+                : view.section === 'trash'
+                  ? client.trash().then((entries) => ({ entries, path: [] }))
+                  : client.search(view.query, { trashed: view.trashed }).then((entries) => ({ entries, path: [] }));
     asked.then(
       ({ entries, path }) => live && setState({ entries, path, loading: false, error: null, of: key }),
       (error: Error) => live && setState({ entries: [], path: [], loading: false, error, of: key }),
@@ -189,6 +214,91 @@ export function useComments(id: EntryId | null) {
   };
 }
 
+/**
+ * What `ask` answers, asked again after every change and when `key` changes;
+ * `empty` while it loads, and not the last key's answer as this one's.
+ */
+function useAsked<T>(key: string | null, ask: (client: DriveClient) => Promise<T>, empty: T) {
+  const { client, revision } = useDrive();
+  const [state, setState] = useState<{ of: string | null; value: T; error: Error | null }>({ of: null, value: empty, error: null });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked again after every change, which `revision` counts, and for each key, not each new `ask`
+  useEffect(() => {
+    if (key === null) return setState({ of: null, value: empty, error: null });
+    let live = true;
+    ask(client).then(
+      (value) => live && setState({ of: key, value, error: null }),
+      (error: Error) => live && setState({ of: key, value: empty, error }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [client, key, revision]);
+  const mine = state.of === key;
+  return { value: mine ? state.value : empty, loading: key !== null && !mine, error: mine ? state.error : null };
+}
+
+const NONE: never[] = [];
+
+/** Who did what to an entry, the newest first. */
+export function useActivity(id: EntryId | null, limit = 50) {
+  const { value, loading, error } = useAsked(id && `${id}:${limit}`, (client) => client.activity(id!, limit), NONE as Activity[]);
+  return { activity: value, loading, error };
+}
+
+/** The files with these words written inside, each with a piece of its text around them; none for an empty query. */
+export function useTextSearch(query: string, limit = 50) {
+  const asked = query.trim();
+  const { value, loading, error } = useAsked(asked ? `${asked}:${limit}` : null, (client) => client.searchText(asked, limit), NONE as TextFound[]);
+  return { results: value, loading, error };
+}
+
+/** What the one asking was told, the newest first, how many are new, and saying they were seen. */
+export function useNotifications() {
+  const { client, changed } = useDrive();
+  const { value, loading, error } = useAsked('', (client) => client.notifications(), { notifications: NONE as Notice[], unseen: 0 });
+  const saw = useCallback(async () => {
+    await client.sawNotifications();
+    changed();
+  }, [client, changed]);
+  return { notifications: value.notifications, unseen: value.unseen, loading, error, saw };
+}
+
+/** The requests for files the one asking has made, each with its folder, its link and its token; and reminding whom one was sent to. */
+export function useRequests() {
+  const { client, changed } = useDrive();
+  const { value, loading, error } = useAsked('', (client) => client.requests(), NONE as Awaited<ReturnType<DriveClient['requests']>>);
+  const remind = useCallback(
+    async (folder: EntryId, link: string) => {
+      try {
+        return await client.remind(folder, link);
+      } finally {
+        changed();
+      }
+    },
+    [client, changed],
+  );
+  return { requests: value, loading, error, remind };
+}
+
+/** Who matches what is typed, from the application's directory, to share with; none for an empty query. */
+export function usePeople(query: string) {
+  const asked = query.trim();
+  const { value, loading, error } = useAsked(asked || null, (client) => client.people(asked), NONE as Someone[]);
+  return { people: value, loading, error };
+}
+
+/** The files one may read whose field `expires` comes within so many days, or passed: the soonest first. */
+export function useExpiring(days = 15) {
+  const { value, loading, error } = useAsked(String(days), (client) => client.expiring(days), NONE as Awaited<ReturnType<DriveClient['expiring']>>);
+  return { files: value, loading, error };
+}
+
+/** The entries one may read with a field of this value, as the files of one record of yours; none without a value. */
+export function useWithField(name: string, value: string) {
+  const { value: entries, loading, error } = useAsked(name && value ? JSON.stringify([name, value]) : null, (client) => client.withField(name, value), NONE as Entry[]);
+  return { entries, loading, error };
+}
+
 /** The changes, each telling the provider when it is done so that every hook asks again. */
 export function useActions() {
   const { client, changed } = useDrive();
@@ -211,6 +321,13 @@ export function useActions() {
       deleteForever: then(client.deleteForever),
       emptyTrash: then(client.emptyTrash),
       restoreVersion: then(client.restoreVersion),
+      /** A copy of a file, beside it unless a folder is given. */
+      copy: then(client.copy),
+      star: then(client.star),
+      setColor: then(client.setColor),
+      setFields: then(client.setFields),
+      /** A file that came through a request accepted, or turned back with a reason. */
+      review: then(client.review),
       share: then(client.share),
       unshare: then(client.unshare),
       createLink: then(client.createLink),

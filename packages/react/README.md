@@ -129,38 +129,42 @@ function Folder({ id }: { id: string | null }) {
 
 | Hook | What it gives |
 | --- | --- |
-| `useEntries(view)` | A folder, the recent files, Shared with me, the trash or a search, asked again after every change. |
+| `useEntries(view)` | A folder, the recent files, the starred, what came through requests (`'received'`), Shared with me, the trash or a search, asked again after every change. |
 | `useEntry(id)` | One entry as it is now, and where it is; null while it loads. |
-| `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`. |
+| `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `copy`, `star`, `setColor`, `setFields`, `review`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`. |
 | `useUploads({ check })` | Files sent three at a time, in parts, with what has gone of each, how fast and how long it has left (`uploads`, `summary`); `retry`, `stop`, `stopAll`, `dismiss`, `clear`. With `check: true`, each looked for in the drive first and asked about (`decide`). |
 | `useSettings()` | The drive's settings and the person's own, and `save`, `saveMine`. |
 | `useComments(id)` | What is said of an entry, each thread with its replies; `add`, `edit`, `resolve`, `remove`. |
+| `useActivity(id)` | Who did what to an entry, the newest first. |
+| `useTextSearch(query)` | The files with these words written inside, each with a piece of its text (`entry`, `snippet`). |
+| `useNotifications()` | What the one asking was told, how many are new (`unseen`), and `saw()`. |
+| `useRequests()` | The requests for files one has made, each with its folder, link and token; `remind(folder, link)`. |
+| `useExpiring(days)` | The files whose field `expires` comes within so many days, or passed: the soonest first. |
+| `useWithField(name, value)` | The entries with a field of this value: the files of one record of yours. |
+| `usePeople(query)` | Who matches what is typed, from your directory, to share with. |
 | `useDrive()` | The provider itself: `client`, every route as a function; `revision`, which goes up after each change; and `changed()`, to tell every hook to ask again. |
 
 Every hook asks again when someone else changes the drive, a moment after,
-from the server's `/events` (`<DriveProvider live={false}>` for none).
+from the server's `/events` (`<DriveProvider live={false}>` for none). Those
+that take a query give nothing, without asking, for an empty one.
 
 ### What has no hook of its own
 
-Starred files, copies, folder colours, fields, activity, a search by what is
-written, requests for files and what came through them, notifications and
-people are the client's: `useDrive()` gives it, with `revision` to ask again
-when the drive changes and `changed()` to tell every hook after a change of
-yours.
+The space used, names of people by their ids, a link changed, an archive, a
+legal hold are the client's: `useDrive()` gives
+it, with `revision` to ask again when the drive changes and `changed()` to
+tell every hook after a change of yours.
 
 ```tsx
-function Starred() {
-  const { client, revision, changed } = useDrive();
-  const [starred, setStarred] = useState<Awaited<ReturnType<typeof client.starred>>>([]);
-  useEffect(() => void client.starred().then(setStarred), [client, revision]);
-  const unstar = async (id: string) => (await client.star(id, false), changed());
-  return starred.map((entry) => <button key={entry.id} onClick={() => unstar(entry.id)}>{entry.name} ★</button>);
+function Space() {
+  const { client, revision } = useDrive();
+  const [usage, setUsage] = useState<Awaited<ReturnType<typeof client.usage>> | null>(null);
+  useEffect(() => void client.usage().then(setUsage), [client, revision]);
+  return usage && <meter value={usage.used} max={usage.quota ?? usage.used} />;
 }
 ```
 
-The same for `client.copy`, `setColor`, `setFields`, `activity`,
-`searchText`, `received`, `review`, `notifications`, `people`: every function
-of the client is in the reference of the documentation.
+Every function of the client is in the reference of the documentation.
 
 ## Settings of your own
 
@@ -197,9 +201,9 @@ axe; the client is tested in `@rebofiles/drive`. On npm.
 
 ## Where it can improve
 
-- **Hooks for what is newer:** starred files, the activity, a search by what
-  is written, folder colours, requests for files and notifications are in
-  `<FileDrive>` and in the client of `useDrive()`, not yet hooks of their own.
+- **More of the client as hooks:** the space used and the screens of whoever
+  looks after the drive are in the client of `useDrive()`, not yet hooks of
+  their own.
 
 ## License
 

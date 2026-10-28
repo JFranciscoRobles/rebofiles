@@ -65,7 +65,8 @@ test('a request from a template, its QR code, a reminder, a date asked, and what
   await expect(ready.getByRole('img', { name: /QR code of the request Carla Ruiz/ }).locator('svg')).toBeVisible();
   const download = page.waitForEvent('download');
   await ready.getByRole('button', { name: 'Download QR' }).click();
-  expect((await download).suggestedFilename()).toBe('QR - Carla Ruiz.png');
+  // WebKit on Linux gives spaces back as underscores.
+  expect((await download).suggestedFilename().replaceAll('_', ' ')).toBe('QR - Carla Ruiz.png');
 
   // Reminded at once, by a mail the demo keeps instead of sending.
   await ready.getByRole('button', { name: 'Remind now · Carla Ruiz' }).click();

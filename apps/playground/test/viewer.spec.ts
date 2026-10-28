@@ -15,7 +15,7 @@ async function axe(page: Page) {
   return violations.map((v) => `${v.id} (${v.impact}): ${v.help} · ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
 
-test('each kind shown in the viewer, the arrows going through them, no tab opened', async ({ page, browserName }) => {
+test('each kind shown in the viewer, the arrows going through them, no tab opened', async ({ page }) => {
   await page.goto('/?as=viewer');
   // Popups of the drive's page: axe opens a page of its own, which is not one.
   const tabs: string[] = [];
@@ -38,6 +38,7 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
     { name: 'e-config.json', mimeType: 'application/json', buffer: Buffer.from('{"a":1,"b":[2,3]}') },
   ]);
   await expect(item(page, 'e-config.json')).toBeVisible();
+  const webp = await page.evaluate(() => document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'));
 
   // A Word document's thumbnail is a picture of its first page, made when it was uploaded and kept with it.
   await expect
@@ -45,8 +46,9 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
       const found = (await (await page.request.get('/api/files/search?q=agreement', { headers: { 'x-user': 'viewer' } })).json()).entries[0];
       return found.versions[0].renditions?.map((r: { type: string }) => r.type);
     })
-    // WebP, which keeps the text of a page sharper and lighter than JPEG; JPEG where the browser makes no WebP, as Safari.
-    .toEqual(browserName === 'webkit' ? ['image/jpeg', 'image/jpeg'] : ['image/webp', 'image/webp']);
+    // WebP, which keeps the text of a page sharper and lighter than JPEG; JPEG where the browser makes no WebP, as Safari
+    // (WebKit on Linux makes it): asked of the browser as the drive asks it.
+    .toEqual(Array(2).fill(webp ? 'image/webp' : 'image/jpeg'));
   await item(page, 'a-agreement.docx').click();
   await expect(page.getByRole('complementary', { name: 'Details' }).locator('img.rf-doc-pic')).toBeVisible();
   await page.getByRole('button', { name: 'Grid' }).click();

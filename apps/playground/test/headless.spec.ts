@@ -4,7 +4,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('a whole drive from the hooks: folders, uploads, details, renaming, versions, the trash, search', async ({ page }) => {
+test('a whole drive from the hooks: folders, uploads, details, renaming, versions, the trash, starred, a copy, the activity, search', async ({ page }) => {
   await page.goto('/headless.html?as=hooks');
   await expect(page.getByText('This folder is empty.')).toBeVisible();
 
@@ -35,8 +35,22 @@ test('a whole drive from the hooks: folders, uploads, details, renaming, version
   await page.getByRole('complementary', { name: 'Details' }).getByRole('button', { name: 'Restore' }).click();
   await expect(page.getByText('This folder is empty.')).toBeVisible();
 
+  // Starred, a copy and what was done, from the hooks too.
+  await page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name: 'My files' }).click();
+  await page.getByRole('button', { name: '📁 Hooks' }).click();
+  await page.getByRole('button', { name: 'notes.txt' }).click();
+  await expect(details.getByRole('list', { name: 'Activity' })).toContainText('hooks · renamed');
+  await details.getByRole('button', { name: 'Add to starred' }).click();
+  await expect(details.getByRole('button', { name: 'Remove from starred' })).toHaveAttribute('aria-pressed', 'true');
+  await details.getByRole('button', { name: 'Make a copy' }).click();
+  await expect(page.getByRole('button', { name: 'notes (2).txt' })).toBeVisible();
+  await page.getByRole('button', { name: 'Starred', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'notes.txt' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'notes (2).txt' })).toHaveCount(0);
+
   await page.getByRole('searchbox').fill('notes');
   await expect(page.getByRole('button', { name: 'notes.txt' })).toBeVisible();
+  await page.getByRole('button', { name: 'notes.txt' }).click();
   const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(violations.map((v) => v.id)).toEqual([]);
 });

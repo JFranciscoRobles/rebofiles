@@ -18,6 +18,13 @@ export {
   useUploads,
   useSettings,
   useComments,
+  useActivity,
+  useTextSearch,
+  useNotifications,
+  useRequests,
+  usePeople,
+  useExpiring,
+  useWithField,
 } from './headless';
 // What the drive is made of, from @rebofiles/drive, so that an application of React needs only this package.
 export {
@@ -41,6 +48,7 @@ export {
   type Conflict,
   type Choice,
   type DriveEvent,
+  type TextFound,
   type Exported,
   RequestError,
   refusalText,

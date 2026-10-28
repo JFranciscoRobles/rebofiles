@@ -5,7 +5,7 @@ import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
 import { COMMENTS_HOOK } from '../team';
-import { ACTIONS, BEYOND, ENTRIES, ENTRY, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { ACTIONS, BEYOND, ENTRIES, ENTRY, NEWER, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/app.tsx';
@@ -138,20 +138,28 @@ export const hooks: DocPage = {
       body: <Code lang="tsx" code={SETTINGS} />,
     },
     {
+      id: 'newer-hooks',
+      title: '活动、文本、通知、请求、人员',
+      badge: '更多',
+      color: 'blue',
+      lead: '网盘在列表之外展示的内容，各有一个 hook：条目的活动、按内容搜索、发给自己的通知、自己发出的文件请求、可共享的人、即将到期的文件，以及某条记录的文件。',
+      body: <Code lang="tsx" code={NEWER} />,
+    },
+    {
       id: 'beyond-the-hooks',
       title: '没有专门 hook 的功能',
       badge: '客户端',
       color: 'yellow',
       lead: (
         <>
-          星标、副本、文件夹颜色、字段、活动、按内容搜索、文件请求及通过它收到的文件、通知、人员：客户端都提供，<C>useDrive()</C> 会给出它，以及让每个 hook 重新获取的方法。
+          已用空间、按 id 获取人名、修改链接、打包、法律保留：客户端都提供，<C>useDrive()</C> 会给出它，以及让每个 hook 重新获取的方法。
         </>
       ),
       body: (
         <>
           <Code lang="tsx" code={BEYOND} />
           <P>
-            通过 <C>client</C> 做的变更，在调用 <C>changed()</C> 之前 hooks 看不到；<C>useActions</C> 和 <C>useComments</C> 已经会调用它。客户端的每个函数都在<a href={to('reference')}>参考</a>中。
+            通过 <C>client</C> 做的变更，在调用 <C>changed()</C> 之前 hooks 看不到；hooks 提供的操作已经会调用它。客户端的每个函数都在<a href={to('reference')}>参考</a>中。
           </P>
         </>
       ),

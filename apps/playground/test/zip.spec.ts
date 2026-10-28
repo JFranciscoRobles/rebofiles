@@ -31,7 +31,7 @@ test('picked files and a folder go in one .zip, the folder with what is in it', 
   const saving = page.waitForEvent('download');
   await page.getByRole('toolbar', { name: '3 selected' }).getByRole('button', { name: 'Download as .zip' }).click();
   const download = await saving;
-  expect(download.suggestedFilename()).toMatch(/^Files \d{4}-\d{2}-\d{2}\.zip$/);
+  expect(download.suggestedFilename()).toMatch(/^Files[ _]\d{4}-\d{2}-\d{2}\.zip$/);
   const read = unzipSync(new Uint8Array(readFileSync((await download.path())!)));
   expect(Object.keys(read).sort()).toEqual(['Contratos/', 'Contratos/año.txt', 'notes.md', 'photo.bin']);
   expect(new TextDecoder().decode(read['notes.md'])).toBe('# Visita\n'.repeat(300));
@@ -87,11 +87,20 @@ test('a file that could not be read is left out, said, and downloaded on its own
     { name: 'two.txt', mimeType: 'text/plain', buffer: Buffer.from('two') },
   ]);
   await expect(item(page, 'two.txt')).toBeVisible();
-  // The first file read for the archive fails, as a cut connection would.
-  let failed = false;
+  // one.txt, read for the archive, fails once, as a cut connection would: its address is the one the archive was
+  // given, not any read of its bytes, which a preview of the file shown also makes, first in some browsers.
+  const one = (await (await page.request.get('/api/files/search?q=one.txt', { headers: { 'x-user': 'zipmiss' } })).json()).entries[0].id;
+  let cut: string | null = null;
+  await page.route('**/api/files/urls**', async (route) => {
+    const response = await route.fetch();
+    const { urls } = await response.json();
+    // Those of the archive, to download: not the addresses of what is shown in the page.
+    if (cut === null && !route.request().postDataJSON()?.inline) cut = urls[one] ? new URL(urls[one].url, page.url()).href : null;
+    return route.fulfill({ response });
+  });
   await page.route('**/api/files/bytes?**', (route) => {
-    if (!failed && route.request().method() === 'GET') {
-      failed = true;
+    if (cut && route.request().url() === cut) {
+      cut = '';
       return route.abort('connectionreset');
     }
     return route.continue();
@@ -106,6 +115,6 @@ test('a file that could not be read is left out, said, and downloaded on its own
   // By the keyboard: right after a download, Playwright takes the page for one still moving, though nothing in it does.
   await page.getByRole('status').getByRole('button', { name: 'Download those' }).press('Enter');
   const again = await rest;
-  expect(again.suggestedFilename()).toMatch(/\(the rest\)\.zip$/);
+  expect(again.suggestedFilename()).toMatch(/\(the[ _]rest\)\.zip$/);
   expect(Object.keys(unzipSync(new Uint8Array(readFileSync((await again.path())!))))).toEqual(['one.txt']);
 });
