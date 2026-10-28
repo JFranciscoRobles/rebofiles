@@ -5,12 +5,12 @@ import { REPO, docHref } from '@/lib/site';
 import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
-import { COMMENTS_HOOK } from '../team';
-import { ACTIONS, BEYOND, ENTRIES, ENTRY, NEWER, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { HookExplorer } from '../../hooks/Explorer';
+import { BEYOND, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SHARED, SPANISH, THEMED, TOGETHER, VANILLA, WHOLE, propId } from '../app';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/app.tsx';
-const { PROPS, HOOKS } = referenceIn('es');
+const { PROPS } = referenceIn('es');
 const GROUP_NAMES: Record<PropGroup, string> = { Server: 'servidor', Look: 'aspecto', Files: 'archivos', 'Word documents': 'documentos de Word', Events: 'eventos' };
 
 export const react: DocPage = {
@@ -92,68 +92,13 @@ export const hooks: DocPage = {
   sections: [
     {
       id: 'the-hooks',
-      title: 'Los hooks',
-      badge: 'Referencia',
+      title: 'Prueba cada hook',
+      badge: 'En vivo',
       color: 'green',
-      body: <RefTable label="Hooks" name="Hook" rows={HOOKS.map((hook) => ({ id: hookId(hook.name), name: hook.name, does: withCode(`${hook.short} ${hook.gives}`) }))} />,
+      lead: 'Cada hook funcionando sobre un drive guardado en esta página: cambia algo en la demo y mira cómo cambia lo que devuelve el hook. El código de abajo es el de la demo, tal como está en su archivo.',
+      body: <HookExplorer />,
     },
     { id: 'driveprovider', title: 'DriveProvider', badge: 'Provider', color: 'purple', lead: 'El cliente y las palabras, para cada hook que tenga debajo.', body: <Code lang="tsx" code={PROVIDER} /> },
-    {
-      id: 'useentries',
-      title: 'useEntries',
-      badge: 'Leer',
-      color: 'blue',
-      lead: 'Una vista del drive, pedida de nuevo tras cada cambio hecho a través del provider.',
-      body: <Code lang="tsx" code={ENTRIES} />,
-    },
-    {
-      id: 'useentry',
-      title: 'useEntry',
-      badge: 'Leer',
-      color: 'blue',
-      lead: 'Una entrada tal como está ahora, y las carpetas por encima, pedida de nuevo tras cada cambio.',
-      body: <Code lang="tsx" code={ENTRY} />,
-    },
-    {
-      id: 'useactions',
-      title: 'useActions',
-      badge: 'Cambiar',
-      color: 'yellow',
-      lead: 'Lo que cambia el drive; cada acción avisa después a todos los hooks.',
-      body: <Code lang="tsx" code={ACTIONS} />,
-    },
-    {
-      id: 'useuploads',
-      title: 'useUploads',
-      badge: 'Subir',
-      color: 'orange',
-      lead: 'Archivos enviados de tres en tres, cada uno en partes, con su velocidad y el tiempo que le queda, y lo mismo de todos juntos.',
-      body: <Code lang="tsx" code={UPLOADS} />,
-    },
-    {
-      id: 'usecomments',
-      title: 'useComments',
-      badge: 'Comentarios',
-      color: 'purple',
-      lead: 'Lo que se dice de una entrada, cada hilo con sus respuestas debajo; añadir, editar, resolver y quitar avisan después a todos los hooks.',
-      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
-    },
-    {
-      id: 'usesettings',
-      title: 'useSettings',
-      badge: 'Ajustes',
-      color: 'green',
-      lead: 'Los ajustes del drive y los de la persona, para un panel de ajustes tuyo.',
-      body: <Code lang="tsx" code={SETTINGS} />,
-    },
-    {
-      id: 'newer-hooks',
-      title: 'Actividad, texto, notificaciones, solicitudes, personas',
-      badge: 'Más',
-      color: 'blue',
-      lead: 'Lo que el drive muestra además de sus listas, cada uno un hook: la actividad de una entrada, la búsqueda por lo que está escrito, lo que se le dijo a uno, las solicitudes de archivos que hizo, con quién compartir, lo que está por vencer y los archivos de un registro.',
-      body: <Code lang="tsx" code={NEWER} />,
-    },
     {
       id: 'beyond-the-hooks',
       title: 'Lo que no tiene hook propio',

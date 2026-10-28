@@ -203,3 +203,70 @@ dialog.sheet::backdrop,
 dialog.palette::backdrop {
   background: rgba(47, 46, 43, 0.35);
 }
+
+/* The demos of the hooks are plain markup, as an application's first try is: given a look here only. */
+.hook-demo ul,
+.hook-demo ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hook-demo li {
+  padding: 6px 0;
+  border-top: 1px solid #f0eee9;
+}
+.hook-demo li:first-child {
+  border-top: 0;
+}
+.hook-demo h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.hook-demo p {
+  margin: 4px 0;
+}
+.hook-demo button {
+  margin: 2px 6px 2px 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hook-demo button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+.hook-demo button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hook-demo li > button:only-child,
+.hook-demo nav button {
+  border: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  color: var(--color-brand);
+}
+.hook-demo input,
+.hook-demo select {
+  height: 30px;
+  margin-right: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font: inherit;
+}
+.hook-demo label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+}
+.hook-demo small {
+  color: var(--color-muted);
+}

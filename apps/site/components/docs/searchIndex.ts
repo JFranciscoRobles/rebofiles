@@ -4,7 +4,8 @@
 
 import type { Locale } from '@/lib/i18n';
 import { docHref, navOf } from '@/lib/site';
-import { hookId, propId } from './pages/app';
+import { hookHash } from './hooks/hooks';
+import { propId } from './pages/app';
 import { clientId, packageId } from './pages/reference';
 import { optionId } from './pages/server';
 import { toolId } from './pages/together';
@@ -51,7 +52,7 @@ export function searchIndex(locale: Locale = 'en'): SearchEntry[] {
   for (const prop of PROPS) entries.push({ kind: 'Prop', title: prop.name, detail: `FileDrive · ${prop.type}`, href: `${hrefOf('react')}#${propId(prop.name)}`, keywords: plain(prop.does) });
   for (const option of SERVER_OPTIONS)
     entries.push({ kind: 'Prop', title: option.name, detail: `createDriveHandler · ${option.type}`, href: `${hrefOf('server')}#${optionId(option.name)}`, keywords: plain(option.does) });
-  for (const hook of HOOKS) entries.push({ kind: 'Hook', title: hook.name, detail: hook.short, href: `${hrefOf('hooks')}#${hookId(hook.name)}`, keywords: plain(hook.gives) });
+  for (const hook of HOOKS) entries.push({ kind: 'Hook', title: hook.name, detail: hook.short, href: `${hrefOf('hooks')}#${hookHash(hook.name)}`, keywords: plain(hook.gives) });
   for (const method of CLIENT) entries.push({ kind: 'Function', title: `client.${method.name}`, detail: plain(method.does), href: `${hrefOf('client')}#${clientId(method.name)}` });
   for (const route of routes()) entries.push({ kind: 'Route', title: `${route.method} ${route.path}`, detail: plain(routeIn(locale, route)), href: `${hrefOf('routes')}#${routeId(route)}` });
   for (const tool of toolsIn(locale))

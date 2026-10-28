@@ -1,9 +1,9 @@
 // What the landing page says: one place for the version, the packages and the
 // features, so the badge, the install picker and the table change together.
 
-import { version } from '../package.json';
+import { version } from '../../../packages/react/package.json';
 
-/** The version the packages will be published at; the site moves with them. */
+/** The version the packages are published at: the site's own is never raised, so it is read from theirs. */
 export const VERSION = version;
 /**
  * Whether the packages are on npm. Until they are, the page shows no command

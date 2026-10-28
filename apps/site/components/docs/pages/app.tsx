@@ -4,9 +4,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO, hrefOf } from '@/lib/site';
-import { HOOKS, PROPS, type PropGroup } from '../reference';
+import { PROPS, type PropGroup } from '../reference';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../ui';
-import { COMMENTS_HOOK } from './team';
+import { HookExplorer } from '../hooks/Explorer';
 
 export const GROUPS: PropGroup[] = ['Server', 'Look', 'Files', 'Word documents', 'Events'];
 export const propId = (name: string) => `prop-${name}`;
@@ -124,52 +124,6 @@ export const PROVIDER = `import { DriveProvider } from '@rebofiles/react';
   <YourDrive />
 </DriveProvider>`;
 
-export const ENTRIES = `const { entries, path, loading, error, refresh } = useEntries({ section: 'files', folder: id });
-// or { section: 'recent' }, { section: 'starred' }, { section: 'received' },
-//    { section: 'shared' }, { section: 'trash' },
-//    { section: 'search', query: 'contract', trashed: false }`;
-
-export const ACTIONS = `const actions = useActions();
-await actions.createFolder('Contracts', parent);   // FolderEntry
-await actions.rename(id, 'final.docx');            // refused as 409 "name-taken" when taken
-await actions.move(id, folder);
-await actions.moveToTrash(id); await actions.restore(id);
-await actions.restoreVersion(id, versionId);
-await actions.copy(id);                            // a copy beside it, or in a folder given
-await actions.star(id);                            // star(id, false) to take it back
-await actions.setColor(folder, 'green');           // null for the drive's own
-await actions.setFields(id, { case: '2026-114' }); // null takes one away
-await actions.review(id, 'rejected', 'Blurred');   // what came through a request; or 'accepted'
-await actions.upload(file, { parent, onProgress });  // or { file: id } for a new version
-await actions.share(id, 'bea', 'editor', 7);       // for a week; unshare(id, 'bea')
-const { token } = await actions.createLink(id, 7, { password: 'tea' });  // removeLink(id, link)
-const url = await actions.url(id, { inline: true });`;
-
-export const UPLOADS = `const { uploads, summary, upload, retry, stop, decide } = useUploads({ check: true });
-upload(input.files, folder, (entry) => console.log('up', entry.name));
-// uploads: [{ id, name, size, sent, speed?, remaining?, state, conflict?, error? }]
-//   state: 'waiting' | 'checking' | 'asking' | 'sending' | 'done' | 'failed' | 'stopped' | 'skipped'
-formatDuration(summary.remaining ?? 0, 'en'); // "3 min"
-decide(id, 'replace' | 'keep' | 'skip', all?); // one 'asking': there already`;
-
-export const ENTRY = `const found = useEntry(id);  // null while it loads, or when there is none
-if (found) {
-  const { entry, path, trashed } = found;  // as it is now, the folders above it, whether in the trash
-}`;
-
-export const SETTINGS = `const { settings, mine, canConfigure, save, saveMine } = useSettings();
-if (canConfigure) await save({ trashDays: 30 });   // the drive's
-await saveMine({ language: 'es', theme: 'dark' });  // one's own`;
-
-export const NEWER = `const { activity } = useActivity(id);                 // who did what to it, the newest first
-const { results } = useTextSearch('indemnity');        // [{ entry, snippet }]: by what is written inside
-const { notifications, unseen, saw } = useNotifications();
-const { requests, remind } = useRequests();            // [{ folder, link, token }]; remind(folder.id, link.id)
-const { people } = usePeople(typed);                   // [{ id, name, detail? }], from your directory
-const { files } = useExpiring(30);                     // [{ entry, expires, days }], the soonest first
-const { entries } = useWithField('client', 'carla');   // the files of one record of yours
-// Each asks again after every change, says \`loading\` and \`error\`, and gives nothing for an empty query.`;
-
 export const BEYOND = `import { useEffect, useState } from 'react';
 import { useDrive } from '@rebofiles/react';
 
@@ -200,61 +154,13 @@ export const hooks: DocPage = {
   sections: [
     {
       id: 'the-hooks',
-      title: 'The hooks',
-      badge: 'Reference',
+      title: 'Try each hook',
+      badge: 'Live',
       color: 'green',
-      body: <RefTable label="Hooks" name="Hook" rows={HOOKS.map((hook) => ({ id: hookId(hook.name), name: hook.name, does: withCode(`${hook.short} ${hook.gives}`) }))} />,
+      lead: 'Each hook running on a drive kept in this page: change something in the demo and see what the hook returns change with it. The code under it is the demo’s, as its file has it.',
+      body: <HookExplorer />,
     },
     { id: 'driveprovider', title: 'DriveProvider', badge: 'Provider', color: 'purple', lead: 'The client and the words, for every hook under it.', body: <Code lang="tsx" code={PROVIDER} /> },
-    {
-      id: 'useentries',
-      title: 'useEntries',
-      badge: 'Read',
-      color: 'blue',
-      lead: 'A view of the drive, asked again after every change made through the provider.',
-      body: <Code lang="tsx" code={ENTRIES} />,
-    },
-    {
-      id: 'useentry',
-      title: 'useEntry',
-      badge: 'Read',
-      color: 'blue',
-      lead: 'One entry as it is now, and the folders above it, asked again after every change.',
-      body: <Code lang="tsx" code={ENTRY} />,
-    },
-    { id: 'useactions', title: 'useActions', badge: 'Change', color: 'yellow', lead: 'What changes the drive; each tells every hook after.', body: <Code lang="tsx" code={ACTIONS} /> },
-    {
-      id: 'useuploads',
-      title: 'useUploads',
-      badge: 'Upload',
-      color: 'orange',
-      lead: 'Files sent three at a time, each in parts, with how fast it goes and how long it has left, and the same of all of them.',
-      body: <Code lang="tsx" code={UPLOADS} />,
-    },
-    {
-      id: 'usecomments',
-      title: 'useComments',
-      badge: 'Comments',
-      color: 'purple',
-      lead: 'What is said of an entry, each thread with its replies under it; adding, editing, resolving and removing tell every hook after.',
-      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
-    },
-    {
-      id: 'usesettings',
-      title: 'useSettings',
-      badge: 'Settings',
-      color: 'green',
-      lead: 'The drive’s settings and the person’s own, for a panel of settings of yours.',
-      body: <Code lang="tsx" code={SETTINGS} />,
-    },
-    {
-      id: 'newer-hooks',
-      title: 'Activity, text, notifications, requests, people',
-      badge: 'Newer',
-      color: 'blue',
-      lead: 'What the drive shows besides its lists, each a hook: an entry’s activity, a search by what is written, what one was told, the requests for files one made, who to share with, what is about to expire and the files of one record.',
-      body: <Code lang="tsx" code={NEWER} />,
-    },
     {
       id: 'beyond-the-hooks',
       title: 'What has no hook of its own',

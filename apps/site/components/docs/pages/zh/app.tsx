@@ -4,12 +4,12 @@ import { REPO, docHref } from '@/lib/site';
 import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
-import { COMMENTS_HOOK } from '../team';
-import { ACTIONS, BEYOND, ENTRIES, ENTRY, NEWER, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { HookExplorer } from '../../hooks/Explorer';
+import { BEYOND, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SHARED, SPANISH, THEMED, TOGETHER, VANILLA, WHOLE, propId } from '../app';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/app.tsx';
-const { PROPS, HOOKS } = referenceIn('zh');
+const { PROPS } = referenceIn('zh');
 const GROUP_NAMES: Record<PropGroup, string> = { Server: '服务器', Look: '外观', Files: '文件', 'Word documents': 'Word 文档', Events: '事件' };
 
 export const react: DocPage = {
@@ -90,61 +90,13 @@ export const hooks: DocPage = {
   sections: [
     {
       id: 'the-hooks',
-      title: 'Hooks 一览',
-      badge: '参考',
+      title: '逐个试用 hooks',
+      badge: '实时',
       color: 'green',
-      body: <RefTable label="Hooks" name="Hook" rows={HOOKS.map((hook) => ({ id: hookId(hook.name), name: hook.name, does: withCode(`${hook.short} ${hook.gives}`) }))} />,
+      lead: '每个 hook 都运行在保存于此页面的网盘上：在演示中修改内容，即可看到 hook 返回值随之变化。下方代码就是演示文件中的代码。',
+      body: <HookExplorer />,
     },
     { id: 'driveprovider', title: 'DriveProvider', badge: 'Provider', color: 'purple', lead: '客户端与文字，供其下的每个 hook 使用。', body: <Code lang="tsx" code={PROVIDER} /> },
-    {
-      id: 'useentries',
-      title: 'useEntries',
-      badge: '读取',
-      color: 'blue',
-      lead: '网盘的一个视图，每次通过 provider 做出改动后都会重新获取。',
-      body: <Code lang="tsx" code={ENTRIES} />,
-    },
-    {
-      id: 'useentry',
-      title: 'useEntry',
-      badge: '读取',
-      color: 'blue',
-      lead: '某个条目当前的样子及其上层文件夹，每次变更后重新获取。',
-      body: <Code lang="tsx" code={ENTRY} />,
-    },
-    { id: 'useactions', title: 'useActions', badge: '修改', color: 'yellow', lead: '修改网盘的操作；每个操作完成后都会通知所有 hooks。', body: <Code lang="tsx" code={ACTIONS} /> },
-    {
-      id: 'useuploads',
-      title: 'useUploads',
-      badge: '上传',
-      color: 'orange',
-      lead: '文件三个一组发送，每个分片上传，显示速度和剩余时间，也提供全部文件的汇总。',
-      body: <Code lang="tsx" code={UPLOADS} />,
-    },
-    {
-      id: 'usecomments',
-      title: 'useComments',
-      badge: '评论',
-      color: 'purple',
-      lead: '对某个条目的评论，每个讨论串下附有回复；添加、编辑、解决和删除后都会通知每个 hook。',
-      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
-    },
-    {
-      id: 'usesettings',
-      title: 'useSettings',
-      badge: '设置',
-      color: 'green',
-      lead: '网盘的设置和个人设置，用于你自己的设置面板。',
-      body: <Code lang="tsx" code={SETTINGS} />,
-    },
-    {
-      id: 'newer-hooks',
-      title: '活动、文本、通知、请求、人员',
-      badge: '更多',
-      color: 'blue',
-      lead: '网盘在列表之外展示的内容，各有一个 hook：条目的活动、按内容搜索、发给自己的通知、自己发出的文件请求、可共享的人、即将到期的文件，以及某条记录的文件。',
-      body: <Code lang="tsx" code={NEWER} />,
-    },
     {
       id: 'beyond-the-hooks',
       title: '没有专门 hook 的功能',
