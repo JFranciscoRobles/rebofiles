@@ -4,7 +4,8 @@ import { REPO, docHref } from '@/lib/site';
 import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
-import { ACTIONS, ENTRIES, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { COMMENTS_HOOK } from '../team';
+import { ACTIONS, BEYOND, ENTRIES, ENTRY, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
 
 const to = (slug: string) => docHref('zh', slug);
 const SOURCE = 'apps/site/components/docs/pages/zh/app.tsx';
@@ -103,6 +104,14 @@ export const hooks: DocPage = {
       lead: '网盘的一个视图，每次通过 provider 做出改动后都会重新获取。',
       body: <Code lang="tsx" code={ENTRIES} />,
     },
+    {
+      id: 'useentry',
+      title: 'useEntry',
+      badge: '读取',
+      color: 'blue',
+      lead: '某个条目当前的样子及其上层文件夹，每次变更后重新获取。',
+      body: <Code lang="tsx" code={ENTRY} />,
+    },
     { id: 'useactions', title: 'useActions', badge: '修改', color: 'yellow', lead: '修改网盘的操作；每个操作完成后都会通知所有 hooks。', body: <Code lang="tsx" code={ACTIONS} /> },
     {
       id: 'useuploads',
@@ -111,6 +120,41 @@ export const hooks: DocPage = {
       color: 'orange',
       lead: '文件三个一组发送，每个分片上传，显示速度和剩余时间，也提供全部文件的汇总。',
       body: <Code lang="tsx" code={UPLOADS} />,
+    },
+    {
+      id: 'usecomments',
+      title: 'useComments',
+      badge: '评论',
+      color: 'purple',
+      lead: '对某个条目的评论，每个讨论串下附有回复；添加、编辑、解决和删除后都会通知每个 hook。',
+      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
+    },
+    {
+      id: 'usesettings',
+      title: 'useSettings',
+      badge: '设置',
+      color: 'green',
+      lead: '网盘的设置和个人设置，用于你自己的设置面板。',
+      body: <Code lang="tsx" code={SETTINGS} />,
+    },
+    {
+      id: 'beyond-the-hooks',
+      title: '没有专门 hook 的功能',
+      badge: '客户端',
+      color: 'yellow',
+      lead: (
+        <>
+          星标、副本、文件夹颜色、字段、活动、按内容搜索、文件请求及通过它收到的文件、通知、人员：客户端都提供，<C>useDrive()</C> 会给出它，以及让每个 hook 重新获取的方法。
+        </>
+      ),
+      body: (
+        <>
+          <Code lang="tsx" code={BEYOND} />
+          <P>
+            通过 <C>client</C> 做的变更，在调用 <C>changed()</C> 之前 hooks 看不到；<C>useActions</C> 和 <C>useComments</C> 已经会调用它。客户端的每个函数都在<a href={to('reference')}>参考</a>中。
+          </P>
+        </>
+      ),
     },
     {
       id: 'with-filedrive',

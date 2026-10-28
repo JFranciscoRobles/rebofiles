@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { REPO, hrefOf } from '@/lib/site';
 import { HOOKS, PROPS, type PropGroup } from '../reference';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../ui';
+import { COMMENTS_HOOK } from './team';
 
 export const GROUPS: PropGroup[] = ['Server', 'Look', 'Files', 'Word documents', 'Events'];
 export const propId = (name: string) => `prop-${name}`;
@@ -134,6 +135,8 @@ await actions.move(id, folder);
 await actions.moveToTrash(id); await actions.restore(id);
 await actions.restoreVersion(id, versionId);
 await actions.upload(file, { parent, onProgress });  // or { file: id } for a new version
+await actions.share(id, 'bea', 'editor', 7);       // for a week; unshare(id, 'bea')
+const { token } = await actions.createLink(id, 7, { password: 'tea' });  // removeLink(id, link)
 const url = await actions.url(id, { inline: true });`;
 
 export const UPLOADS = `const { uploads, summary, upload, retry, stop, decide } = useUploads({ check: true });
@@ -142,6 +145,39 @@ upload(input.files, folder, (entry) => console.log('up', entry.name));
 //   state: 'waiting' | 'checking' | 'asking' | 'sending' | 'done' | 'failed' | 'stopped' | 'skipped'
 formatDuration(summary.remaining ?? 0, 'en'); // "3 min"
 decide(id, 'replace' | 'keep' | 'skip', all?); // one 'asking': there already`;
+
+export const ENTRY = `const found = useEntry(id);  // null while it loads, or when there is none
+if (found) {
+  const { entry, path, trashed } = found;  // as it is now, the folders above it, whether in the trash
+}`;
+
+export const SETTINGS = `const { settings, mine, canConfigure, save, saveMine } = useSettings();
+if (canConfigure) await save({ trashDays: 30 });   // the drive's
+await saveMine({ language: 'es', theme: 'dark' });  // one's own`;
+
+export const BEYOND = `import { useEffect, useState } from 'react';
+import { useDrive } from '@rebofiles/react';
+
+// What has no hook of its own is the client's: useDrive() gives it, \`revision\`
+// goes up after every change, and \`changed()\` tells every hook to ask again.
+function Starred() {
+  const { client, revision, changed } = useDrive();
+  const [starred, setStarred] = useState<Awaited<ReturnType<typeof client.starred>>>([]);
+  useEffect(() => void client.starred().then(setStarred), [client, revision]);
+  const unstar = async (id: string) => (await client.star(id, false), changed());
+  return starred.map((entry) => <button key={entry.id} onClick={() => unstar(entry.id)}>{entry.name} ★</button>);
+}
+
+// The same for the rest, each a route of the server:
+await client.copy(id);                     // a copy beside it
+await client.setColor(folder, 'green');    // a folder's colour
+await client.setFields(id, { case: '2026-114' });
+await client.activity(id);                 // who did what to it
+await client.searchText('indemnity');      // by what is written inside
+await client.received();                   // what came through one's requests for files
+await client.review(id, 'accepted');       // or 'rejected', with a reason
+await client.notifications();              // what one was told, and how many are new
+await client.people('be');                 // who is who, from your directory`;
 
 export const TOGETHER = `<DriveProvider base="/api/files">
   <FileDrive />          {/* the whole drive */}
@@ -170,6 +206,14 @@ export const hooks: DocPage = {
       lead: 'A view of the drive, asked again after every change made through the provider.',
       body: <Code lang="tsx" code={ENTRIES} />,
     },
+    {
+      id: 'useentry',
+      title: 'useEntry',
+      badge: 'Read',
+      color: 'blue',
+      lead: 'One entry as it is now, and the folders above it, asked again after every change.',
+      body: <Code lang="tsx" code={ENTRY} />,
+    },
     { id: 'useactions', title: 'useActions', badge: 'Change', color: 'yellow', lead: 'What changes the drive; each tells every hook after.', body: <Code lang="tsx" code={ACTIONS} /> },
     {
       id: 'useuploads',
@@ -178,6 +222,43 @@ export const hooks: DocPage = {
       color: 'orange',
       lead: 'Files sent three at a time, each in parts, with how fast it goes and how long it has left, and the same of all of them.',
       body: <Code lang="tsx" code={UPLOADS} />,
+    },
+    {
+      id: 'usecomments',
+      title: 'useComments',
+      badge: 'Comments',
+      color: 'purple',
+      lead: 'What is said of an entry, each thread with its replies under it; adding, editing, resolving and removing tell every hook after.',
+      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
+    },
+    {
+      id: 'usesettings',
+      title: 'useSettings',
+      badge: 'Settings',
+      color: 'green',
+      lead: 'The drive’s settings and the person’s own, for a panel of settings of yours.',
+      body: <Code lang="tsx" code={SETTINGS} />,
+    },
+    {
+      id: 'beyond-the-hooks',
+      title: 'What has no hook of its own',
+      badge: 'The client',
+      color: 'yellow',
+      lead: (
+        <>
+          Starred files, copies, folder colours, fields, activity, a search by what is written, requests for files and what came through them, notifications, people: the client has each, and{' '}
+          <C>useDrive()</C> gives it with what makes every hook ask again.
+        </>
+      ),
+      body: (
+        <>
+          <Code lang="tsx" code={BEYOND} />
+          <P>
+            A change made through <C>client</C> is not seen by the hooks until <C>changed()</C> is called; what <C>useActions</C> and <C>useComments</C> do calls it already. Every function of the
+            client is in <a href={hrefOf('reference')}>the reference</a>.
+          </P>
+        </>
+      ),
     },
     {
       id: 'with-filedrive',

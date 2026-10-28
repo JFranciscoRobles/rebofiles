@@ -255,7 +255,7 @@ AWS's example. Postgres in
 `test/postgres.test.ts`, on PGlite, and two processes on one Postgres 16 with
 `REBOFILES_TEST_POSTGRES`. Run against Cloudflare
 R2 with `npm run storage:check` and by hand in the page (`apps/storage`); not
-against AWS or MinIO yet. Not on npm yet.
+against AWS or MinIO yet. On npm.
 
 ## Where it can improve
 

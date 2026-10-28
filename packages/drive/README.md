@@ -189,7 +189,7 @@ The client tested against the routes in `test/client.test.ts`, on the disk
 and on an S3 kept in memory; the drive kept in the page in `test/memory.test.ts`.
 The screen driven in Chrome by `npm run test:browser`: through `<FileDrive>`
 by every test there, and on a page with no framework at all
-(`apps/playground/vanilla.html`), with axe. Not on npm yet.
+(`apps/playground/vanilla.html`), with axe. On npm.
 
 ## Where it can improve
 

@@ -3,23 +3,23 @@
 // checked" of ROADMAP.md, which says the same in the same order.
 
 /** When the numbers below were taken. */
-export const MEASURED = 'October 26, 2026';
+export const MEASURED = 'October 28, 2026';
 
 export const TESTS: { where: string; count: number; what: string }[] = [
   {
     where: 'packages/core',
-    count: 64,
-    what: 'Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity, text found in a file, folder colours and placeholders; groups of the application, reached down the tree and in Shared with me.',
+    count: 72,
+    what: 'Names, the tree, renaming and moving, the trash and the trash that empties itself, versions, search, changes; the top of the drive for each owner, roles down the tree, Shared with me and what is new in it, links with a password or a number of uses; settings, space, archives, activity, text found in a file, folder colours and placeholders; groups of the application, reached down the tree and in Shared with me. Requests for files read as given, and shares that end.',
   },
   {
     where: 'packages/server',
-    count: 114,
-    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example. Uploads refused before and after they arrive: by beforeUpload, by the type their bytes are, by a ClamAV that knows EICAR, and while it is down; uploads left halfway swept from a bucket and the disk. The events: each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut. The drive a piece at a time: what SQLite and Postgres answer to each query is what the drive held whole answers; rows of before filled once; two hundred thousand entries listed in milliseconds, never read whole. Comments, threads, resolved, taken back; a legal hold and a minimum of days; everything of a person exported. onChange, the logger, OpenTelemetry, limits by person, by link and by address. Only the parts of a version that changed sent, the rest copied in the bucket and on the disk. Pictures, placeholders and text made by the server with sharp and pdf.js, a PDF’s first page among them.',
+    count: 159,
+    what: 'The routes on the disk and on an S3 kept in memory, uploads in parts, resumed and given up, quotas, who may do what, sharing and links read without signing in, with a password or for one download, news of what is shared, the same file found again, settings, pictures in sizes, addresses good for an hour, the drive held in memory, activity and text on memory, SQLite and Postgres on PGlite, pages of another origin, and the signature against AWS’s example. Uploads refused before and after they arrive: by beforeUpload, by the type their bytes are, by a ClamAV that knows EICAR, and while it is down; uploads left halfway swept from a bucket and the disk. The events: each told only what they may see, from this process and from another on the same SQLite, and the client coming back after a cut. The drive a piece at a time: what SQLite and Postgres answer to each query is what the drive held whole answers; rows of before filled once; two hundred thousand entries listed in milliseconds, never read whole. Comments, threads, resolved, taken back; a legal hold and a minimum of days; everything of a person exported. onChange, the logger, OpenTelemetry, limits by person, by link and by address. Only the parts of a version that changed sent, the rest copied in the bucket and on the disk. Pictures, placeholders and text made by the server with sharp and pdf.js, a PDF’s first page among them. Copies of a file; requests for files sent signed out, looked at, and reminded of by email; the people and groups of a directory; webhooks signed and tried again; and `onRead` told who read what.',
   },
   {
     where: 'packages/drive',
-    count: 40,
-    what: 'The client against the routes and against a bucket: uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; the drive kept in the page; what the server refused, said in each language.',
+    count: 46,
+    what: 'The client against the routes and against a bucket: uploads in parts with progress, resumed after a cut, the headers a bucket signed, versions, refusals; the queue of uploads, three at a time, its speed and time left, the same file or name asked about; folders of the computer read as they were; the .zip written and read back; the text of a file; the drive kept in the page; what the server refused, said in each language. A QR code drawn as SVG.',
   },
   {
     where: 'packages/react',
@@ -48,8 +48,8 @@ export const TESTS: { where: string; count: number; what: string }[] = [
   },
   {
     where: 'npm run test:browser',
-    count: 53,
-    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools; a folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard and the grid; comments said, answered, edited and resolved, axe on them, seen in another window; a legal hold; a PDF’s first page made by the server and shown as it comes. All of it in WebKit too.',
+    count: 72,
+    what: 'The playground in Chrome with Playwright: uploads in parts, several at once, stopped and resumed, folders dropped, the same file and the same name asked about; the preview and the viewer; .zip downloads; search by name and by what is written; sharing with Bea, links signed out, one with a password, what is new in Shared with me; the list in an order of one’s choosing, its menu, undo; settings and quotas; activity; folder colours and pictures shown blurred; the keyboard alone; axe on every state, light and dark; the drive with no framework and from the hooks alone; the demo’s Claude through the MCP tools; a folder made and renamed in one window seen in another without loading again; a folder of four hundred, of which only what is in sight is in the page, gone through with the keyboard and the grid; comments said, answered, edited and resolved, axe on them, seen in another window; a legal hold; a PDF’s first page made by the server and shown as it comes. All of it in WebKit too. A copy made from the menu; a share for a week, until when; requests for files sent signed out, with documents and photos, and looked at in Received; the drive without its own bar, driven by the application’s, and kept in a folder.',
   },
 ];
 

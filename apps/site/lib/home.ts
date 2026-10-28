@@ -9,7 +9,7 @@ export const VERSION = version;
  * Whether the packages are on npm. Until they are, the page shows no command
  * to install them (ROADMAP.md): turn it on with the first publish.
  */
-export const PUBLISHED = false;
+export const PUBLISHED = true;
 
 /** The six pastel pairs, background and text, that take turns on tags, icons and packages. */
 export type Pastel = 'blue' | 'yellow' | 'green' | 'pink' | 'purple' | 'orange';

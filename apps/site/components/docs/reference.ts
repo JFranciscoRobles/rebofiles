@@ -33,7 +33,7 @@ export const PROPS: Prop[] = [
     name: 'chrome',
     type: 'boolean',
     group: 'Look',
-    does: '`false` leaves out its bar and its sections, for your application’s own around it: it drives it with `go`, `search`, `upload`, `newFolder`, `openSettings`.',
+    does: '`false` leaves out its bar and its sections, for your application’s own around it: it drives it with `go`, `search`, `upload`, `newFolder`, `requestFiles`, `share`, `openSettings`.',
   },
   { name: 'root', type: 'EntryId', group: 'Look', does: 'The folder it is kept in, as the files of one record of yours: it starts there, its path starts there, nothing above it.' },
   {
@@ -97,12 +97,12 @@ export const HOOKS: Hook[] = [
     short: 'The client and the words, for every hook under it.',
     gives: '`base`, `client`, `headers`, `language`, `texts`, `live`; a <FileDrive> inside it uses the same. Every hook asks again when someone else changes the drive.',
   },
-  { name: 'useEntries', short: 'A folder, Recent, the trash, Shared with me or a search.', gives: '`entries`, `path`, `folder`, `loading`, `error`, `refresh`: asked again after every change.' },
-  { name: 'useEntry', short: 'One entry as it is now, and where it is.', gives: '`entry`, `path`, `trashed`, `loading`, `error`.' },
+  { name: 'useEntries', short: 'A folder, Recent, the trash, Shared with me or a search.', gives: '`entries`, `path`, `loading`, `error`, `refresh`: asked again after every change.' },
+  { name: 'useEntry', short: 'One entry as it is now, and where it is.', gives: '`entry`, `path`, `trashed`; null while it loads, or when there is none.' },
   {
     name: 'useActions',
     short: 'What changes the drive, telling every hook after.',
-    gives: '`createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `upload`, `url`.',
+    gives: '`createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`.',
   },
   {
     name: 'useUploads',
@@ -111,7 +111,11 @@ export const HOOKS: Hook[] = [
   },
   { name: 'useSettings', short: 'The drive’s settings and the person’s own.', gives: '`settings`, `drive`, `mine`, `canConfigure`, `save`, `saveMine`.' },
   { name: 'useComments', short: 'What is said of an entry, and saying more.', gives: '`comments`, `loading`, `error`, `add`, `edit`, `resolve`, `remove`.' },
-  { name: 'useDrive', short: 'The provider itself.', gives: '`client`, `t`, `locale`, `changed()`: every route as a function, and the drive’s words.' },
+  {
+    name: 'useDrive',
+    short: 'The provider itself.',
+    gives: '`client`, `revision`, `changed()`, `t`, `locale`, `settings`: every route as a function, a number that goes up after each change, and the drive’s words. For what has no hook of its own.',
+  },
 ];
 
 export interface Method {
@@ -308,7 +312,7 @@ export const PACKAGE_DOCS: PackageDoc[] = [
     what: 'The whole drive as <FileDrive>, the headless hooks it is built from, and <SharedLink> for a link.',
     runs: 'React 18+',
     install: 'npm install @rebofiles/react',
-    gives: ['FileDrive', 'SharedLink', 'DriveProvider', 'useEntries', 'useEntry', 'useActions', 'useUploads', 'useSettings', 'useDrive', 'createMemoryClient'],
+    gives: ['FileDrive', 'SharedLink', 'DriveProvider', 'useEntries', 'useEntry', 'useActions', 'useUploads', 'useSettings', 'useComments', 'useDrive', 'createMemoryClient'],
   },
   {
     name: '@rebofiles/drive',

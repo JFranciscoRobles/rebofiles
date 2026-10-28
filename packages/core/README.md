@@ -66,7 +66,7 @@ it cannot be done.
 
 ## Status
 
-Tested in `test/`, one file for each area. Not on npm yet.
+Tested in `test/`, one file for each area. On npm.
 
 ## Where it can improve
 

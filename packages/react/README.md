@@ -52,6 +52,32 @@ said. Its colours, radii and fonts are custom properties on `.rf-drive`
 (`--rf-brand`, `--rf-radius`, `--rf-font`…): change them on the element, or
 on a `className` of your own.
 
+## Inside your application's own bar
+
+`chrome={false}` leaves out the drive's bar (title, search, notifications,
+settings) and its sections, for an application that puts its own around it.
+It drives the drive through `controls`, and shows where it is from `onState`.
+
+```tsx
+import { FileDrive, type DriveControls, type DriveState } from '@rebofiles/react';
+
+const drive = useRef<DriveControls>(null);
+const [state, setState] = useState<DriveState | null>(null);
+
+<button onClick={() => drive.current?.upload()}>Upload</button>
+<button onClick={() => drive.current?.share()}>Share</button>
+<FileDrive chrome={false} controls={drive} onState={setState} />
+```
+
+`controls` gives `go(section, folder)`, `search(query)`, `upload()`,
+`newFolder()`, `requestFiles()` and `share()` (of the folder shown) and
+`openSettings()`. `onState` is told the section, the folder and its path,
+what is searched, how many are shown, the space used, and what is new.
+
+`root={folderId}` keeps the drive in one folder, as the files of one record of
+yours (a client, a property): it starts there, its path starts there, and
+nothing above it is gone to.
+
 ## Sharing
 
 **Share**, in the details, gives an entry to someone by their id, as viewer,
@@ -103,14 +129,38 @@ function Folder({ id }: { id: string | null }) {
 
 | Hook | What it gives |
 | --- | --- |
-| `useEntries(view)` | A folder, the recent files, the trash or a search, asked again after every change. |
-| `useEntry(id)` | One entry as it is now, and where it is. |
-| `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `upload`, `url`. |
+| `useEntries(view)` | A folder, the recent files, Shared with me, the trash or a search, asked again after every change. |
+| `useEntry(id)` | One entry as it is now, and where it is; null while it loads. |
+| `useActions()` | `createFolder`, `rename`, `move`, `moveToTrash`, `restore`, `deleteForever`, `emptyTrash`, `restoreVersion`, `share`, `unshare`, `createLink`, `removeLink`, `linkToken`, `upload`, `url`. |
 | `useUploads({ check })` | Files sent three at a time, in parts, with what has gone of each, how fast and how long it has left (`uploads`, `summary`); `retry`, `stop`, `stopAll`, `dismiss`, `clear`. With `check: true`, each looked for in the drive first and asked about (`decide`). |
 | `useSettings()` | The drive's settings and the person's own, and `save`, `saveMine`. |
+| `useComments(id)` | What is said of an entry, each thread with its replies; `add`, `edit`, `resolve`, `remove`. |
+| `useDrive()` | The provider itself: `client`, every route as a function; `revision`, which goes up after each change; and `changed()`, to tell every hook to ask again. |
 
 Every hook asks again when someone else changes the drive, a moment after,
 from the server's `/events` (`<DriveProvider live={false}>` for none).
+
+### What has no hook of its own
+
+Starred files, copies, folder colours, fields, activity, a search by what is
+written, requests for files and what came through them, notifications and
+people are the client's: `useDrive()` gives it, with `revision` to ask again
+when the drive changes and `changed()` to tell every hook after a change of
+yours.
+
+```tsx
+function Starred() {
+  const { client, revision, changed } = useDrive();
+  const [starred, setStarred] = useState<Awaited<ReturnType<typeof client.starred>>>([]);
+  useEffect(() => void client.starred().then(setStarred), [client, revision]);
+  const unstar = async (id: string) => (await client.star(id, false), changed());
+  return starred.map((entry) => <button key={entry.id} onClick={() => unstar(entry.id)}>{entry.name} ★</button>);
+}
+```
+
+The same for `client.copy`, `setColor`, `setFields`, `activity`,
+`searchText`, `received`, `review`, `notifications`, `people`: every function
+of the client is in the reference of the documentation.
 
 ## Settings of your own
 
@@ -143,14 +193,13 @@ the client the hooks use: one function per route, and
 ## Status
 
 The component and the hooks driven in Chrome by `npm run test:browser`, with
-axe; the client is tested in `@rebofiles/drive`. Not on npm yet.
+axe; the client is tested in `@rebofiles/drive`. On npm.
 
 ## Where it can improve
 
-- **Hooks for what is newer:** the activity, a search by what is written, and
-  folder colours are in `<FileDrive>` and in the client (`client.activity`,
-  `client.searchText`, `client.setColor` of `useDrive()`), not yet hooks of
-  their own.
+- **Hooks for what is newer:** starred files, the activity, a search by what
+  is written, folder colours, requests for files and notifications are in
+  `<FileDrive>` and in the client of `useDrive()`, not yet hooks of their own.
 
 ## License
 

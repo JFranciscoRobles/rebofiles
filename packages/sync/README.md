@@ -53,7 +53,7 @@ is taken for a disk not there: nothing is done (`allowEmpty`).
 Tested in `test/` against a server behind its routes and a folder of the
 disk: every rule above, and a sync that goes on. In the desktop application
 its commands are tested in Rust; it has not been driven in the window by
-tests. Not on npm yet.
+tests. On npm.
 
 ## Where it can improve
 

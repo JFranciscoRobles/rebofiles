@@ -5,7 +5,8 @@ import { REPO, docHref } from '@/lib/site';
 import type { PropGroup } from '../../reference';
 import { referenceIn } from '../../referenceI18n';
 import { C, Callout, Code, type DocPage, List, P, RefTable, Table, withCode } from '../../ui';
-import { ACTIONS, ENTRIES, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
+import { COMMENTS_HOOK } from '../team';
+import { ACTIONS, BEYOND, ENTRIES, ENTRY, FILEDRIVE, GROUPS, PROVIDER, QUEUE, SETTINGS, SHARED, SPANISH, THEMED, TOGETHER, UPLOADS, VANILLA, WHOLE, hookId, propId } from '../app';
 
 const to = (slug: string) => docHref('es', slug);
 const SOURCE = 'apps/site/components/docs/pages/es/app.tsx';
@@ -106,6 +107,14 @@ export const hooks: DocPage = {
       body: <Code lang="tsx" code={ENTRIES} />,
     },
     {
+      id: 'useentry',
+      title: 'useEntry',
+      badge: 'Leer',
+      color: 'blue',
+      lead: 'Una entrada tal como está ahora, y las carpetas por encima, pedida de nuevo tras cada cambio.',
+      body: <Code lang="tsx" code={ENTRY} />,
+    },
+    {
       id: 'useactions',
       title: 'useActions',
       badge: 'Cambiar',
@@ -120,6 +129,43 @@ export const hooks: DocPage = {
       color: 'orange',
       lead: 'Archivos enviados de tres en tres, cada uno en partes, con su velocidad y el tiempo que le queda, y lo mismo de todos juntos.',
       body: <Code lang="tsx" code={UPLOADS} />,
+    },
+    {
+      id: 'usecomments',
+      title: 'useComments',
+      badge: 'Comentarios',
+      color: 'purple',
+      lead: 'Lo que se dice de una entrada, cada hilo con sus respuestas debajo; añadir, editar, resolver y quitar avisan después a todos los hooks.',
+      body: <Code lang="tsx" code={COMMENTS_HOOK} />,
+    },
+    {
+      id: 'usesettings',
+      title: 'useSettings',
+      badge: 'Ajustes',
+      color: 'green',
+      lead: 'Los ajustes del drive y los de la persona, para un panel de ajustes tuyo.',
+      body: <Code lang="tsx" code={SETTINGS} />,
+    },
+    {
+      id: 'beyond-the-hooks',
+      title: 'Lo que no tiene hook propio',
+      badge: 'El cliente',
+      color: 'yellow',
+      lead: (
+        <>
+          Los destacados, las copias, los colores de carpeta, los campos, la actividad, la búsqueda por lo que está escrito, las solicitudes de archivos y lo que llegó por ellas, las notificaciones,
+          las personas: el cliente tiene cada una, y <C>useDrive()</C> lo da con lo que hace que todos los hooks pidan de nuevo.
+        </>
+      ),
+      body: (
+        <>
+          <Code lang="tsx" code={BEYOND} />
+          <P>
+            Un cambio hecho con <C>client</C> no lo ven los hooks hasta llamar a <C>changed()</C>; lo que hacen <C>useActions</C> y <C>useComments</C> ya lo llama. Cada función del cliente está en{' '}
+            <a href={to('reference')}>la referencia</a>.
+          </P>
+        </>
+      ),
     },
     {
       id: 'with-filedrive',

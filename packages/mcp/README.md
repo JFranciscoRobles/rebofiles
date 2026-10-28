@@ -130,7 +130,7 @@ process, two people's assistants among them; Rebodocs' tools in
 `test/without-rebodocs.test.ts`. Driven by the protocol's official SDK as a
 client, over stdio from the command installed from its tarball and over HTTP
 from the playground, a contract written, changed, compared and restored
-there. Not on npm yet.
+there. On npm.
 
 ## Where it can improve
 
