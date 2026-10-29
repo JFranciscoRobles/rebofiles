@@ -4,7 +4,7 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
-## Unreleased
+## 0.13.0 — 2026-10-29
 
 ### Changed
 

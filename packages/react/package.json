@@ -1,6 +1,6 @@
 {
   "name": "@rebofiles/react",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "The drive as a React component, or as headless hooks: folders, upload, previews, versions and the trash, against @rebofiles/server.",
   "license": "MIT",
   "private": true,
@@ -13,8 +13,8 @@
     "./rebosheets": "./src/rebosheets.ts"
   },
   "dependencies": {
-    "@rebofiles/core": "0.12.0",
-    "@rebofiles/drive": "0.12.0"
+    "@rebofiles/core": "0.13.0",
+    "@rebofiles/drive": "0.13.0"
   },
   "peerDependencies": {
     "@rebodocs/core": ">=0.12.0",
