@@ -41,6 +41,22 @@ drive.refresh();  // after a change made elsewhere
 drive.destroy();
 ```
 
+### Decks and workbooks
+
+`formats` gives other kinds of files a thumbnail, a viewer and their text, as the options above give them to Word documents. ReboSlides' and Rebosheets' come with the package:
+
+```ts
+import { slidesFormat } from '@rebofiles/drive/reboslides'; // needs @reboslides/core and @reboslides/viewer
+import { sheetsFormat } from '@rebofiles/drive/rebosheets'; // needs @rebosheets/viewer
+
+mountDrive(element, { base: '/api/files', formats: [slidesFormat, sheetsFormat] });
+```
+
+- **Decks** (`.reboslides`): their first slide as the thumbnail, the deck in the viewer (one slide under another or as a grid, presented, printed), and what their slides and notes say, to find them by.
+- **Workbooks** (`.xlsx`, `.csv`): the first cells of their sheet as the thumbnail, and the grid, read only, with its sheets in the viewer.
+
+The pictures are made when a file is uploaded, and kept with it in the sizes of the drive's settings; one uploaded before is drawn once and kept then. A format of your own is an object with `test(file)` and any of `picture`, `view` and `text` (`FileFormat`). In this repository the engines are linked from `../slides` and `../sheets` with `npm run link-engines`.
+
 ### Inside your application's own bar
 
 `chrome: false` leaves out the drive's bar (title, search, notifications,
@@ -176,7 +192,7 @@ drive's. `settings: false` leaves all of it out.
 | **Uploads** | `createUploads`, `lookInDrive`, `formatDuration`; `readDropped`, `readChosen` for folders; `hashOf`, `textOf`, `renditionsOf`, `placeholderOf`. |
 | **Archives** | `downloadZip`, `writeZip`, `blobSink`, `streamSink`. |
 | **Words** | `TEXTS` in English and Spanish, `translator`, `formatSize`, `formatDate`. |
-| **Files** | `kindOf`, `badgeOf`, `picturesToPdf`, `qrMatrix`, `qrSvg`, `qrPng`; of `./rebodocs`, `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`, `newDocx`, `compareDocx`. |
+| **Files** | `kindOf`, `badgeOf`, `picturesToPdf`, `qrMatrix`, `qrSvg`, `qrPng`; of `./rebodocs`, `previewDocx`, `viewDocx`, `thumbDocx`, `pictureOfDocx`, `textOfDocx`, `newDocx`, `compareDocx`; of `./reboslides`, `slidesFormat`, `pictureOfDeck`, `viewDeck`, `textOfDeck`; of `./rebosheets`, `sheetsFormat`, `pictureOfWorkbook`, `viewWorkbook`. |
 | **The look** | `CSS`, scoped to `.rf-drive`, its colours, radii and fonts as custom properties, light and dark. |
 
 The screen renders itself again after each change, and changes only what

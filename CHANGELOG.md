@@ -4,6 +4,32 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## Unreleased
+
+### Changed
+
+- **ReboFiles is orange.** Its brand colour goes from emerald to orange
+  (#c2410c, #9a3412 under the pointer, #fcebdd for what is on), so that
+  green is Rebosheets' in the suite: in the drive's `--rf-brand` tokens,
+  light and dark, the logo, the site, the demos and the desktop app. A page
+  that wants the old colour sets `--rf-brand: #0e7c52` again.
+
+### Added
+
+- **Decks and workbooks drawn by the suite's engines**: `mountDrive` takes
+  `formats`, kinds of files with their thumbnail, their viewer and their
+  text, as `pictureDocument`, `viewDocument` and `textDocument` do for Word
+  documents. `slidesFormat` of `@rebofiles/drive/reboslides` gives decks
+  (.reboslides) their first slide as the thumbnail, the deck in the viewer
+  (one under another or as a grid, presented, printed) and their text to
+  find them by; `sheetsFormat` of `@rebofiles/drive/rebosheets` gives .xlsx
+  and .csv the first cells of their sheet as the thumbnail and the grid,
+  read only, with its sheets in the viewer. The pictures are made when a
+  file is uploaded and kept with it; one uploaded before is drawn once and
+  kept then. Also in `@rebofiles/react/reboslides` and `/rebosheets`. Their
+  engines are optional peers; `npm run link-engines` links them from
+  `../slides` and `../sheets`, and the playground uses them.
+
 ## 0.12.0 — 2026-10-28
 
 ### Added

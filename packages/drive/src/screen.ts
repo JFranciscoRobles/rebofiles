@@ -107,6 +107,12 @@ export interface DriveOptions {
    * `@rebofiles/drive/rebodocs`. Given, each version but the current has "Compare" in the history.
    */
   compareDocument?: (element: HTMLElement, before: Uint8Array, after: Uint8Array, context: { language: string; before: string; after: string }) => ShownDocument | Promise<ShownDocument>;
+  /**
+   * Kinds of files the drive draws and shows by what is given, each its thumbnail, its viewer and its text:
+   * `slidesFormat` of `@rebofiles/drive/reboslides` for decks, `sheetsFormat` of `@rebofiles/drive/rebosheets` for
+   * workbooks. The first a file is of is the one that goes; a Word document goes by the options above.
+   */
+  formats?: FileFormat[];
   /** Reads a Word document for its preview: `previewDocx` of `@rebofiles/drive/rebodocs`, or one of your own. */
   previewDocument?: (bytes: Uint8Array) => DocumentPreview | Promise<DocumentPreview>;
   /** The address a link of the drive is given: your page that shows it with `mountSharedLink`. This page with `?link=` unless given. */
@@ -155,6 +161,22 @@ export interface DriveOptions {
 
 /** A document shown in the viewer's element: what takes it down, or more of it, as `viewDocx` gives. */
 export type ShownDocument = (() => void) | { destroy(): void; pages?: number; layout?(mode: 'all' | 'pages'): void; print?(): void; pdf?(): Promise<Uint8Array> } | undefined;
+
+/** A kind of file the drive draws and shows by what is given (`formats`), as `pictureDocument` and `viewDocument` do for Word documents. */
+export interface FileFormat {
+  /** Whether a file is of this kind, by its name and its type. */
+  test(file: { name: string; type: string }): boolean;
+  /**
+   * The file as a picture, its longest side `size` pixels, for its thumbnail in the grid, the list and the details.
+   * Made when one is uploaded and kept with it in the sizes the drive shows; drawn here once, and kept then, for one
+   * uploaded before.
+   */
+  picture?: (bytes: Uint8Array, size: number, type: string, quality: number) => Promise<Blob>;
+  /** The file shown in the viewer, in `element`, and what takes it down. */
+  view?: (element: HTMLElement, bytes: Uint8Array, context: { language: string }) => ShownDocument | Promise<ShownDocument>;
+  /** What is written in it, to find it by in a search. */
+  text?: (bytes: Uint8Array) => string | Promise<string>;
+}
 
 /** Where the drive is, as an application that puts its own bar and sections around it shows it (`onState`). */
 export interface DriveState {
@@ -592,16 +614,21 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const THUMB_SIZES = [320, 640];
   /** The pictures made of a file when it goes up: of an image, in the drive's sizes; of a Word document, its first page in those the drive shows. */
   /** What this page makes of a file it uploads, which the server need not: pictures of pictures, and of Word documents with Rebodocs; the text of text, and of those. */
+  const isDocxFile = (file: { name?: string; type: string }) => /\.docx$/i.test(file.name ?? '') || file.type.includes('wordprocessingml');
+  /** The format of `formats` a file is of, when it is of one. */
+  const formatOf = (file: { name?: string; type: string }) => (isDocxFile(file) ? undefined : options.formats?.find((format) => format.test({ name: file.name ?? '', type: file.type })));
+  /** What draws a file that is not a picture, for its thumbnail: Rebodocs for a Word document, or its format. */
+  const drawerOf = (file: { name?: string; type: string }) => (isDocxFile(file) ? options.pictureDocument : formatOf(file)?.picture);
   const madeHere = (file: File): ('pictures' | 'text')[] => {
-    const isDocx = /\.docx$/i.test(file.name) || file.type.includes('wordprocessingml');
+    const isDocx = isDocxFile(file);
     const picture = /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(file.type);
     const textual = /^text\/|^application\/(json|xml|csv)/.test(file.type) || TEXT_EXTENSIONS.includes(splitName(file.name).ext.slice(1).toLowerCase());
-    return [...(picture || (isDocx && options.pictureDocument) ? (['pictures'] as const) : []), ...(textual || (isDocx && options.textDocument) ? (['text'] as const) : [])];
+    const reads = isDocx ? options.textDocument : formatOf(file)?.text;
+    return [...(picture || drawerOf(file) ? (['pictures'] as const) : []), ...(textual || reads ? (['text'] as const) : [])];
   };
   const picturesOf = async (file: Blob & { name?: string }, images: DriveSettings['images']): Promise<MadeRendition[]> => {
-    const document = options.pictureDocument;
-    const isDocx = /\.docx$/i.test(file.name ?? '') || file.type.includes('wordprocessingml');
-    if (!isDocx) return renditionsOf(file, images);
+    const document = drawerOf(file);
+    if (!isDocxFile(file) && !document) return renditionsOf(file, images);
     if (!document || !images.enabled || file.size > PREVIEW_LIMIT) return [];
     const sizes = [...new Set(THUMB_SIZES.map((wanted) => images.sizes.find((size) => size >= wanted) ?? images.sizes[images.sizes.length - 1]))];
     // A page is mostly text, which WebP keeps sharper and lighter than JPEG, by a third; JPEG where the browser makes no WebP.
@@ -622,7 +649,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
    */
   const keepPictures = async (file: FileEntry, bytes: ArrayBuffer) => {
     const images = settings?.settings.images;
-    if (!options.pictureDocument || !images?.enabled) return;
+    if (!drawerOf(file) || !images?.enabled) return;
     try {
       const version = file.versions[0].id;
       const made = await picturesOf(Object.assign(new Blob([bytes], { type: file.type }), { name: file.name }), images);
@@ -732,20 +759,53 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   };
 
+  /** The pictures a format drew of files that had none kept, by version: null while it is drawn, an Error when it could not be. */
+  const drawn = new Map<string, { src: string; wide: boolean } | null | Error>();
+  /** The thumbnail of a file of a format, drawn here once when it has no picture kept, and kept then for the next time. */
+  const drawnThumb = (file: FileEntry, draw: NonNullable<FileFormat['picture']>, fit: 'page' | 'width'): Child | undefined => {
+    // Shown from its top left corner, where a sheet starts; one lying down, as a slide, whole.
+    if (file.versions[0].size > PREVIEW_LIMIT) return undefined;
+    const key = `${file.id}:${file.versions[0].id}`;
+    const url = urlOf(file);
+    if (url && !drawn.has(key)) {
+      drawn.set(key, null);
+      fetch(url)
+        .then((answer) => answer.arrayBuffer())
+        .then(async (bytes) => {
+          const blob = await draw(new Uint8Array(bytes), THUMB_SIZES[THUMB_SIZES.length - 1], 'image/png', 0.9);
+          const bitmap = await createImageBitmap(blob);
+          const wide = bitmap.width > bitmap.height * 1.2;
+          bitmap.close();
+          void keepPictures(file, bytes);
+          return { src: URL.createObjectURL(blob), wide };
+        })
+        .then(
+          (picture) => (drawn.set(key, picture), render()),
+          (error: Error) => (drawn.set(key, error), render()),
+        );
+    }
+    const picture = drawn.get(key);
+    if (picture instanceof Error) return undefined;
+    return h(
+      'div',
+      { key: `drawn:${key}:${fit}`, class: `rf-doc-thumb rf-fit-${picture?.wide ? 'page rf-wide' : 'cover'}`, 'aria-hidden': 'true' },
+      picture && h('img', { class: 'rf-doc-pic', src: picture.src, alt: '' }),
+    );
+  };
+
   const docThumb = (file: FileEntry, fit: 'page' | 'width', wanted = 640): Child | undefined => {
-    if (kindOf(file) !== 'docx') return undefined;
+    const draw = kindOf(file) === 'docx' ? undefined : formatOf(file)?.picture;
+    if (kindOf(file) !== 'docx' && !draw) return undefined;
     // The picture made of its first page when it was uploaded, when there is one: nothing to draw.
     const renditions = file.versions[0].renditions;
     if (renditions?.length) {
       const src = urlOf(file, wanted);
       // A page lying down is shown whole: its top would be a strip.
-      const wide = renditions[0].width > renditions[0].height;
-      return h(
-        'div',
-        { key: `pic:${file.id}:${fit}`, class: `rf-doc-thumb rf-fit-${wide ? 'page' : fit}${wide ? ' rf-wide' : ''}`, 'aria-hidden': 'true' },
-        src && h('img', { class: 'rf-doc-pic', src, alt: '' }),
-      );
+      const wide = renditions[0].width > renditions[0].height * (draw ? 1.2 : 1);
+      const shown = wide ? 'page' : draw ? 'cover' : fit;
+      return h('div', { key: `pic:${file.id}:${fit}`, class: `rf-doc-thumb rf-fit-${shown}${wide ? ' rf-wide' : ''}`, 'aria-hidden': 'true' }, src && h('img', { class: 'rf-doc-pic', src, alt: '' }));
     }
+    if (draw) return drawnThumb(file, draw, fit);
     const make = options.thumbDocument;
     if (!make || file.versions[0].size > PREVIEW_LIMIT) return undefined;
     const key = `${file.id}:${file.versions[0].id}`;
@@ -1037,7 +1097,10 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
   const madeOf = (file: File) => ({
     images: settings?.settings.images,
     renditions: picturesOf,
-    text: (blob: Blob, name: string) => textOf(blob, name, options.textDocument),
+    text: async (blob: Blob, name: string) => {
+      const read = formatOf({ name, type: blob.type })?.text;
+      return read ? read(new Uint8Array(await blob.arrayBuffer())) : textOf(blob, name, options.textDocument);
+    },
     madeHere: madeHere(file),
   });
   const uploader = createUploads(client, {
@@ -1123,7 +1186,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
     );
   /** A file's own thumbnail made small, for a row of the list: its picture, its first page, its first lines; a folder's tile. */
   /** Whether a file is shown by a picture: a picture, or one with smaller pictures of it, as the server makes of a PDF. */
-  const pictured = (file: FileEntry, kind: Kind) => kind === 'image' || (kind !== 'docx' && Boolean(file.versions[0].renditions?.length));
+  const pictured = (file: FileEntry, kind: Kind) => kind === 'image' || (kind !== 'docx' && !formatOf(file) && Boolean(file.versions[0].renditions?.length));
   const rowThumb = (entry: Entry) => {
     if (entry.kind === 'folder') return tile(entry);
     const kind = kindOf(entry);
@@ -3730,6 +3793,32 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
         h('p', null, why),
         button(withIcon('download', t('download')), () => void attempt(() => downloadEach([file])), { class: 'rf-btn rf-primary' }),
       );
+    const shows = formatOf(file)?.view;
+    if (shows) {
+      const url = urlOf(file);
+      if (!url) return h('div', { class: 'rf-view-wait' }, t('loading'));
+      // Shown by its format, in an element of its own that the drive does not draw again.
+      return h('div', {
+        key: `format:${url}`,
+        class: 'rf-view-pages',
+        'data-own': true,
+        mount: (node: HTMLElement) => {
+          undoDocument();
+          fetch(url)
+            .then((answer) => answer.arrayBuffer())
+            .then((bytes) => shows(node, new Uint8Array(bytes), { language: locale }))
+            .then(
+              (shown) => {
+                const handle = typeof shown === 'function' ? { destroy: shown } : shown;
+                if (viewing !== file.id) return handle?.destroy();
+                shownDocument = handle;
+                render();
+              },
+              () => node.replaceChildren(h('p', { class: 'rf-view-cut' }, t('couldNotRead'))),
+            );
+        },
+      });
+    }
     if (kind === 'image') {
       const url = urlOf(file, 2048);
       return url
@@ -4121,7 +4210,7 @@ export function mountDrive(element: HTMLElement, given: DriveOptions = {}): Moun
                 'label',
                 { class: 'rf-swatch-custom', title: t('customColour') },
                 h('span', { class: 'rf-sr' }, t('customColour')),
-                h('input', { type: 'color', value: drive.brand ?? '#0e7c52', onChange: (event: Event) => saveDrive({ brand: (event.target as HTMLInputElement).value }) }),
+                h('input', { type: 'color', value: drive.brand ?? '#c2410c', onChange: (event: Event) => saveDrive({ brand: (event.target as HTMLInputElement).value }) }),
               ),
             ),
             low && h('p', { class: 'rf-set-hint rf-set-warn' }, t('lowContrast')),

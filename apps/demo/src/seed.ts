@@ -67,13 +67,13 @@ export async function seed(): Promise<{ drive: Drive; blobs: Map<string, Blob> }
     'logo-mark.png',
     'f3',
     await picture('image/png', (ctx, w, h) => {
-      ctx.fillStyle = '#e3f4ea';
+      ctx.fillStyle = '#fcebdd';
       ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#0e7c52';
+      ctx.fillStyle = '#c2410c';
       ctx.beginPath();
       ctx.roundRect(w / 2 - 110, h / 2 - 80, 220, 160, 28);
       ctx.fill();
-      ctx.fillStyle = '#e3f4ea';
+      ctx.fillStyle = '#fcebdd';
       ctx.beginPath();
       ctx.roundRect(w / 2 - 70, h / 2 - 40, 140, 90, 12);
       ctx.fill();

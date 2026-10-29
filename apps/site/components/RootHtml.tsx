@@ -29,7 +29,7 @@ export function rootMetadata(locale: Locale): Metadata {
     keywords: ['file manager', 'file drive', 'React file manager', 'S3 file browser', 'headless', 'uploads', 'open source'],
   };
 }
-export const viewport: Viewport = { themeColor: '#0e7c52' };
+export const viewport: Viewport = { themeColor: '#c2410c' };
 
 /** The page itself, in its language: each language has a root of its own, so that each says its own `lang`. */
 export function RootHtml({ locale, children }: { locale: Locale; children: ReactNode }) {

@@ -8,7 +8,9 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./rebodocs": "./src/rebodocs.ts"
+    "./rebodocs": "./src/rebodocs.ts",
+    "./reboslides": "./src/reboslides.ts",
+    "./rebosheets": "./src/rebosheets.ts"
   },
   "dependencies": {
     "@rebofiles/core": "0.12.0",
@@ -18,13 +20,25 @@
     "@rebodocs/core": ">=0.12.0",
     "@rebodocs/viewer": ">=0.12.0",
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "@reboslides/core": "*",
+    "@reboslides/viewer": "*",
+    "@rebosheets/viewer": "*"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {
       "optional": true
     },
     "@rebodocs/viewer": {
+      "optional": true
+    },
+    "@reboslides/core": {
+      "optional": true
+    },
+    "@reboslides/viewer": {
+      "optional": true
+    },
+    "@rebosheets/viewer": {
       "optional": true
     }
   },

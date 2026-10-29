@@ -8,11 +8,11 @@ export function GET() {
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '72px 80px', background: '#fbfaf7', color: '#2f2e2b' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
         <svg width="84" height="84" viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="2" y="2" width="28" height="28" rx="8" fill="#E3F4EA" />
+          <rect x="2" y="2" width="28" height="28" rx="8" fill="#FCEBDD" />
           <path
             d="M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z"
             fill="none"
-            stroke="#0E7C52"
+            stroke="#C2410C"
             strokeWidth="1.8"
             strokeLinejoin="round"
           />
@@ -25,7 +25,7 @@ export function GET() {
       </div>
       <div style={{ display: 'flex', gap: 14 }}>
         {['React', 'Headless hooks', 'S3 · disk', 'SQLite · Postgres', 'MCP'].map((tag) => (
-          <span key={tag} style={{ padding: '10px 20px', borderRadius: 999, background: '#e3f4ea', color: '#0e7c52', fontSize: 26, fontWeight: 600 }}>
+          <span key={tag} style={{ padding: '10px 20px', borderRadius: 999, background: '#fcebdd', color: '#c2410c', fontSize: 26, fontWeight: 600 }}>
             {tag}
           </span>
         ))}

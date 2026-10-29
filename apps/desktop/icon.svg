@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 32 32">
   <title>ReboFiles</title>
-  <rect x="2" y="2" width="28" height="28" rx="8" fill="#E3F4EA"/>
-  <path d="M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z" fill="none" stroke="#0E7C52" stroke-width="1.8" stroke-linejoin="round"/>
+  <rect x="2" y="2" width="28" height="28" rx="8" fill="#FCEBDD"/>
+  <path d="M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z" fill="none" stroke="#C2410C" stroke-width="1.8" stroke-linejoin="round"/>
 </svg>

@@ -5,17 +5,17 @@ import { DEMOS, DOCS, GET_STARTED, NPM_ORG, REBODOCS, REPO, STATUS } from '@/lib
 import { LanguageSwitcher } from '../LanguageSwitcher';
 
 const ghost = 'rounded-lg px-3 py-2 text-ink transition-colors hover:bg-hover';
-export const primary = 'bg-brand font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(14,124,82,0.22)]';
+export const primary = 'bg-brand font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(194, 65, 12,0.22)]';
 
 /** Rebodocs' tile with a folder in place of a page. */
 export function Logo({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="2" y="2" width="28" height="28" rx="8" fill="#E3F4EA" />
+      <rect x="2" y="2" width="28" height="28" rx="8" fill="#FCEBDD" />
       <path
         d="M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z"
         fill="none"
-        stroke="#0E7C52"
+        stroke="#C2410C"
         strokeWidth="1.8"
         strokeLinejoin="round"
       />

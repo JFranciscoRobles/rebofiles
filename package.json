@@ -30,6 +30,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "sample": "vite-node tools/sample.ts --",
+    "link-engines": "node tools/link-engines.mjs",
     "build:packages": "npm run build -w @rebofiles/core -w @rebofiles/server -w @rebofiles/drive -w @rebofiles/react -w @rebofiles/mcp -w @rebofiles/sync",
     "test:browser": "playwright test --project=chrome",
     "changeset": "changeset",

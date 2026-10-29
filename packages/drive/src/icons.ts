@@ -72,11 +72,11 @@ export function logo(size = 24): SVGElement {
   return s(
     'svg',
     { width: size, height: size, viewBox: '0 0 32 32', 'aria-hidden': 'true', focusable: 'false' },
-    s('rect', { x: 2, y: 2, width: 28, height: 28, rx: 8, fill: '#E3F4EA' }),
+    s('rect', { x: 2, y: 2, width: 28, height: 28, rx: 8, fill: '#FCEBDD' }),
     s('path', {
       d: 'M9 11.5a1.5 1.5 0 0 1 1.5-1.5h3.6l1.8 2h5.6a1.5 1.5 0 0 1 1.5 1.5v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 9 20Z',
       fill: 'none',
-      stroke: '#0E7C52',
+      stroke: '#C2410C',
       'stroke-width': 1.8,
       'stroke-linejoin': 'round',
     }),

@@ -1,7 +1,7 @@
 // How the drive looks, as one stylesheet scoped to `.rf-drive`. Its colours,
 // radii and fonts are custom properties: an application changes them on the
 // element, or on a class of its own, and leaves the rest. The values are the
-// suite's (Rebodocs' neutrals and pastels) with ReboFiles' emerald; the dark
+// suite's (Rebodocs' neutrals and pastels) with ReboFiles' orange; the dark
 // ones, for `theme="dark"` or `"auto"` on a dark system, are the same pairs
 // made light on dark, each read at 4.5:1 or more as the light ones are.
 
@@ -25,7 +25,7 @@ const folderColours = (dark: boolean) =>
 /** The colours that change with the theme, dark. */
 const DARK = `
   ${folderColours(true)}
-  --rf-brand: #4cc995; --rf-brand-hover: #74d8ad; --rf-brand-light: #17382a; --rf-focus: #2f8a62; --rf-on-brand: #0d1f17;
+  --rf-brand: #fb923c; --rf-brand-hover: #fdba74; --rf-brand-light: #3b2216; --rf-focus: #c2410c; --rf-on-brand: #2a1206;
   --rf-docs: #8ab4f8; --rf-docs-hover: #aecbfa; --rf-on-docs: #0d1a2e;
   --rf-ink: #ecebe7; --rf-ink-soft: #d2d0ca; --rf-muted: #a9a69f; --rf-faint: #6f6c66;
   --rf-surface: #161514; --rf-hover: #2a2926; --rf-border: #33312d; --rf-border-strong: #46433d; --rf-divider: #2a2926;
@@ -40,7 +40,7 @@ const DARK = `
 
 export const CSS = `
 .rf-drive {
-  --rf-brand: #0e7c52; --rf-brand-hover: #095c3c; --rf-brand-light: #e3f4ea; --rf-focus: #8fd3ae;
+  --rf-brand: #c2410c; --rf-brand-hover: #9a3412; --rf-brand-light: #fcebdd; --rf-focus: #f5b48a;
   --rf-docs: #0b57d0; --rf-docs-hover: #08398a;
   --rf-ink: #2f2e2b; --rf-ink-soft: #4a4843; --rf-muted: #6b6964; --rf-faint: #9b9890;
   --rf-surface: #f7f6f3; --rf-hover: #f1f0ec; --rf-border: #eae8e3; --rf-border-strong: #dddad3; --rf-divider: #f0eee9;
@@ -233,6 +233,7 @@ ${Object.keys(FOLDERS)
 /* Over the rules of pictures in a preview and in a card, which fill their box. */
 .rf-doc-thumb img.rf-doc-pic { position: absolute; left: 50%; top: -1%; width: 122%; max-width: none; height: auto; max-height: none; object-fit: initial; transform: translateX(-50%); border-radius: 0; }
 .rf-doc-thumb.rf-fit-page img.rf-doc-pic { left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; transform: none; }
+.rf-doc-thumb.rf-fit-cover img.rf-doc-pic { left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; transform: none; }
 .rf-doc-thumb.rf-wide { background: none; }
 .rf-doc-thumb.rf-wide img.rf-doc-pic { left: 4%; top: 4%; width: 92%; height: 92%; filter: drop-shadow(0 1px 3px rgba(var(--rf-shade),.22)); }
 .rf-doc-thumb .dx-page { box-shadow: 0 1px 3px rgba(var(--rf-shade),.18); pointer-events: none; }
@@ -381,7 +382,7 @@ ${Object.keys(FOLDERS)
 .rf-view-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.08); }
 .rf-view .rf-btn.rf-icon { color: #ecebe7; border-radius: 10px; }
 .rf-view .rf-btn.rf-icon:hover { background: rgba(255,255,255,.1); }
-.rf-view :focus-visible { outline: none; box-shadow: 0 0 0 3px #8fd3ae; }
+.rf-view :focus-visible { outline: none; box-shadow: 0 0 0 3px #f5b48a; }
 .rf-view-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rf-view-title strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-view-title span { font-size: 12px; color: #a9a69f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -730,7 +731,7 @@ ${Object.keys(FOLDERS)
 .rf-swatches > button { padding: 3px; border: 2px solid transparent; border-radius: 50%; background: none; }
 .rf-swatches > button[aria-pressed='true'] { border-color: var(--rf-ink); }
 .rf-swatch { display: block; width: 28px; height: 28px; border-radius: 50%; }
-.rf-swatch-own { background: conic-gradient(#0e7c52 0 50%, #4cc995 0); }
+.rf-swatch-own { background: conic-gradient(#c2410c 0 50%, #fb923c 0); }
 .rf-swatch-custom { position: relative; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: conic-gradient(#e11d48, #f59e0b, #10b981, #0ea5e9, #8b5cf6, #e11d48); cursor: pointer; }
 .rf-swatch-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .rf-swatch-custom:focus-within { box-shadow: 0 0 0 3px var(--rf-focus); }

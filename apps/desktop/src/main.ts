@@ -235,13 +235,13 @@ function style() {
     .connect .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
     .connect small { font-weight: 400; color: #5c6b63; }
     .connect input { font: inherit; font-weight: 400; padding: 10px 12px; border-radius: 10px; border: 1px solid #b9c7bf; background: #fff; color: inherit; }
-    .connect input:focus { outline: none; border-color: #0e7c52; box-shadow: 0 0 0 3px #0e7c5233; }
-    .connect button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 999px; border: 0; background: #0e7c52; color: #fff; align-self: flex-start; }
+    .connect input:focus { outline: none; border-color: #c2410c; box-shadow: 0 0 0 3px #c2410c33; }
+    .connect button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 999px; border: 0; background: #c2410c; color: #fff; align-self: flex-start; }
     .connect button:disabled { opacity: 0.7; }
     .connect .error { color: #b3261e; min-height: 1.2em; }
     .sync-chip { position: fixed; left: 14px; bottom: 12px; z-index: 50; font: 600 12px system-ui, sans-serif; padding: 6px 12px; border-radius: 999px; border: 1px solid #b9c7bf; background: #fff; color: #1d2a23; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sync-chip[data-state='running']::before { content: '⟳ '; }
-    .sync-chip[data-state='idle']::before { content: '✓ '; color: #0e7c52; }
+    .sync-chip[data-state='idle']::before { content: '✓ '; color: #c2410c; }
     .sync-chip[data-state='problem'] { color: #b3261e; border-color: #e3a7a2; }
     .sync-dialog { border: 0; border-radius: 16px; padding: 24px; width: min(460px, calc(100vw - 32px)); box-sizing: border-box; font: 14px system-ui, sans-serif; }
     .sync-dialog::backdrop { background: #0006; }
@@ -251,7 +251,7 @@ function style() {
     .sync-dialog .field { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
     .sync-dialog input { font: inherit; font-weight: 400; padding: 10px 12px; border-radius: 10px; border: 1px solid #b9c7bf; }
     .sync-dialog .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-    .sync-dialog button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 999px; border: 0; background: #0e7c52; color: #fff; }
+    .sync-dialog button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 999px; border: 0; background: #c2410c; color: #fff; }
     .sync-dialog button.quiet { background: transparent; color: #1d2a23; border: 1px solid #b9c7bf; }
     @media (prefers-color-scheme: dark) {
       .connect p, .connect small { color: #a9b8b0; }

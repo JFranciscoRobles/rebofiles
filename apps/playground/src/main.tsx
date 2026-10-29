@@ -1,5 +1,6 @@
 // The playground: the whole drive, against the backend of `server/dev.ts`,
-// with Word documents previewed and opened in Rebodocs. Saving in the editor
+// with Word documents previewed and opened in Rebodocs, and decks and
+// workbooks drawn by ReboSlides and Rebosheets (`npm run link-engines` first). Saving in the editor
 // keeps a new version of the file in the drive.
 // `?lang=es` shows it in Spanish, `?view=grid` starts with the grid.
 // `?theme=dark` (or `auto`) shows it dark.
@@ -13,6 +14,8 @@
 import type { FileEntry } from '@rebofiles/core';
 import { type DriveControls, type DriveState, DriveProvider, FileDrive, type Section, SharedLink, createDriveClient } from '@rebofiles/react';
 import { compareDocx, newDocx, pictureOfDocx, previewDocx, textOfDocx, thumbDocx, viewDocx } from '@rebofiles/react/rebodocs';
+import { sheetsFormat } from '@rebofiles/react/rebosheets';
+import { slidesFormat } from '@rebofiles/react/reboslides';
 import { StrictMode, Suspense, lazy, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -66,6 +69,9 @@ function HostBar({ controls, state }: { controls: { current: DriveControls | nul
   );
 }
 
+/** Decks and workbooks: their thumbnails and their viewers. */
+const FORMATS = [slidesFormat, sheetsFormat];
+
 function Playground() {
   const [open, setOpen] = useState<{ file: FileEntry; url: string } | null>(null);
   const controls = useRef<DriveControls>(null);
@@ -89,6 +95,7 @@ function Playground() {
         thumbDocument={thumbDocx}
         textDocument={textOfDocx}
         pictureDocument={pictureOfDocx}
+        formats={FORMATS}
         onOpenDocument={(file, url) => setOpen({ file, url })}
       />
       {open && (

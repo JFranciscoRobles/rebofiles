@@ -4,9 +4,9 @@
    there), with ReboFiles' emerald as the brand. Rebodocs' blue stays only on
    what points to Rebodocs. */
 @theme {
-  --color-brand: #0e7c52;
-  --color-brand-hover: #095c3c;
-  --color-brand-light: #e3f4ea;
+  --color-brand: #c2410c;
+  --color-brand-hover: #9a3412;
+  --color-brand-light: #fcebdd;
   --color-docs: #0b57d0;
   --color-docs-hover: #08398a;
 
@@ -58,10 +58,10 @@
   @keyframes pulse-dot {
     0%,
     100% {
-      box-shadow: 0 0 0 0 rgba(14, 124, 82, 0.25);
+      box-shadow: 0 0 0 0 rgba(194, 65, 12, 0.25);
     }
     50% {
-      box-shadow: 0 0 0 6px rgba(14, 124, 82, 0);
+      box-shadow: 0 0 0 6px rgba(194, 65, 12, 0);
     }
   }
 
@@ -119,9 +119,9 @@
 .home {
   font-family: var(--font-text);
 }
-/* The green of Rebodocs' blue ring. */
+/* The orange of Rebodocs' blue ring. */
 .home :focus-visible {
-  outline: 3px solid #8fd3ae;
+  outline: 3px solid #f5b48a;
   outline-offset: 2px;
 }
 /* The drive of the demo takes the fonts of the page. */
