@@ -1,5 +1,5 @@
 // Files shown in the drive itself, without a tab of their own: a picture, a
-// page of Markdown, a table of a CSV, code, a Word document in its pages; and
+// page of Markdown, the grid of a CSV, code, a Word document in its pages; and
 // the others before and after, with the arrows.
 
 import AxeBuilder from '@axe-core/playwright';
@@ -66,9 +66,10 @@ test('each kind shown in the viewer, the arrows going through them, no tab opene
   expect.soft(await axe(page)).toEqual([]);
 
   await page.keyboard.press('ArrowRight');
+  // Its grid by Rebosheets, read only.
   const table = page.getByRole('dialog', { name: 'd-prices.csv' });
-  await expect(table.getByRole('columnheader', { name: 'Property' })).toBeVisible();
-  await expect(table.getByRole('cell', { name: 'Casa Rivera, 3 rooms' })).toBeVisible();
+  await expect(table.getByRole('grid')).toBeVisible();
+  await expect(table.getByRole('tab')).toHaveCount(1);
 
   await table.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByRole('dialog', { name: 'e-config.json' }).locator('pre')).toContainText('"b": [');

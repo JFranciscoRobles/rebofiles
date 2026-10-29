@@ -3,7 +3,7 @@
 // @rebofiles/server and goes as it is into any server of your own.
 
 import react from '@vitejs/plugin-react';
-import { type Plugin, defineConfig, searchForWorkspaceRoot } from 'vite';
+import { type Plugin, defineConfig } from 'vite';
 
 // Another with `PORT`, as the tests in Chrome do, beside a playground already running.
 const PORT = Number(process.env.PORT) || 5180;
@@ -32,6 +32,5 @@ export default defineConfig({
   plugins: [react(), backend()],
   // Three pages: the drive in React, without a framework (vanilla.html), and built from the hooks (headless.html).
   build: { rollupOptions: { input: { main: 'index.html', vanilla: 'vanilla.html', headless: 'headless.html' } } },
-  // ReboSlides' and Rebosheets' engines are linked from the repositories beside this one (`npm run link-engines`), and served from there.
-  server: { port: PORT, strictPort: true, fs: { allow: [searchForWorkspaceRoot(process.cwd()), '../../../slides', '../../../sheets', '../../../docs'] } },
+  server: { port: PORT, strictPort: true },
 });

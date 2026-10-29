@@ -27,8 +27,11 @@ minor version (0.x.0) may change the API; such changes are listed under
   read only, with its sheets in the viewer. The pictures are made when a
   file is uploaded and kept with it; one uploaded before is drawn once and
   kept then. Also in `@rebofiles/react/reboslides` and `/rebosheets`. Their
-  engines are optional peers; `npm run link-engines` links them from
-  `../slides` and `../sheets`, and the playground uses them.
+  engines are optional peers, `@reboslides/core` and `@reboslides/viewer`
+  0.6.0 and `@rebosheets/viewer` 0.1.0 or later, installed from npm.
+- **Rebodocs 0.13.** The repository is built and tried with `@rebodocs/*`
+  0.13.0, the version ReboSlides' engine asks for, so that there is one copy
+  of Rebodocs' engine and not two.
 
 ## 0.12.0 — 2026-10-28
 

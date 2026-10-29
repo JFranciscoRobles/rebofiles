@@ -40,7 +40,7 @@ const DARK = `
 
 export const CSS = `
 .rf-drive {
-  --rf-brand: #c2410c; --rf-brand-hover: #9a3412; --rf-brand-light: #fcebdd; --rf-focus: #f5b48a;
+  --rf-brand: #c2410c; --rf-brand-hover: #9a3412; --rf-brand-light: #fdeee2; --rf-focus: #f5b48a;
   --rf-docs: #0b57d0; --rf-docs-hover: #08398a;
   --rf-ink: #2f2e2b; --rf-ink-soft: #4a4843; --rf-muted: #6b6964; --rf-faint: #9b9890;
   --rf-surface: #f7f6f3; --rf-hover: #f1f0ec; --rf-border: #eae8e3; --rf-border-strong: #dddad3; --rf-divider: #f0eee9;

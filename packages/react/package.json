@@ -21,9 +21,9 @@
     "@rebodocs/viewer": ">=0.12.0",
     "react": ">=18",
     "react-dom": ">=18",
-    "@reboslides/core": "*",
-    "@reboslides/viewer": "*",
-    "@rebosheets/viewer": "*"
+    "@reboslides/core": ">=0.6.0",
+    "@reboslides/viewer": ">=0.6.0",
+    "@rebosheets/viewer": ">=0.1.0"
   },
   "peerDependenciesMeta": {
     "@rebodocs/core": {
