@@ -9,7 +9,8 @@ minor version (0.x.0) may change the API; such changes are listed under
 ### Changed
 
 - **ReboFiles is orange.** Its brand colour goes from emerald to orange
-  (#c2410c, #9a3412 under the pointer, #fcebdd for what is on), so that
+  (#c2410c, #9a3412 under the pointer, #fdeee2 for what is on, light
+  enough for the orange on it to read at 4.5:1), so that
   green is Rebosheets' in the suite: in the drive's `--rf-brand` tokens,
   light and dark, the logo, the site, the demos and the desktop app. A page
   that wants the old colour sets `--rf-brand: #0e7c52` again.
