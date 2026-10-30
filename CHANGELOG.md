@@ -4,6 +4,16 @@ Every package of ReboFiles is released at the same version. Before 1.0, a
 minor version (0.x.0) may change the API; such changes are listed under
 **Changed** with what to do about them.
 
+## Unreleased
+
+### Changed
+
+- **Decks shown with ReboSlides 0.7.** The drive is tried and built on
+  `@reboslides/core` and `@reboslides/viewer` 0.7, whose classes are under
+  `rsl-` and no longer meet Rebosheets' `rs-` in the same page. The peers
+  still take 0.6 and up; with both a deck and a workbook in a page, 0.7 is
+  the one to install.
+
 ## 0.13.0 — 2026-10-29
 
 ### Changed
